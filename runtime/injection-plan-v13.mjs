@@ -29,6 +29,9 @@ export const MARK_CLASSES = [
   'forge-composer-thread-fade',
   'forge-composer-progress-fade',
   'forge-composer-progress-pill',
+  'forge-progress-status-icon',
+  'forge-diff-added',
+  'forge-diff-removed',
   'forge-plan-pill',
   'forge-diff-summary',
   'forge-composer-submit',
@@ -201,6 +204,14 @@ function applyRuntime(payload) {
     return match;
   };
 
+  const createBackgroundImage = () => {
+    const image = document.createElement('img');
+    image.dataset.forgeBackgroundImage = '';
+    image.alt = '';
+    image.draggable = false;
+    image.decoding = 'async';
+    return image;
+  };
   const ensureBackground = () => {
     let overlay = document.getElementById('wukong-forge-background');
     if (overlay && overlay.querySelectorAll(':scope > [data-forge-background-layer]').length !== 2) {
@@ -229,8 +240,7 @@ function applyRuntime(payload) {
       const layer = document.createElement('div');
       layer.dataset.forgeBackgroundLayer = String(index);
       layer.dataset.forgeActive = 'false';
-      const image = document.createElement('i');
-      image.dataset.forgeBackgroundImage = '';
+      const image = createBackgroundImage();
       const veil = document.createElement('i');
       veil.dataset.forgeBackgroundVeil = '';
       layer.append(image, veil);
@@ -241,38 +251,65 @@ function applyRuntime(payload) {
     return overlay;
   };
 
-  const normalizeStoredCursor = value => Number.isInteger(value) && value >= -1 ? value : -1;
+  const sceneStateStorageKey = 'wukong-forge-scene-cursors-v13'; // gitleaks:allow -- public localStorage key, not a credential
+  const orderedDeckStrategy = 'ordered-v1';
+  const automaticRotationCooldownMs = 20 * 60 * 1000;
   const normalizeStoredScene = value => Number.isInteger(value) && value >= 0 ? value : null;
+  const normalizeStoredDeck = value => ({
+    strategy: value?.strategy === orderedDeckStrategy ? orderedDeckStrategy : null,
+    order: Array.isArray(value?.order)
+      ? value.order.map(normalizeStoredScene).filter(scene => scene !== null)
+      : [],
+    index: Number.isInteger(value?.index) && value.index >= 0 ? value.index : -1
+  });
   const readSceneState = () => {
-    try {
-      const parsed = JSON.parse(sessionStorage.getItem('wukong-forge-scene-cursors-v13') || '{}');
-      return {
-        cursors: {
-          battle: normalizeStoredCursor(parsed.battle),
-          scenery: normalizeStoredCursor(parsed.scenery)
-        },
-        selections: {
-          battle: normalizeStoredScene(parsed.selectedBattle),
-          scenery: normalizeStoredScene(parsed.selectedScenery)
+    let parsed = null;
+    for (const storageName of ['localStorage', 'sessionStorage']) {
+      try {
+        const value = window[storageName]?.getItem(sceneStateStorageKey);
+        if (!value) continue;
+        const candidate = JSON.parse(value);
+        if (candidate && typeof candidate === 'object') {
+          parsed = candidate;
+          break;
         }
-      };
-    } catch {
-      return {
-        cursors: { battle: -1, scenery: -1 },
-        selections: { battle: null, scenery: null }
-      };
+      } catch {
+        // Sandboxed fixture pages may disable either storage implementation.
+      }
     }
+    parsed ||= {};
+    return {
+      decks: {
+        battle: normalizeStoredDeck(parsed.backgroundDecks?.battle || parsed.decks?.battle),
+        scenery: normalizeStoredDeck(parsed.backgroundDecks?.scenery || parsed.decks?.scenery)
+      },
+      selections: {
+        battle: normalizeStoredScene(parsed.selectedBattle ?? parsed.selections?.battle),
+        scenery: normalizeStoredScene(parsed.selectedScenery ?? parsed.selections?.scenery)
+      },
+      lastAutoRotationAt: Number.isFinite(parsed.lastAutoRotationAt) && parsed.lastAutoRotationAt >= 0
+        ? parsed.lastAutoRotationAt
+        : null,
+      autoSceneryPending: parsed.autoSceneryPending === true,
+      autoSceneryReady: parsed.autoSceneryPending === true && parsed.autoSceneryReady === true
+    };
   };
-  const writeSceneState = (cursors, selections) => {
-    try {
-      sessionStorage.setItem('wukong-forge-scene-cursors-v13', JSON.stringify({
-        battle: cursors.battle,
-        scenery: cursors.scenery,
-        selectedBattle: selections.battle,
-        selectedScenery: selections.scenery
-      }));
-    } catch {
-      // Sandboxed fixture pages may disable storage.
+  const writeSceneState = sceneState => {
+    const serialized = JSON.stringify({
+      version: 3,
+      backgroundDecks: sceneState.backgroundDecks,
+      selectedBattle: sceneState.selectedScenes.battle,
+      selectedScenery: sceneState.selectedScenes.scenery,
+      lastAutoRotationAt: sceneState.lastAutoRotationAt,
+      autoSceneryPending: sceneState.autoSceneryPending,
+      autoSceneryReady: sceneState.autoSceneryReady
+    });
+    for (const storageName of ['localStorage', 'sessionStorage']) {
+      try {
+        window[storageName]?.setItem(sceneStateStorageKey, serialized);
+      } catch {
+        // Local persistence is preferred; session storage remains a fallback.
+      }
     }
   };
   const sceneList = (computed, name, sceneCount) => computed.getPropertyValue(name)
@@ -280,25 +317,83 @@ function applyRuntime(payload) {
     .split(/\s+/)
     .map(value => Number.parseInt(value, 10))
     .filter(value => Number.isInteger(value) && value >= 0 && value < sceneCount);
+  const readSceneChoices = mode => {
+    const computed = getComputedStyle(root);
+    const sceneCount = Math.max(1, Number.parseInt(computed.getPropertyValue('--forge-scene-count'), 10) || 1);
+    const sceneryScenes = sceneList(computed, '--forge-scenery-scenes', sceneCount);
+    const combinedBattleScenes = sceneList(computed, '--forge-battle-scenes', sceneCount);
+    const legacyBattleScenes = [
+      ...sceneList(computed, '--forge-battle-primary-scenes', sceneCount),
+      ...sceneList(computed, '--forge-battle-secondary-scenes', sceneCount)
+    ];
+    const choices = mode === 'battle'
+      ? (combinedBattleScenes.length ? combinedBattleScenes : legacyBattleScenes)
+      : sceneryScenes;
+    const uniqueChoices = [...new Set(choices)];
+    return uniqueChoices.length ? uniqueChoices : [0];
+  };
+  const deckMatchesChoices = (deck, choices) => (
+    deck &&
+    deck.strategy === orderedDeckStrategy &&
+    Array.isArray(deck.order) &&
+    deck.order.length === choices.length &&
+    deck.order.every((scene, index) => scene === choices[index]) &&
+    Number.isInteger(deck.index) &&
+    deck.index >= 0 &&
+    deck.index < deck.order.length
+  );
+  const ensureSceneSelection = (mode, choices, persist = true) => {
+    let changed = false;
+    let deck = state.backgroundDecks[mode];
+    if (!deckMatchesChoices(deck, choices)) {
+      const storedSelection = choices.includes(state.selectedScenes[mode])
+        ? state.selectedScenes[mode]
+        : choices[0];
+      deck = {
+        strategy: orderedDeckStrategy,
+        order: [...choices],
+        index: choices.indexOf(storedSelection)
+      };
+      state.backgroundDecks[mode] = deck;
+      state.selectedScenes[mode] = storedSelection;
+      changed = true;
+    } else if (state.selectedScenes[mode] !== deck.order[deck.index]) {
+      state.selectedScenes[mode] = deck.order[deck.index];
+      changed = true;
+    }
+    if (changed && persist) persistSceneState();
+    return state.selectedScenes[mode];
+  };
+  const stepSceneSelection = (mode, choices, direction = 1, persist = true) => {
+    ensureSceneSelection(mode, choices, false);
+    const deck = state.backgroundDecks[mode];
+    const step = direction < 0 ? -1 : 1;
+    const nextIndex = (deck.index + step + deck.order.length) % deck.order.length;
+    deck.index = nextIndex;
+    state.selectedScenes[mode] = deck.order[nextIndex];
+    if (persist) persistSceneState();
+    return state.selectedScenes[mode];
+  };
+  const advanceSceneSelection = (mode, choices, persist = true) => (
+    stepSceneSelection(mode, choices, 1, persist)
+  );
   const sourceFromCssUrl = value => {
     const trimmed = String(value || '').trim();
     if (!trimmed || trimmed === 'none') return '';
     const match = trimmed.match(/^url\((['"]?)(.*)\1\)$/s);
     return match ? match[2] : '';
   };
-  const preloadBackground = backgroundImage => {
+  const preloadBackground = (image, backgroundImage) => {
     const source = sourceFromCssUrl(backgroundImage);
-    if (!source) return Promise.resolve(false);
+    if (!(image instanceof HTMLImageElement) || !source) return Promise.resolve(false);
     const existing = state.preloadRequests.get(source);
-    if (existing) return existing.promise;
+    if (existing?.image === image) return existing.promise;
     state.preloadRequests.forEach(request => request.cancel());
-    if (state.decodedSources.has(source)) return Promise.resolve(true);
 
     let resolvePromise;
     let settled = false;
     let decodeStarted = false;
     let timeout = 0;
-    const image = new Image();
     const promise = new Promise(resolve => {
       resolvePromise = resolve;
     });
@@ -308,22 +403,29 @@ function applyRuntime(payload) {
       if (timeout) clearTimeout(timeout);
       image.onload = null;
       image.onerror = null;
-      try { image.src = ''; } catch { }
+      if (!value) {
+        try { image.removeAttribute('src'); } catch { }
+      }
       state.preloadRequests.delete(source);
       resolvePromise(value);
     };
     const request = {
+      image,
       promise,
       cancel: () => finish(false)
     };
     state.preloadRequests.set(source, request);
+    delete image.dataset.forgeDecoded;
     timeout = window.setTimeout(() => finish(false), 5000);
     const finishLoadedImage = async () => {
       if (settled || decodeStarted) return;
       decodeStarted = true;
       try { await image.decode?.(); } catch { }
       const decoded = image.naturalWidth > 0;
-      if (decoded) state.decodedSources.add(source);
+      if (decoded) {
+        image.dataset.forgeDecoded = 'true';
+        state.decodedSources.add(source);
+      }
       finish(decoded);
     };
     image.onload = () => {
@@ -364,8 +466,8 @@ function applyRuntime(payload) {
     const veil = layer.querySelector('[data-forge-background-veil]');
     layer.dataset.forgeScene = String(sceneStyle.scene);
     layer.dataset.forgeMode = sceneStyle.mode;
-    image.style.backgroundImage = sceneStyle.backgroundImage;
-    image.style.backgroundPosition = sceneStyle.backgroundPosition;
+    image.dataset.forgeBackgroundSource = sceneStyle.backgroundImage;
+    image.style.objectPosition = sceneStyle.backgroundPosition;
     image.style.setProperty('--forge-layer-brightness', sceneStyle.brightness);
     veil.style.backgroundImage = sceneStyle.veil || 'none';
   };
@@ -375,11 +477,16 @@ function applyRuntime(payload) {
     const veil = layer.querySelector('[data-forge-background-veil]');
     layer.dataset.forgeActive = 'false';
     layer.style.opacity = '0';
+    layer.style.removeProperty('z-index');
     delete layer.dataset.forgeScene;
     delete layer.dataset.forgeMode;
     if (image) {
-      image.style.backgroundImage = 'none';
-      image.style.removeProperty('background-position');
+      image.onload = null;
+      image.onerror = null;
+      try { image.removeAttribute('src'); } catch { }
+      delete image.dataset.forgeBackgroundSource;
+      delete image.dataset.forgeDecoded;
+      image.style.removeProperty('object-position');
       image.style.removeProperty('--forge-layer-brightness');
     }
     if (veil) veil.style.backgroundImage = 'none';
@@ -388,18 +495,23 @@ function applyRuntime(payload) {
     const value = getComputedStyle(root).getPropertyValue('--forge-background-transition').trim();
     if (value.endsWith('ms')) return Math.max(0, Number.parseFloat(value) || 0);
     if (value.endsWith('s')) return Math.max(0, (Number.parseFloat(value) || 0) * 1000);
-    return 220;
+    return 420;
   };
-  const commitScene = sceneStyle => {
+  const commitScene = (sceneStyle, preparedLayer = null) => {
     const overlay = ensureBackground();
     const initial = state.currentScene === null || !overlayReady();
     if (!initial && state.transitionInFlight) {
       state.pendingSceneStyle = sceneStyle;
+      if (preparedLayer && preparedLayer.dataset.forgeActive !== 'true') clearLayer(preparedLayer);
       return;
     }
     const nextIndex = initial ? 0 : (state.activeLayer === 0 ? 1 : 0);
     const previousLayer = overlay.querySelector(`[data-forge-background-layer="${state.activeLayer}"]`);
     const nextLayer = overlay.querySelector(`[data-forge-background-layer="${nextIndex}"]`);
+    if (preparedLayer && preparedLayer !== nextLayer) {
+      clearLayer(preparedLayer);
+      return;
+    }
     paintLayer(nextLayer, sceneStyle);
     root.dataset.forgeScene = String(sceneStyle.scene);
     root.dataset.forgeMode = sceneStyle.mode;
@@ -413,11 +525,13 @@ function applyRuntime(payload) {
     } else {
       state.transitionInFlight = true;
       overlay.dataset.forgeTransitioning = 'true';
+      previousLayer.style.zIndex = '1';
+      previousLayer.style.opacity = '1';
       nextLayer.dataset.forgeActive = 'false';
+      nextLayer.style.zIndex = '2';
       nextLayer.style.opacity = '0';
       nextLayer.getBoundingClientRect();
       previousLayer.dataset.forgeActive = 'false';
-      previousLayer.style.opacity = '0';
       nextLayer.dataset.forgeActive = 'true';
       nextLayer.style.opacity = '1';
     }
@@ -439,10 +553,11 @@ function applyRuntime(payload) {
         state.transitionInFlight = false;
         delete overlay.dataset.forgeTransitioning;
         clearLayer(previousLayer);
+        nextLayer.style.removeProperty('z-index');
         const pending = state.pendingSceneStyle;
         state.pendingSceneStyle = null;
         if (pending && (pending.scene !== state.currentScene || pending.mode !== state.currentMode)) {
-          commitScene(pending);
+          requestScene(pending.scene, pending.mode);
         }
       };
       const duration = transitionDuration();
@@ -451,6 +566,11 @@ function applyRuntime(payload) {
     }
   };
   const requestScene = (scene, mode, force = false) => {
+    if (document.hidden) {
+      state.hiddenDirty = true;
+      return;
+    }
+    const overlay = ensureBackground();
     const requestKey = `${mode}:${scene}:${state.overlayGeneration}`;
     if (!force && (
       (state.currentScene === scene && state.currentMode === mode) ||
@@ -458,6 +578,16 @@ function applyRuntime(payload) {
       state.requestedSceneKey === requestKey
     )) return;
     const sceneStyle = readSceneStyle(scene, mode);
+    if (state.transitionInFlight) {
+      state.pendingSceneStyle = sceneStyle;
+      return;
+    }
+    const initial = state.currentScene === null || !overlayReady();
+    const nextIndex = initial ? 0 : (state.activeLayer === 0 ? 1 : 0);
+    const nextLayer = overlay.querySelector(`[data-forge-background-layer="${nextIndex}"]`);
+    clearLayer(nextLayer);
+    paintLayer(nextLayer, sceneStyle);
+    const nextImage = nextLayer.querySelector('[data-forge-background-image]');
     state.requestedSceneKey = requestKey;
     state.requestedScene = {
       scene,
@@ -466,18 +596,30 @@ function applyRuntime(payload) {
     };
     const token = ++state.sceneRequestToken;
 
-    void preloadBackground(sceneStyle.preloadImage).then(ready => {
-      if (token !== state.sceneRequestToken) return;
+    void preloadBackground(nextImage, sceneStyle.preloadImage).then(ready => {
+      if (token !== state.sceneRequestToken) {
+        if (
+          nextLayer.dataset.forgeActive !== 'true' &&
+          nextLayer.dataset.forgeScene === String(sceneStyle.scene)
+        ) clearLayer(nextLayer);
+        return;
+      }
       state.requestedSceneKey = null;
       state.requestedScene = null;
+      if (document.hidden) {
+        clearLayer(nextLayer);
+        state.hiddenDirty = true;
+        return;
+      }
       if (!ready) {
+        clearLayer(nextLayer);
         if (state.currentScene === null) {
           state.resolveInitialReady?.(false);
           state.resolveInitialReady = null;
         }
         return;
       }
-      commitScene(sceneStyle);
+      commitScene(sceneStyle, nextLayer);
     });
   };
   const overlayReady = () => {
@@ -489,9 +631,10 @@ function applyRuntime(payload) {
       root.dataset.forgeBackgroundReady === 'true' &&
       overlay.dataset.forgeReady === 'true' &&
       active &&
-      image &&
-      image.style.backgroundImage &&
-      image.style.backgroundImage !== 'none'
+      image instanceof HTMLImageElement &&
+      Boolean(image.dataset.forgeBackgroundSource) &&
+      Boolean(image.getAttribute('src')) &&
+      image.dataset.forgeDecoded === 'true'
     );
   };
 
@@ -1012,6 +1155,17 @@ function applyRuntime(payload) {
       mark(pill, 'forge-composer-progress-pill');
       if (planPattern.test(text)) mark(pill, 'forge-plan-pill');
       if (diffPattern.test(text)) mark(pill, 'forge-diff-summary');
+      [...pill.querySelectorAll('svg')].filter(layoutPresent).forEach(icon => {
+        mark(icon, 'forge-progress-status-icon');
+      });
+      const markSmallestDelta = (pattern, className) => {
+        [...pill.querySelectorAll('*')]
+          .filter(element => pattern.test(textOf(element)))
+          .filter(element => ![...element.children].some(child => pattern.test(textOf(child))))
+          .forEach(element => mark(element, className));
+      };
+      markSmallestDelta(/^[+＋]\s*\d/u, 'forge-diff-added');
+      markSmallestDelta(/^[-−－]\s*\d/u, 'forge-diff-removed');
     });
 
     /*
@@ -1468,29 +1622,22 @@ function applyRuntime(payload) {
       reconcileMarks(plannedMarks);
     }
 
-    const computed = getComputedStyle(root);
-    const sceneCount = Math.max(1, Number.parseInt(computed.getPropertyValue('--forge-scene-count'), 10) || 1);
-    const sceneryScenes = sceneList(computed, '--forge-scenery-scenes', sceneCount);
-    const combinedBattleScenes = sceneList(computed, '--forge-battle-scenes', sceneCount);
-    const legacyBattleScenes = [
-      ...sceneList(computed, '--forge-battle-primary-scenes', sceneCount),
-      ...sceneList(computed, '--forge-battle-secondary-scenes', sceneCount)
-    ];
-    const battleScenes = [...new Set(combinedBattleScenes.length ? combinedBattleScenes : legacyBattleScenes)];
-    const choices = mode === 'battle' ? battleScenes : sceneryScenes;
-    const safeChoices = choices.length ? choices : [0];
+    const safeChoices = readSceneChoices(mode);
+    ensureSceneSelection(mode, safeChoices);
     /*
-     * Each renderer selects one scene for each semantic mode. Sidebar task
-     * switches, history/hash churn and repeated New Task clicks therefore do
-     * not decode or crossfade another full-window image. Only a real
-     * landing/thread mode change swaps the pinned battle/scenery scene.
+     * A qualifying New Task click rotates battle immediately, but scenery is
+     * consumed only after this renderer has actually observed the landing
+     * surface. This prevents a follow-up refresh of the old thread from
+     * spending the paired scenery draw before navigation has completed.
      */
-    const storedSelectionIsValid = safeChoices.includes(state.selectedScenes[mode]);
-    if (!storedSelectionIsValid) {
-      const stored = normalizeStoredCursor(state.sceneCursors[mode]);
-      state.sceneCursors[mode] = (stored + 1) % safeChoices.length;
-      state.selectedScenes[mode] = safeChoices[state.sceneCursors[mode]];
-      writeSceneState(state.sceneCursors, state.selectedScenes);
+    if (mode === 'battle' && state.autoSceneryPending && !state.autoSceneryReady) {
+      state.autoSceneryReady = true;
+      persistSceneState();
+    } else if (mode === 'scenery' && state.autoSceneryPending && state.autoSceneryReady) {
+      advanceSceneSelection('scenery', safeChoices, false);
+      state.autoSceneryPending = false;
+      state.autoSceneryReady = false;
+      persistSceneState();
     }
     state.sceneKey = `${mode}|renderer`;
     const plannedScene = state.selectedScenes[mode];
@@ -1553,8 +1700,15 @@ function applyRuntime(payload) {
     timerDueAt: 0,
     hiddenDirty: false,
     routeTimers: new Set(),
-    sceneCursors: storedSceneState.cursors,
+    backgroundDecks: storedSceneState.decks,
     selectedScenes: storedSceneState.selections,
+    lastAutoRotationAt: storedSceneState.lastAutoRotationAt,
+    autoSceneryPending: storedSceneState.autoSceneryPending,
+    autoSceneryReady: storedSceneState.autoSceneryReady,
+    pendingAutoNewTask: false,
+    pendingBackgroundMode: null,
+    pendingBackgroundDirection: 1,
+    autoRotationCooldownMs: automaticRotationCooldownMs,
     sceneKey: null,
     currentScene: null,
     currentMode: null,
@@ -1572,8 +1726,58 @@ function applyRuntime(payload) {
     renderCount: 0,
     resolveInitialReady,
     refresh,
+    nextBackground: null,
+    previousBackground: null,
     dispose: null
   };
+  const persistSceneState = () => writeSceneState(state);
+  const stepBackground = (requestedMode, direction = 1) => {
+    const mode = requestedMode === 'battle' || requestedMode === 'scenery'
+      ? requestedMode
+      : (root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery' ? 'scenery' : 'battle');
+    const step = direction < 0 ? -1 : 1;
+    if (document.hidden) {
+      if (!state.pendingAutoNewTask && state.pendingBackgroundMode === null) {
+        state.pendingBackgroundMode = mode;
+        state.pendingBackgroundDirection = step;
+      }
+      state.hiddenDirty = true;
+      return false;
+    }
+    const scene = stepSceneSelection(mode, readSceneChoices(mode), step);
+    if (root.dataset.forgeMode === mode) requestScene(scene, mode);
+    return true;
+  };
+  const nextBackground = requestedMode => stepBackground(requestedMode, 1);
+  const previousBackground = requestedMode => stepBackground(requestedMode, -1);
+  const requestAutomaticBackgroundCycle = () => {
+    if (document.hidden) {
+      state.pendingAutoNewTask = true;
+      state.pendingBackgroundMode = null;
+      state.hiddenDirty = true;
+      return false;
+    }
+    const sampledNow = Date.now();
+    const now = Number.isFinite(sampledNow) ? sampledNow : 0;
+    const lastRotation = state.lastAutoRotationAt;
+    if (
+      Number.isFinite(lastRotation) &&
+      now >= lastRotation &&
+      now - lastRotation < automaticRotationCooldownMs
+    ) return false;
+
+    const battleScene = advanceSceneSelection('battle', readSceneChoices('battle'), false);
+    state.lastAutoRotationAt = now;
+    state.autoSceneryPending = true;
+    state.autoSceneryReady = root.dataset.forgeSurface === 'landing';
+    persistSceneState();
+    if (root.dataset.forgeSurface === 'landing' && root.dataset.forgeMode === 'battle') {
+      requestScene(battleScene, 'battle');
+    }
+    return true;
+  };
+  state.nextBackground = nextBackground;
+  state.previousBackground = previousBackground;
   const scheduleRefresh = maximumDelay => {
     if (document.hidden) {
       state.hiddenDirty = true;
@@ -1606,11 +1810,26 @@ function applyRuntime(payload) {
       state.timer = 0;
       state.timerDueAt = 0;
       state.hiddenDirty = true;
+      if (state.requestedScene || state.preloadRequests.size) {
+        state.sceneRequestToken += 1;
+        state.requestedSceneKey = null;
+        state.requestedScene = null;
+        state.preloadRequests.forEach(request => request.cancel());
+        state.preloadRequests.clear();
+      }
       return;
     }
-    if (!state.hiddenDirty) return;
+    const hiddenDirty = state.hiddenDirty;
+    const pendingAutoNewTask = state.pendingAutoNewTask;
+    const pendingBackgroundMode = state.pendingBackgroundMode;
+    const pendingBackgroundDirection = state.pendingBackgroundDirection;
     state.hiddenDirty = false;
-    scheduleRefresh(0);
+    state.pendingAutoNewTask = false;
+    state.pendingBackgroundMode = null;
+    state.pendingBackgroundDirection = 1;
+    if (pendingAutoNewTask) requestAutomaticBackgroundCycle();
+    else if (pendingBackgroundMode) stepBackground(pendingBackgroundMode, pendingBackgroundDirection);
+    if (hiddenDirty || pendingAutoNewTask || pendingBackgroundMode) scheduleRefresh(0);
   };
   const queueRefreshes = delays => {
     /*
@@ -1635,6 +1854,8 @@ function applyRuntime(payload) {
     if (!target) return;
     const label = textOf(target);
     const newTask = exactNewTask(label);
+    const disabled = target.matches(':disabled, [aria-disabled="true"], [data-disabled="true"]');
+    if (newTask && !disabled) requestAutomaticBackgroundCycle();
     const composerSubmit = Boolean(target.closest('[data-thread-find-composer="true"], .composer-surface-chrome'));
     const possibleNavigation = newTask ||
       target.matches('a[href], [role="treeitem"], [aria-current], [aria-selected]') ||
@@ -1647,6 +1868,22 @@ function applyRuntime(payload) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('[data-thread-find-composer="true"], .composer-surface-chrome')) return;
     queueRefreshes([320, 1100]);
+  };
+  const scheduleBackgroundKeyboardStep = event => {
+    if (
+      event.repeat ||
+      !event.ctrlKey ||
+      !event.altKey ||
+      !(
+        String(event.key || '').toLowerCase() === 'b' ||
+        event.code === 'KeyB'
+      )
+    ) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    if (event.shiftKey) previousBackground();
+    else nextBackground();
   };
   const routeEventName = 'wukong-forge-route-v13';
   const scheduleRouteRefresh = () => queueRefreshes([160, 720]);
@@ -1817,6 +2054,7 @@ function applyRuntime(payload) {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   document.addEventListener('click', scheduleNavigationRefresh, true);
   document.addEventListener('keydown', scheduleComposerKeyboardSubmit, true);
+  document.addEventListener('keydown', scheduleBackgroundKeyboardStep, true);
   state.observer = observer;
   state.resizeObserver = resizeObserver;
   state.dispose = () => {
@@ -1828,6 +2066,7 @@ function applyRuntime(payload) {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     document.removeEventListener('click', scheduleNavigationRefresh, true);
     document.removeEventListener('keydown', scheduleComposerKeyboardSubmit, true);
+    document.removeEventListener('keydown', scheduleBackgroundKeyboardStep, true);
     observer.disconnect();
     resizeObserver?.disconnect();
     if (state.timer) clearTimeout(state.timer);
@@ -1840,6 +2079,7 @@ function applyRuntime(payload) {
     state.resolveInitialReady = null;
     state.preloadRequests.forEach(request => request.cancel());
     state.preloadRequests.clear();
+    document.querySelectorAll('#wukong-forge-background > [data-forge-background-layer]').forEach(clearLayer);
     state.routeTimers.forEach(timer => clearTimeout(timer));
     state.routeTimers.clear();
     if (history.pushState === state.patchedPushState) history.pushState = originalPushState;
@@ -1910,10 +2150,14 @@ export const THEME_STATE_EXPRESSION = `(() => {
     backgroundActiveLayer: overlay?.dataset.forgeActiveLayer || null,
     backgroundActiveScene: activeLayer?.dataset.forgeScene || null,
     backgroundActiveMode: activeLayer?.dataset.forgeMode || null,
-    backgroundActiveImage: activeImage?.style.backgroundImage || '',
+    backgroundActiveImage: activeImage?.dataset.forgeBackgroundSource || '',
     backgroundLoadedLayerCount: overlay
       ? [...overlay.querySelectorAll('[data-forge-background-image]')]
-        .filter(image => image.style.backgroundImage && image.style.backgroundImage !== 'none').length
+        .filter(image => (
+          image.dataset.forgeBackgroundSource &&
+          image.getAttribute('src') &&
+          image.dataset.forgeDecoded === 'true'
+        )).length
       : 0,
     backgroundTransitioning: overlay?.dataset.forgeTransitioning === 'true',
     backgroundReady: document.documentElement.dataset.forgeBackgroundReady === 'true' &&
@@ -1980,8 +2224,9 @@ export const ACTIVE_PROBE_EXPRESSION = `(() => {
     overlay?.dataset.forgeReady === 'true' &&
     layers.length === 2 &&
     active &&
-    image?.style.backgroundImage &&
-    image.style.backgroundImage !== 'none' &&
+    image?.dataset.forgeBackgroundSource &&
+    image.getAttribute('src') &&
+    image.dataset.forgeDecoded === 'true' &&
     nativeComposerFrames.every(
       frame => frame.classList.contains('forge-composer-frame')
     )

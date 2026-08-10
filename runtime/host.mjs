@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import net from 'node:net';
@@ -23,6 +23,7 @@ const CONTROL_TIMEOUT_MS = 12_000;
 const STARTUP_TIMEOUT_MS = 45_000;
 const INITIAL_TARGET_SETTLE_MS = 650;
 const EVENT_CHANNEL_DISCONNECT_GRACE_MS = 4_000;
+const STARTUP_TARGET_PROBE_DELAYS_MS = [120, 280, 650, 1_200, 2_400, 4_800];
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -46,15 +47,24 @@ const assertDirectPath = (candidate, label, { allowMissing = false } = {}) => {
 };
 
 export const parseHostArgs = argv => {
-  const values = { portable: false, signalDisable: false };
+  const values = { portable: false, repository: false, signalDisable: false };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
     if (flag === '--portable') values.portable = true;
+    else if (flag === '--repository') values.repository = true;
     else if (flag === '--signal-disable') values.signalDisable = true;
     else if (flag === '--root' && argv[index + 1]) values.root = argv[++index];
+    else if (flag === '--appx-activator' && argv[index + 1]) values.appxActivator = argv[++index];
+    else if (flag === '--appx-aumid' && argv[index + 1]) values.appxAumid = argv[++index];
+    else if (flag === '--appx-package' && argv[index + 1]) values.appxPackage = argv[++index];
+    else if (flag === '--appx-version' && argv[index + 1]) values.appxVersion = argv[++index];
+    else if (flag === '--appx-executable' && argv[index + 1]) values.appxExecutable = argv[++index];
     else throw Error(`Unknown or incomplete host argument: ${flag}`);
   }
-  if (!values.root) throw Error('Use --root DIR [--portable|--signal-disable].');
+  if (!values.root) throw Error('Use --root DIR [--repository|--portable|--signal-disable].');
+  if (values.portable && values.repository) {
+    throw Error('Repository and portable modes are mutually exclusive.');
+  }
   return values;
 };
 
@@ -68,11 +78,38 @@ export const deriveOfficialPaths = (nodePath = process.execPath) => {
   };
 };
 
-export const resolveHostPaths = ({ root, portable = false, env = process.env }) => {
+export const repositoryStateRoot = ({ root, env = process.env }) => {
+  const rootPath = normalizePath(root);
+  const localAppData = env.LOCALAPPDATA || path.join(
+    env.USERPROFILE || os.homedir(),
+    'AppData',
+    'Local'
+  );
+  const repositoryId = crypto
+    .createHash('sha256')
+    .update(rootPath.toLowerCase())
+    .digest('hex')
+    .slice(0, 24);
+  return normalizePath(path.join(localAppData, 'WukongCodexForge', 'repository-state', repositoryId));
+};
+
+export const resolveHostPaths = ({
+  root,
+  portable = false,
+  repository = false,
+  appxActivator = null,
+  appxAumid = null,
+  appxPackage = null,
+  appxVersion = null,
+  appxExecutable = null,
+  env = process.env
+}) => {
   const rootPath = normalizePath(root);
   const stateRoot = portable
     ? path.join(rootPath, '.wukong-runtime')
-    : path.join(env.USERPROFILE || os.homedir(), '.codex', 'themes', 'wukong-codex-forge');
+    : repository
+      ? repositoryStateRoot({ root: rootPath, env })
+      : path.join(env.USERPROFILE || os.homedir(), '.codex', 'themes', 'wukong-codex-forge');
   const profilePath = portable
     ? path.join(stateRoot, 'profile')
     : path.join(env.APPDATA || path.join(env.USERPROFILE || os.homedir(), 'AppData', 'Roaming'), 'Codex', 'web', 'Codex');
@@ -84,7 +121,12 @@ export const resolveHostPaths = ({ root, portable = false, env = process.env }) 
     eventPath: normalizePath(path.join(stateRoot, 'runtime-events.jsonl')),
     markerPath: normalizePath(path.join(rootPath, 'package.json')),
     themePath: normalizePath(path.join(rootPath, 'themes', 'active.json')),
-    stylePath: normalizePath(path.join(rootPath, 'runtime', 'forge-background-v13.css'))
+    stylePath: normalizePath(path.join(rootPath, 'runtime', 'forge-background-v13.css')),
+    appxActivatorPath: appxActivator ? normalizePath(appxActivator) : null,
+    appxAumid: appxAumid ? String(appxAumid) : null,
+    appxPackage: appxPackage ? String(appxPackage) : null,
+    appxVersion: appxVersion ? String(appxVersion) : null,
+    appxExecutable: appxExecutable ? normalizePath(appxExecutable) : null
   };
 };
 
@@ -263,6 +305,9 @@ export const createHostSignals = () => {
       terminateRequested = true;
       events.emit('change');
     },
+    requestRefresh() {
+      events.emit('change');
+    },
     confirmDisabled(result) { disabledResolve(result); },
     failDisabled(error) { disabledReject(error); }
   };
@@ -316,6 +361,9 @@ export async function runEventWatcher({
   const targetSettleMs = dependencies.targetSettleMs ?? INITIAL_TARGET_SETTLE_MS;
   const disconnectGraceMs = dependencies.disconnectGraceMs ?? EVENT_CHANNEL_DISCONNECT_GRACE_MS;
   const connectionStartupTimeoutMs = dependencies.connectionStartupTimeoutMs ?? STARTUP_TIMEOUT_MS;
+  const startupTargetProbeDelays = dependencies.startupTargetProbeDelays ?? STARTUP_TARGET_PROBE_DELAYS_MS;
+  const setTimer = dependencies.setTimeout || setTimeout;
+  const clearTimer = dependencies.clearTimeout || clearTimeout;
   const now = dependencies.now || Date.now;
 
   let expectedIdentity = null;
@@ -327,6 +375,8 @@ export async function runEventWatcher({
   let ready = false;
   let restorationInFlight = false;
   let disconnectedAt = now();
+  let startupTargetProbeIndex = 0;
+  let startupTargetProbeTimer = null;
   const settledTargets = new Set();
   let stopResolve;
   const stoppedPromise = new Promise(resolve => { stopResolve = resolve; });
@@ -335,8 +385,23 @@ export async function runEventWatcher({
     if (stopped) return;
     stopped = true;
     stopResult = result;
+    if (startupTargetProbeTimer !== null) {
+      clearTimer(startupTargetProbeTimer);
+      startupTargetProbeTimer = null;
+    }
     try { client?.close(); } catch { }
     stopResolve(result);
+  };
+
+  const scheduleStartupTargetProbe = () => {
+    if (ready || stopped || startupTargetProbeTimer !== null) return;
+    if (startupTargetProbeIndex >= startupTargetProbeDelays.length) return;
+    const waitMs = startupTargetProbeDelays[startupTargetProbeIndex++];
+    startupTargetProbeTimer = setTimer(() => {
+      startupTargetProbeTimer = null;
+      if (!ready && !stopped) scheduleReconcile();
+    }, waitMs);
+    startupTargetProbeTimer?.unref?.();
   };
 
   const reconcile = async () => {
@@ -395,7 +460,10 @@ export async function runEventWatcher({
           return;
         }
 
-        if (!targets.length) continue;
+        if (!targets.length) {
+          scheduleStartupTargetProbe();
+          continue;
+        }
         const states = [];
         for (const target of targets) {
           let active = await evaluate(target, ACTIVE_PROBE_EXPRESSION).catch(() => false);
@@ -533,6 +601,7 @@ export async function runEventWatcher({
       reconnectDelay = Math.min(900, Math.ceil(reconnectDelay * 1.7));
     }
   } finally {
+    if (startupTargetProbeTimer !== null) clearTimer(startupTargetProbeTimer);
     unsubscribe();
     requestWatch?.close();
     markerWatch?.close();
@@ -551,19 +620,27 @@ export const readDevToolsPort = ({ profilePath, notBefore = 0 }) => {
   } catch { return null; }
 };
 
-export const waitForDevToolsPort = ({ profilePath, notBefore = 0, timeoutMs = STARTUP_TIMEOUT_MS }) => {
+export const waitForDevToolsPort = ({
+  profilePath,
+  notBefore = 0,
+  timeoutMs = STARTUP_TIMEOUT_MS,
+  signals = null
+}) => {
   fs.mkdirSync(profilePath, { recursive: true });
   const current = readDevToolsPort({ profilePath, notBefore });
   if (current) return Promise.resolve(current);
+  if (signals?.disableRequested || signals?.terminateRequested) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
     let settled = false;
     let watcher = null;
     let timeout = null;
+    let unsubscribe = null;
     const finish = (error, port) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       watcher?.close();
+      unsubscribe?.();
       if (error) reject(error);
       else resolve(port);
     };
@@ -571,6 +648,12 @@ export const waitForDevToolsPort = ({ profilePath, notBefore = 0, timeoutMs = ST
       const port = readDevToolsPort({ profilePath, notBefore });
       if (port) finish(null, port);
     });
+    if (signals?.subscribe) {
+      unsubscribe = signals.subscribe(() => {
+        if (signals.disableRequested || signals.terminateRequested) finish(null, null);
+      });
+      if (signals.disableRequested || signals.terminateRequested) finish(null, null);
+    }
     timeout = setTimeout(() => finish(Error('Timed out waiting for the managed loopback channel')), timeoutMs);
   });
 };
@@ -592,8 +675,113 @@ export const findReusableDevToolsPort = async ({ profilePath, dependencies = {} 
   }
 };
 
-const spawnOfficialActivation = ({ chatGpt, profilePath, portable }) => {
+const quoteWindowsArgument = value => {
+  const argument = String(value);
+  if (argument && !/[\s"]/u.test(argument)) return argument;
+  let quoted = '"';
+  let slashes = 0;
+  for (const character of argument) {
+    if (character === '\\') {
+      slashes += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted += '\\'.repeat((slashes * 2) + 1) + '"';
+      slashes = 0;
+      continue;
+    }
+    quoted += '\\'.repeat(slashes) + character;
+    slashes = 0;
+  }
+  return quoted + '\\'.repeat(slashes * 2) + '"';
+};
+
+export const appxArgumentLine = args => args.map(quoteWindowsArgument).join(' ');
+
+export const activatePackagedChatGpt = ({
+  helperPath,
+  args,
+  aumid,
+  packageName,
+  version,
+  expectedExecutable,
+  env = process.env,
+  dependencies = {}
+}) => {
+  const run = dependencies.spawnSync || spawnSync;
+  assertDirectPath(helperPath, 'Native AppX activation helper');
+  assertDirectPath(expectedExecutable, 'Expected official ChatGPT executable');
+  if (!/^[A-Za-z0-9._-]+![A-Za-z0-9._-]+$/u.test(String(aumid || ''))) {
+    throw Error('Native AppX activation AUMID is invalid');
+  }
+  if (!String(packageName || '').trim() || !String(version || '').trim()) {
+    throw Error('Native AppX activation package evidence is incomplete');
+  }
+  const argumentLine = appxArgumentLine(args || []);
+  const argumentLineBase64 = Buffer.from(argumentLine, 'utf8').toString('base64');
+  const result = run(helperPath, [
+    '--aumid',
+    aumid,
+    '--expected-executable',
+    expectedExecutable,
+    '--package',
+    packageName,
+    '--version',
+    version,
+    '--arguments-base64',
+    argumentLineBase64
+  ], {
+    encoding: 'utf8',
+    env,
+    timeout: 20_000,
+    windowsHide: true
+  });
+  if (result.error) throw Error(`Official AppX activation failed: ${result.error.message}`);
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || '').trim().slice(-1_200);
+    throw Error(`Official AppX activation helper exited with ${result.status}${detail ? `: ${detail}` : ''}`);
+  }
+  const evidenceLine = String(result.stdout || '')
+    .split(/\r?\n/u)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .at(-1);
+  let evidence;
+  try {
+    evidence = JSON.parse(evidenceLine || '');
+  } catch {
+    throw Error('Official AppX activation helper did not return JSON evidence');
+  }
+  const pid = Number(evidence.pid);
+  const executableMatches = String(evidence.executable || '') &&
+    normalizePath(evidence.executable).toLowerCase() === normalizePath(expectedExecutable).toLowerCase();
+  if (
+    !Number.isInteger(pid) || pid <= 0 ||
+    String(evidence.aumid || '') !== String(aumid) ||
+    String(evidence.package || '') !== String(packageName) ||
+    String(evidence.version || '') !== String(version) ||
+    !executableMatches
+  ) {
+    throw Error('Official AppX activation evidence is invalid');
+  }
+  return { ...evidence, pid };
+};
+
+const spawnOfficialActivation = ({ chatGpt, profilePath, portable, paths }) => {
   const args = [...(portable ? [`--user-data-dir=${profilePath}`] : []), 'codex://launch'];
+  if (!portable) {
+    return {
+      ...activatePackagedChatGpt({
+        helperPath: paths.appxActivatorPath,
+        args,
+        aumid: paths.appxAumid,
+        packageName: paths.appxPackage,
+        version: paths.appxVersion,
+        expectedExecutable: paths.appxExecutable
+      }),
+      activationMode: 'native-appx-aumid'
+    };
+  }
   const child = spawn(chatGpt, args, {
     detached: true,
     stdio: 'ignore',
@@ -601,6 +789,7 @@ const spawnOfficialActivation = ({ chatGpt, profilePath, portable }) => {
     env: portable ? { ...process.env, CODEX_ELECTRON_USER_DATA_PATH: profilePath } : process.env
   });
   child.unref();
+  return { pid: child.pid, activationMode: 'direct-portable' };
 };
 
 const writeRuntimeEvent = (eventPath, record) => {
@@ -608,16 +797,38 @@ const writeRuntimeEvent = (eventPath, record) => {
   fs.appendFileSync(eventPath, `${JSON.stringify({ at: new Date().toISOString(), host: HOST_MARKER, ...record })}\n`, 'utf8');
 };
 
-const validateThemeRoot = ({ paths, portable }) => {
+const validateThemeRoot = ({ paths, portable, repository, official }) => {
   assertDirectPath(paths.rootPath, 'Theme root');
-  for (const required of [paths.markerPath, paths.themePath, paths.stylePath, path.join(paths.rootPath, 'runtime', 'host.mjs')]) {
+  for (const required of [
+    paths.markerPath,
+    paths.themePath,
+    paths.stylePath,
+    path.join(paths.rootPath, 'runtime', 'activate-appx.cs'),
+    path.join(paths.rootPath, 'runtime', 'host.mjs')
+  ]) {
     assertDirectPath(required, 'Managed lifecycle file');
   }
   const marker = JSON.parse(fs.readFileSync(paths.markerPath, 'utf8').replace(/^\uFEFF/, ''));
   if (marker.name !== 'wukong-codex-forge') throw Error('Theme package marker is invalid');
-  if (!portable) {
+  if (!portable && !repository) {
     const releaseMarker = path.join(path.dirname(paths.rootPath), 'release.json');
     assertDirectPath(releaseMarker, 'Managed release marker');
+  }
+  if (!portable) {
+    if (!paths.appxActivatorPath || !paths.appxExecutable) {
+      throw Error('Native AppX activation paths are missing from the verified launcher bridge');
+    }
+    assertDirectPath(paths.appxActivatorPath, 'Compiled native AppX activator');
+    assertDirectPath(paths.appxExecutable, 'Verified AppX executable');
+    if (normalizePath(paths.appxExecutable).toLowerCase() !== normalizePath(official.chatGpt).toLowerCase()) {
+      throw Error('Native AppX activation executable does not match the current official ChatGPT path');
+    }
+    if (!/^[A-Za-z0-9._-]+![A-Za-z0-9._-]+$/u.test(String(paths.appxAumid || ''))) {
+      throw Error('Native AppX activation AUMID is invalid');
+    }
+    if (!String(paths.appxPackage || '').trim() || !String(paths.appxVersion || '').trim()) {
+      throw Error('Native AppX activation package identity is incomplete');
+    }
   }
   for (const candidate of [paths.stateRoot, paths.profilePath, paths.requestDirectory]) {
     assertDirectPath(candidate, 'Managed lifecycle path', { allowMissing: true });
@@ -657,8 +868,27 @@ const createControlServer = ({ pipeName, activate, disable }) => {
   });
 };
 
-export async function runHost({ root, portable = false, signalDisable = false }) {
-  const paths = resolveHostPaths({ root, portable });
+export async function runHost({
+  root,
+  portable = false,
+  repository = false,
+  signalDisable = false,
+  appxActivator = null,
+  appxAumid = null,
+  appxPackage = null,
+  appxVersion = null,
+  appxExecutable = null
+}) {
+  const paths = resolveHostPaths({
+    root,
+    portable,
+    repository,
+    appxActivator,
+    appxAumid,
+    appxPackage,
+    appxVersion,
+    appxExecutable
+  });
   const pipeName = controlPipeName(paths.stateRoot);
   if (signalDisable) {
     try { return await sendControl(pipeName, { type: 'disable' }); }
@@ -677,18 +907,27 @@ export async function runHost({ root, portable = false, signalDisable = false })
     if (!/ENOENT|ECONNREFUSED|closed the control channel/.test(error.message)) throw error;
   }
 
-  validateThemeRoot({ paths, portable });
-  fs.mkdirSync(paths.requestDirectory, { recursive: true });
   const official = deriveOfficialPaths();
   assertDirectPath(official.embeddedNode, 'Codex embedded Node');
   assertDirectPath(official.chatGpt, 'Official ChatGPT executable');
+  validateThemeRoot({ paths, portable, repository, official });
+  fs.mkdirSync(paths.requestDirectory, { recursive: true });
 
   const signals = createHostSignals();
   let server;
   try {
     server = await createControlServer({
       pipeName,
-      activate: async () => spawnOfficialActivation({ chatGpt: official.chatGpt, profilePath: paths.profilePath, portable }),
+      activate: async () => {
+        const activation = spawnOfficialActivation({
+          chatGpt: official.chatGpt,
+          profilePath: paths.profilePath,
+          portable,
+          paths
+        });
+        signals.requestRefresh();
+        return { reason: 'activation-requested', ...activation };
+      },
       disable: async () => signals.requestDisable()
     });
   } catch (error) {
@@ -707,22 +946,45 @@ export async function runHost({ root, portable = false, signalDisable = false })
   let rootPid = null;
   let launchMode = 'reattached-live-channel';
   if (port) {
-    spawnOfficialActivation({ chatGpt: official.chatGpt, profilePath: paths.profilePath, portable });
+    const activation = spawnOfficialActivation({
+      chatGpt: official.chatGpt,
+      profilePath: paths.profilePath,
+      portable,
+      paths
+    });
+    rootPid = activation.pid;
+    launchMode = activation.activationMode === 'native-appx-aumid'
+      ? 'reactivated-official-appx'
+      : 'reactivated-portable';
   } else {
     const args = [
       '--remote-debugging-address=127.0.0.1',
       '--remote-debugging-port=0',
       ...(portable ? [`--user-data-dir=${paths.profilePath}`] : [])
     ];
-    const child = spawn(official.chatGpt, args, {
-      detached: false,
-      stdio: 'ignore',
-      windowsHide: false,
-      env: portable ? { ...process.env, CODEX_ELECTRON_USER_DATA_PATH: paths.profilePath } : process.env
-    });
-    rootPid = child.pid;
-    launchMode = 'spawned-official';
-    if (!Number.isInteger(rootPid) || rootPid <= 0) throw Error('Official ChatGPT launch process did not start');
+    if (portable) {
+      const child = spawn(official.chatGpt, args, {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+        env: { ...process.env, CODEX_ELECTRON_USER_DATA_PATH: paths.profilePath }
+      });
+      rootPid = child.pid;
+      launchMode = 'spawned-portable';
+      if (!Number.isInteger(rootPid) || rootPid <= 0) throw Error('Official ChatGPT portable launch process did not start');
+      child.unref();
+    } else {
+      const activation = activatePackagedChatGpt({
+        helperPath: paths.appxActivatorPath,
+        args,
+        aumid: paths.appxAumid,
+        packageName: paths.appxPackage,
+        version: paths.appxVersion,
+        expectedExecutable: paths.appxExecutable
+      });
+      rootPid = activation.pid;
+      launchMode = 'activated-official-appx';
+    }
   }
 
   writeRuntimeEvent(paths.eventPath, {
@@ -731,6 +993,7 @@ export async function runHost({ root, portable = false, signalDisable = false })
     appPath: paths.rootPath,
     profilePath: paths.profilePath,
     profileMode: portable ? 'isolated-portable' : 'native-default',
+    sourceMode: repository ? 'repository-live' : portable ? 'portable' : 'retained-release',
     rootPid,
     hostPid: process.pid,
     disableRequest,
@@ -741,7 +1004,33 @@ export async function runHost({ root, portable = false, signalDisable = false })
 
   let watcherPromise;
   try {
-    if (!port) port = await waitForDevToolsPort({ profilePath: paths.profilePath, notBefore: launchStarted });
+    if (!port) {
+      port = await waitForDevToolsPort({
+        profilePath: paths.profilePath,
+        notBefore: launchStarted,
+        signals
+      });
+    }
+    if (!port) {
+      const result = {
+        reason: signals.disableRequested ? 'disabled-before-channel' : 'terminated-before-channel',
+        targets: 0,
+        deferredNative: true
+      };
+      if (signals.disableRequested) signals.confirmDisabled(result);
+      writeRuntimeEvent(paths.eventPath, {
+        session,
+        state: result.reason,
+        appPath: paths.rootPath,
+        profilePath: paths.profilePath,
+        rootPid,
+        hostPid: process.pid,
+        disableRequest,
+        targets: 0,
+        deferredNative: true
+      });
+      return result;
+    }
     const expression = makeApplyExpression({
       styleSheet: fs.readFileSync(paths.stylePath, 'utf8'),
       variables: payloadFromThemeFile(paths.themePath).variables
@@ -826,6 +1115,18 @@ export async function runHost({ root, portable = false, signalDisable = false })
     });
     if (result.error) throw Error(`Lifecycle host stopped without verified native restoration: ${result.error}`);
     return result;
+  } catch (error) {
+    writeRuntimeEvent(paths.eventPath, {
+      session,
+      state: 'host-error',
+      error: error instanceof Error ? error.message : String(error),
+      appPath: paths.rootPath,
+      profilePath: paths.profilePath,
+      rootPid,
+      hostPid: process.pid,
+      ...(port ? { port } : {})
+    });
+    throw error;
   } finally {
     server.close();
     if (watcherPromise) await watcherPromise.catch(() => {});

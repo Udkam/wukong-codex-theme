@@ -10,6 +10,7 @@ import {
   RESTORE_EXPRESSION,
   THEME_STATE_EXPRESSION
 } from '../runtime/injection-plan-v13.mjs';
+import { cssFor } from '../shared/theme-model.mjs';
 import {
   runtimeFixtureHtml,
   enterThreadState,
@@ -19,17 +20,19 @@ import {
 } from './runtime-fixture.mjs';
 
 const styleSheet = fs.readFileSync(new URL('../runtime/forge-background-v13.css', import.meta.url), 'utf8');
-const tinyScene = index => {
-  const color = ['8b5e3c', '634e3e', '8a703e', '7b2929', '245868', '243c66', '55463c', '30483d', '365641', '55534f', '75463b'][index];
-  return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='18'%3E%3Crect width='32' height='18' fill='%23${color}'/%3E%3Ctext x='3' y='13' fill='white'%3E${index}%3C/text%3E%3C/svg%3E")`;
+const tinySceneSource = index => {
+  const palette = ['8b5e3c', '634e3e', '8a703e', '7b2929', '245868', '243c66', '55463c', '30483d', '365641', '55534f', '75463b'];
+  const color = palette[index % palette.length];
+  return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='18'%3E%3Crect width='32' height='18' fill='%23${color}'/%3E%3Ctext x='3' y='13' fill='white'%3E${index}%3C/text%3E%3C/svg%3E`;
 };
+const tinyScene = index => `url("${tinySceneSource(index)}")`;
 const variables = [
   ':root.forge-ink-mountain{',
   '--forge-paper:#101210;',
   '--forge-scene-count:11;',
-  '--forge-battle-scenes:0 1 2 3 4 5;',
-  '--forge-battle-primary-scenes:0 1 2;',
-  '--forge-battle-secondary-scenes:3 4 5;',
+  '--forge-battle-scenes:0 1 2 3;',
+  '--forge-battle-primary-scenes:0 1;',
+  '--forge-battle-secondary-scenes:2 3;',
   '--forge-scenery-scenes:6 7 8 9 10;',
   `--forge-ui-composer-main:${tinyScene(0)};`,
   `--forge-ui-composer-strip:${tinyScene(1)};`,
@@ -50,6 +53,20 @@ const variables = [
   ))
 ].join('');
 const expression = makeApplyExpression({ styleSheet, variables });
+const activeTheme = JSON.parse(fs.readFileSync(new URL('../themes/active.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''));
+const orderedAssets = activeTheme.background.gallery.map((scene, index) => ({
+  ...scene,
+  url: tinySceneSource(index)
+}));
+const orderedExpression = makeApplyExpression({
+  styleSheet,
+  variables: cssFor(activeTheme, orderedAssets, {}, {})
+});
+const sequenceFor = mode => activeTheme.background.gallery
+  .map((scene, index) => ({ scene, index }))
+  .filter(({ scene }) => mode === 'battle' ? scene.mode.startsWith('battle') : scene.mode === 'scenery')
+  .sort((left, right) => left.scene.order - right.scene.order)
+  .map(({ index }) => String(index));
 let browser;
 let browserServer;
 
@@ -114,6 +131,44 @@ const waitForRuntime = (page, predicate, argument) => page.waitForFunction(
   { timeout: 5000 }
 );
 
+const currentBackground = page => page.evaluate(() => {
+  const runtime = window.__wukongCodexForgeRuntimeV13;
+  return {
+    scene: String(runtime.currentScene),
+    mode: runtime.currentMode,
+    renderCount: runtime.renderCount,
+    preloadInFlight: runtime.preloadRequests.size,
+    transitioning: runtime.transitionInFlight
+  };
+});
+
+const waitForSceneChange = async (page, previousScene, expectedMode) => {
+  await page.waitForFunction(
+    ({ previous, mode }) => {
+      const runtime = window.__wukongCodexForgeRuntimeV13;
+      return runtime?.currentMode === mode &&
+        String(runtime.currentScene) !== previous &&
+        !runtime.transitionInFlight &&
+        runtime.preloadRequests.size === 0;
+    },
+    { previous: String(previousScene), mode: expectedMode },
+    { timeout: 5000 }
+  );
+  return currentBackground(page);
+};
+
+const advanceBackground = async (page, mode) => {
+  const before = await currentBackground(page);
+  assert.equal(before.mode, mode);
+  assert.equal(
+    await page.evaluate(requestedMode => (
+      window.__wukongCodexForgeRuntimeV13.nextBackground(requestedMode)
+    ), mode),
+    true
+  );
+  return waitForSceneChange(page, before.scene, mode);
+};
+
 const backgroundCoverage = page => page.evaluate(() => {
   const overlay = document.getElementById('wukong-forge-background');
   const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
@@ -129,7 +184,7 @@ const backgroundCoverage = page => page.evaluate(() => {
     active: read(active),
     image: read(image),
     veil: read(veil),
-    activeImage: image.style.backgroundImage,
+    activeImage: image.dataset.forgeBackgroundSource || '',
     layerCount: overlay.querySelectorAll(':scope > [data-forge-background-layer]').length,
     overflow: getComputedStyle(overlay).overflow,
     contain: getComputedStyle(overlay).contain
@@ -171,13 +226,11 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     JSON.stringify({ battle: -6, scenery: 'broken' })
   ));
   await page.evaluate(() => {
-    const NativeImage = window.Image;
     window.__forgePreloadImages = [];
-    window.Image = class ForgeAuditedImage extends NativeImage {
-      constructor(...args) {
-        super(...args);
-        window.__forgePreloadImages.push(this);
-      }
+    const nativeDecode = HTMLImageElement.prototype.decode;
+    HTMLImageElement.prototype.decode = function (...args) {
+      if (!window.__forgePreloadImages.includes(this)) window.__forgePreloadImages.push(this);
+      return nativeDecode.call(this, ...args);
     };
   });
 
@@ -259,8 +312,9 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
       inset: getComputedStyle(overlay).inset,
       pointerEvents: getComputedStyle(overlay).pointerEvents,
       transitionDuration: getComputedStyle(active).transitionDuration,
-      backgroundSize: getComputedStyle(image).backgroundSize,
-      backgroundPosition: getComputedStyle(image).backgroundPosition,
+      objectFit: getComputedStyle(image).objectFit,
+      objectPosition: getComputedStyle(image).objectPosition,
+      imageBackground: getComputedStyle(image).backgroundColor,
       filter: getComputedStyle(image).filter,
       transform: getComputedStyle(image).transform,
       willChange: getComputedStyle(active).willChange,
@@ -273,9 +327,10 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   assert.equal(background.position, 'fixed');
   assert.equal(background.inset, '0px');
   assert.equal(background.pointerEvents, 'none');
-  assert.equal(background.transitionDuration, '0.22s');
-  assert.equal(background.backgroundSize, 'cover');
-  assert.equal(background.backgroundPosition, '68% 50%');
+  assert.equal(background.transitionDuration, '0.42s');
+  assert.equal(background.objectFit, 'cover');
+  assert.equal(background.objectPosition, '68% 50%');
+  assert.equal(background.imageBackground, 'rgba(0, 0, 0, 0)');
   assert.equal(background.filter, 'none');
   assert.equal(background.transform, 'none');
   assert.equal(background.willChange, 'auto');
@@ -344,10 +399,9 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     root.dataset.forgeScene = originalScene;
     return matrix;
   });
-  for (const scene of ['0', '4', '8']) {
-    assert.match(landingMarkMatrix[scene].image, /(?:%3E|>)8(?:%3C|<)/);
+  for (const scene of Object.keys(landingMarkMatrix)) {
+    assert.match(landingMarkMatrix[scene].image, /(?:%3E|>)7(?:%3C|<)/);
   }
-  assert.match(landingMarkMatrix['1'].image, /(?:%3E|>)7(?:%3C|<)/);
   for (const scene of Object.values(landingMarkMatrix)) {
     assert.deepEqual(scene.rect, beforeLandingGeometry.icon);
   }
@@ -373,17 +427,37 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   assert.equal(transitionState.backgroundTransitioning, true);
   assert.equal(transitionState.preloadInFlight, 0);
   assert.equal(await page.evaluate(() => window.__forgePreloadImages.length), 2);
-  assert.ok(
-    await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
-      layers.every(layer => getComputedStyle(layer).willChange === 'opacity')
-    ))
-  );
+  const transitionLayers = await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
+    layers.map(layer => {
+      const style = getComputedStyle(layer);
+      return {
+        active: layer.dataset.forgeActive,
+        opacity: Number.parseFloat(style.opacity),
+        zIndex: Number.parseInt(style.zIndex, 10) || 0,
+        transitionDuration: style.transitionDuration,
+        transitionTimingFunction: style.transitionTimingFunction,
+        willChange: style.willChange
+      };
+    })
+  ));
+  assert.equal(transitionLayers.filter(layer => layer.willChange === 'opacity').length, 1);
+  assert.ok(transitionLayers.every(layer => layer.transitionDuration === '0.42s'));
+  assert.ok(transitionLayers.every(layer => layer.transitionTimingFunction === 'cubic-bezier(0.4, 0, 0.6, 1)'));
   await page.waitForTimeout(90);
   const midpoint = await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
-    layers.map(layer => Number.parseFloat(getComputedStyle(layer).opacity))
+    layers.map(layer => ({
+      active: layer.dataset.forgeActive,
+      opacity: Number.parseFloat(getComputedStyle(layer).opacity),
+      zIndex: Number.parseInt(getComputedStyle(layer).zIndex, 10) || 0
+    }))
   ));
-  assert.ok(midpoint.every(opacity => opacity > .03 && opacity < .97), `invalid midpoint ${midpoint}`);
-  assert.ok(Math.abs(midpoint[0] + midpoint[1] - 1) < .12, `alpha sum drifted: ${midpoint}`);
+  const incoming = midpoint.find(layer => layer.active === 'true');
+  const outgoing = midpoint.find(layer => layer.active === 'false');
+  assert.ok(incoming.opacity > .03 && incoming.opacity < .97, `invalid incoming opacity ${incoming.opacity}`);
+  assert.equal(outgoing.opacity, 1);
+  assert.ok(incoming.zIndex > outgoing.zIndex);
+  const compositeAlpha = incoming.opacity + outgoing.opacity * (1 - incoming.opacity);
+  assert.ok(compositeAlpha > .999, `crossfade exposed the backdrop: ${compositeAlpha}`);
   await waitForRuntime(page, 'scene', 6);
   const settledBackgroundState = await page.evaluate(THEME_STATE_EXPRESSION);
   assert.equal(settledBackgroundState.backgroundLoadedLayerCount, 1);
@@ -392,14 +466,14 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   const settledLayers = await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
     layers.map(layer => ({
       active: layer.dataset.forgeActive,
-      background: layer.querySelector('[data-forge-background-image]').style.backgroundImage,
+      background: layer.querySelector('[data-forge-background-image]').dataset.forgeBackgroundSource || '',
       veil: layer.querySelector('[data-forge-background-veil]').style.backgroundImage,
       willChange: getComputedStyle(layer).willChange
     }))
   ));
   assert.deepEqual(
     settledLayers[0],
-    { active: 'false', background: 'none', veil: 'none', willChange: 'auto' }
+    { active: 'false', background: '', veil: 'none', willChange: 'auto' }
   );
   assert.equal(settledLayers[1].active, 'true');
   assert.equal(settledLayers[1].background, 'var(--forge-bg-6)');
@@ -409,11 +483,11 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     await page.evaluate(() => window.__forgePreloadImages.map(image => ({
       onload: image.onload,
       onerror: image.onerror,
-      srcAttribute: image.getAttribute('src')
+      hasSource: Boolean(image.getAttribute('src'))
     }))),
     [
-      { onload: null, onerror: null, srcAttribute: '' },
-      { onload: null, onerror: null, srcAttribute: '' }
+      { onload: null, onerror: null, hasSource: false },
+      { onload: null, onerror: null, hasSource: true }
     ]
   );
   assert.equal(await page.locator('html').getAttribute('data-forge-mode'), 'scenery');
@@ -437,15 +511,10 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     const overlay = document.getElementById('wukong-forge-background');
     const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     return overlay?.querySelectorAll(':scope > [data-forge-background-layer]').length === 2 &&
-      Boolean(active?.querySelector('[data-forge-background-image]')?.style.backgroundImage);
+      Boolean(active?.querySelector('[data-forge-background-image]')?.dataset.forgeBackgroundSource);
   }, null, { timeout: 5000 });
   assert.equal(await page.evaluate(ACTIVE_PROBE_EXPRESSION), true);
 
-  assert.equal(await page.evaluate(() => {
-    const button = document.querySelector('[data-native-slot="new-task"]');
-    button?.click();
-    return Boolean(button);
-  }), true);
   await installLanding(page);
   await page.evaluate(() => {
     const stale = document.createElement('section');
@@ -505,30 +574,14 @@ test('V13 keeps native carriers painted until the first background is decoded', 
     image: getComputedStyle(element).backgroundImage
   }));
   await page.evaluate(() => {
-    window.__forgeFirstReadyImages = [];
-    window.Image = class ForgeControlledImage {
-      constructor() {
-        this.onload = null;
-        this.onerror = null;
-        this.complete = false;
-        this.naturalWidth = 0;
-        this._src = '';
-        window.__forgeFirstReadyImages.push(this);
-      }
-      set src(value) {
-        this._src = value;
-      }
-      get src() {
-        return this._src;
-      }
-      decode() {
-        return Promise.resolve();
-      }
+    window.__forgeFirstReadyDecodeResolvers = [];
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => window.__forgeFirstReadyDecodeResolvers.push(resolve));
     };
   });
 
   const applyPromise = page.evaluate(expression);
-  await page.waitForFunction(() => window.__forgeFirstReadyImages?.length === 1);
+  await page.waitForFunction(() => window.__forgeFirstReadyDecodeResolvers?.length === 1);
   const pending = await page.evaluate(ACTIVE_PROBE_EXPRESSION);
   assert.equal(pending, false);
   assert.equal(await page.locator('html').getAttribute('data-forge-background-ready'), null);
@@ -540,12 +593,7 @@ test('V13 keeps native carriers painted until the first background is decoded', 
     nativeMainPaint
   );
 
-  await page.evaluate(() => {
-    const image = window.__forgeFirstReadyImages[0];
-    image.complete = true;
-    image.naturalWidth = 32;
-    return image.onload?.();
-  });
+  await page.evaluate(() => window.__forgeFirstReadyDecodeResolvers.shift()?.());
   assert.equal(await applyPromise, true);
   assert.equal(await page.evaluate(ACTIVE_PROBE_EXPRESSION), true);
   assert.equal(await page.locator('html').getAttribute('data-forge-background-ready'), 'true');
@@ -567,25 +615,8 @@ test('V13 still waits for decode when a cached background is already complete', 
   }));
   await page.evaluate(() => {
     window.__forgeCachedDecodeResolvers = [];
-    window.Image = class ForgeCachedImage {
-      constructor() {
-        this.onload = null;
-        this.onerror = null;
-        this.complete = true;
-        this.naturalWidth = 32;
-        this._src = '';
-      }
-      set src(value) {
-        this._src = value;
-      }
-      get src() {
-        return this._src;
-      }
-      decode() {
-        return new Promise(resolve => {
-          window.__forgeCachedDecodeResolvers.push(resolve);
-        });
-      }
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => window.__forgeCachedDecodeResolvers.push(resolve));
     };
   });
 
@@ -840,7 +871,7 @@ test('V13 bounds rapid navigation follow-up timers to the latest two probes', as
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V13 ignores streaming-only DOM churn and keeps same-mode task routing on one decoded scene', async () => {
+test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decoded scene', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   await page.route('http://wukong-low-resource.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-low-resource.test/');
@@ -874,10 +905,12 @@ test('V13 ignores streaming-only DOM churn and keeps same-mode task routing on o
     'streaming text inside an established turn scheduled theme work'
   );
 
+  await page.locator('[data-app-action-sidebar-thread-row]').last().click();
   await page.evaluate(() => {
     for (let index = 0; index < 100; index += 1) {
       history.pushState({}, '', `#thread-${index}`);
     }
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
   assert.ok(await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.routeTimers.size <= 2));
   await page.waitForTimeout(1100);
@@ -889,7 +922,7 @@ test('V13 ignores streaming-only DOM churn and keeps same-mode task routing on o
       decodedSources: runtime.decodedSources.size,
       transitioning: runtime.transitionInFlight,
       loadedLayers: [...document.querySelectorAll('[data-forge-background-image]')]
-        .filter(image => image.style.backgroundImage && image.style.backgroundImage !== 'none').length
+        .filter(image => image.dataset.forgeBackgroundSource && image.getAttribute('src')).length
     };
   });
   assert.equal(afterRouting.renderCount, beforeStreaming.renderCount);
@@ -901,15 +934,18 @@ test('V13 ignores streaming-only DOM churn and keeps same-mode task routing on o
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V13 defers hidden-document theme work and resumes with one merged refresh', async () => {
+test('V51.7 merges hidden background requests and resumes with one refresh and one scene change', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   await page.route('http://wukong-hidden-resource.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-hidden-resource.test/');
   await page.evaluate(expression);
   await page.waitForTimeout(900);
-  const before = await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount);
+  const before = await currentBackground(page);
+  const beforeRefreshCount = await page.evaluate(() => (
+    window.__wukongCodexForgeRuntimeV13.refreshCount
+  ));
 
-  await page.evaluate(() => {
+  const hiddenRequests = await page.evaluate(() => {
     window.__forgeTestHidden = true;
     Object.defineProperty(document, 'hidden', {
       configurable: true,
@@ -919,29 +955,53 @@ test('V13 defers hidden-document theme work and resumes with one merged refresh'
     const submit = document.querySelector('[data-native-slot="composer-submit"]');
     submit.setAttribute('aria-disabled', 'true');
     history.pushState({}, '', '#hidden-route');
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    return [runtime.nextBackground(), runtime.nextBackground()];
   });
+  assert.deepEqual(hiddenRequests, [false, false]);
   await page.waitForTimeout(1000);
   assert.deepEqual(
     await page.evaluate(() => ({
       refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount,
-      hiddenDirty: window.__wukongCodexForgeRuntimeV13.hiddenDirty
+      renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
+      scene: String(window.__wukongCodexForgeRuntimeV13.currentScene),
+      hiddenDirty: window.__wukongCodexForgeRuntimeV13.hiddenDirty,
+      preloadInFlight: window.__wukongCodexForgeRuntimeV13.preloadRequests.size
     })),
-    { refreshCount: before, hiddenDirty: true }
+    {
+      refreshCount: beforeRefreshCount,
+      renderCount: before.renderCount,
+      scene: before.scene,
+      hiddenDirty: true,
+      preloadInFlight: 0
+    }
   );
 
   await page.evaluate(() => {
     window.__forgeTestHidden = false;
     document.dispatchEvent(new Event('visibilitychange'));
   });
-  await page.waitForFunction(expected => (
-    window.__wukongCodexForgeRuntimeV13.refreshCount === expected + 1 &&
-    window.__wukongCodexForgeRuntimeV13.hiddenDirty === false
-  ), before);
+  await page.waitForFunction(expected => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    return runtime.refreshCount === expected.refreshCount + 1 &&
+      runtime.renderCount === expected.renderCount + 1 &&
+      String(runtime.currentScene) !== expected.scene &&
+      runtime.hiddenDirty === false &&
+      !runtime.transitionInFlight &&
+      runtime.preloadRequests.size === 0;
+  }, {
+    refreshCount: beforeRefreshCount,
+    renderCount: before.renderCount,
+    scene: before.scene
+  });
   await page.waitForTimeout(700);
-  assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount),
-    before + 1
-  );
+  const resumed = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(resumed.refreshCount, beforeRefreshCount + 1);
+  assert.equal(resumed.renderCount, before.renderCount + 1);
+  assert.notEqual(resumed.scene, before.scene);
+  assert.equal(resumed.backgroundLoadedLayerCount, 1);
+  assert.equal(resumed.backgroundTransitioning, false);
+  assert.equal(resumed.preloadInFlight, 0);
   await page.evaluate(() => {
     delete document.hidden;
     delete window.__forgeTestHidden;
@@ -949,39 +1009,433 @@ test('V13 defers hidden-document theme work and resumes with one merged refresh'
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V13 pins one battle and one scenery scene per renderer without motion', async () => {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 760 }, reducedMotion: 'reduce' });
-  await page.route('http://wukong-rotation.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
-  await page.goto('http://wukong-rotation.test/');
+test('V51.7 advances on real New Task clicks only after the 20 minute cooldown and has no timer rotation', async () => {
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 760 },
+    reducedMotion: 'reduce'
+  });
+  await page.route('http://wukong-auto-rotation.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
+  await page.goto('http://wukong-auto-rotation.test/');
+  await page.evaluate(() => {
+    window.__forgeNow = 24 * 60 * 60 * 1000;
+    Date.now = () => window.__forgeNow;
+    window.__forgeIntervalCalls = 0;
+    window.__forgeLongTimeoutCalls = 0;
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    window.setInterval = () => {
+      window.__forgeIntervalCalls += 1;
+      return 1;
+    };
+    window.setTimeout = (callback, delay, ...args) => {
+      if (Number(delay) >= 20 * 60 * 1000) window.__forgeLongTimeoutCalls += 1;
+      return nativeSetTimeout(callback, delay, ...args);
+    };
+  });
   await page.evaluate(expression);
-
-  const battleScenes = ['0'];
-  const sceneryScenes = [];
-  for (let index = 0; index < 5; index += 1) {
-    await enterThreadState(page);
-    await waitForRuntime(page, 'scene', 6);
-    sceneryScenes.push(await page.locator('html').getAttribute('data-forge-scene'));
-
-    assert.equal(await page.evaluate(() => {
-      const button = document.querySelector('[data-native-slot="new-task"]');
-      button?.click();
-      return Boolean(button);
-    }), true);
-    await installLanding(page);
-    await waitForRuntime(page, 'scene', 0);
-    battleScenes.push(await page.locator('html').getAttribute('data-forge-scene'));
-  }
-
-  assert.deepEqual(battleScenes, ['0', '0', '0', '0', '0', '0']);
-  assert.deepEqual(sceneryScenes, ['6', '6', '6', '6', '6']);
-  assert.equal(new Set(battleScenes).size, 1);
-  assert.equal(new Set(sceneryScenes).size, 1);
+  await waitForRuntime(page, 'scene', 0);
   assert.ok(
     await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
       layers.every(layer => getComputedStyle(layer).transitionDuration === '0s')
     ))
   );
+
+  const initial = await currentBackground(page);
+  await page.locator('[data-native-slot="new-task"]').click();
+  const firstAdvance = await waitForSceneChange(page, initial.scene, 'battle');
+  assert.equal(firstAdvance.renderCount, initial.renderCount + 1);
+
+  await page.locator('[data-native-slot="new-task"]').click();
+  await page.waitForTimeout(650);
+  assert.deepEqual(await currentBackground(page), firstAdvance);
+
+  await page.evaluate(() => {
+    window.__forgeNow += 20 * 60 * 1000 - 1;
+  });
+  await page.locator('[data-native-slot="new-task"]').click();
+  await page.waitForTimeout(650);
+  assert.deepEqual(await currentBackground(page), firstAdvance);
+
+  await page.evaluate(() => {
+    window.__forgeNow += 1;
+  });
+  await page.locator('[data-native-slot="new-task"]').click();
+  const secondAdvance = await waitForSceneChange(page, firstAdvance.scene, 'battle');
+  assert.equal(secondAdvance.renderCount, firstAdvance.renderCount + 1);
+
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      pending: window.__wukongCodexForgeRuntimeV13.autoSceneryPending,
+      ready: window.__wukongCodexForgeRuntimeV13.autoSceneryReady
+    })),
+    { pending: true, ready: true }
+  );
+  await enterThreadState(page);
+  await page.waitForFunction(() => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    return runtime.currentMode === 'scenery' &&
+      runtime.currentScene === runtime.selectedScenes.scenery &&
+      runtime.currentScene !== 6 &&
+      runtime.autoSceneryPending === false &&
+      runtime.autoSceneryReady === false;
+  });
+  await page.waitForFunction(() => !window.__wukongCodexForgeRuntimeV13.transitionInFlight);
+
+  await page.waitForTimeout(900);
+  assert.equal(await page.evaluate(() => window.__forgeIntervalCalls), 0);
+  assert.equal(await page.evaluate(() => window.__forgeLongTimeoutCalls), 0);
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).backgroundLoadedLayerCount, 1);
+  await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V51.9 follows the complete numbered battle and scenery sequences and bounds decoded textures', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const expectedBattle = sequenceFor('battle');
+  const expectedScenery = sequenceFor('scenery');
+  assert.equal(expectedBattle.length, 13);
+  assert.equal(expectedScenery.length, 9);
+  await page.route('http://wukong-background-decks.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
+  await page.goto('http://wukong-background-decks.test/');
+  await page.evaluate(({ battle, scenery }) => {
+    localStorage.setItem('wukong-forge-scene-cursors-v13', JSON.stringify({
+      version: 2,
+      backgroundDecks: {
+        battle: { order: [...battle].reverse(), index: battle.length - 1 },
+        scenery: { order: [...scenery].reverse(), index: scenery.length - 1 }
+      },
+      selectedBattle: battle[0],
+      selectedScenery: scenery[0]
+    }));
+  }, {
+    battle: expectedBattle.map(Number),
+    scenery: expectedScenery.map(Number)
+  });
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', 0);
+
+  const initialBattle = await currentBackground(page);
+  const battleScenes = [initialBattle.scene];
+  await page.keyboard.press('Control+Alt+B');
+  await page.waitForFunction(previous => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    return String(runtime.currentScene) !== previous && runtime.transitionInFlight;
+  }, initialBattle.scene);
+  const transitionState = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(transitionState.backgroundLoadedLayerCount, 2);
+  assert.equal(transitionState.backgroundTransitioning, true);
+  assert.ok(transitionState.preloadInFlight <= 1);
+  battleScenes.push((await waitForSceneChange(page, initialBattle.scene, 'battle')).scene);
+  while (battleScenes.length < expectedBattle.length) {
+    battleScenes.push((await advanceBackground(page, 'battle')).scene);
+  }
+  assert.deepEqual(battleScenes, expectedBattle);
+  assert.equal((await advanceBackground(page, 'battle')).scene, expectedBattle[0]);
+  await page.keyboard.press('Control+Alt+Shift+B');
+  assert.equal(
+    (await waitForSceneChange(page, expectedBattle[0], 'battle')).scene,
+    expectedBattle.at(-1)
+  );
+  await page.keyboard.press('Control+Alt+B');
+  assert.equal(
+    (await waitForSceneChange(page, expectedBattle.at(-1), 'battle')).scene,
+    expectedBattle[0]
+  );
+
+  await enterThreadState(page);
+  await waitForRuntime(page, 'scene', Number(expectedScenery[0]));
+  const sceneryScenes = [(await currentBackground(page)).scene];
+  while (sceneryScenes.length < expectedScenery.length) {
+    sceneryScenes.push((await advanceBackground(page, 'scenery')).scene);
+  }
+  assert.deepEqual(sceneryScenes, expectedScenery);
+  assert.equal((await advanceBackground(page, 'scenery')).scene, expectedScenery[0]);
+  await page.keyboard.press('Control+Alt+Shift+B');
+  assert.equal(
+    (await waitForSceneChange(page, expectedScenery[0], 'scenery')).scene,
+    expectedScenery.at(-1)
+  );
+  await page.keyboard.press('Control+Alt+B');
+  assert.equal(
+    (await waitForSceneChange(page, expectedScenery.at(-1), 'scenery')).scene,
+    expectedScenery[0]
+  );
+
+  const persisted = await page.evaluate(() => JSON.parse(
+    localStorage.getItem('wukong-forge-scene-cursors-v13')
+  ));
+  assert.equal(persisted.version, 3);
+  assert.equal(persisted.backgroundDecks.battle.strategy, 'ordered-v1');
+  assert.equal(persisted.backgroundDecks.scenery.strategy, 'ordered-v1');
+  assert.deepEqual(persisted.backgroundDecks.battle.order.map(String), expectedBattle);
+  assert.deepEqual(persisted.backgroundDecks.scenery.order.map(String), expectedScenery);
+
+  const settled = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(settled.backgroundLoadedLayerCount, 1);
+  assert.equal(settled.backgroundTransitioning, false);
+  assert.equal(settled.preloadInFlight, 0);
+  await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V51.8 switches the decoded image in place on Ctrl+Alt+B without reloading the page or theme', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  await page.route('http://wukong-switch-in-place.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-switch-in-place.test/');
+  await page.evaluate(() => {
+    const nativeDecode = HTMLImageElement.prototype.decode;
+    let decodeCalls = 0;
+    window.__forgeDelayedDecodes = [];
+    HTMLImageElement.prototype.decode = function (...args) {
+      decodeCalls += 1;
+      if (decodeCalls === 1) return nativeDecode.call(this, ...args);
+      return new Promise(resolve => {
+        window.__forgeDelayedDecodes.push({ image: this, resolve });
+      });
+    };
+  });
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', 0);
+  await page.waitForTimeout(900);
+
+  const baseline = await page.evaluate(() => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const style = document.getElementById('wukong-forge-style');
+    const overlay = document.getElementById('wukong-forge-background');
+    const marks = [...document.querySelectorAll('[data-forge-mark]')];
+    window.__forgeSwitchReferences = {
+      document,
+      runtime,
+      style,
+      overlay,
+      marks,
+      styleText: style.textContent,
+      url: location.href,
+      historyLength: history.length,
+      navigationEntries: performance.getEntriesByType('navigation').length,
+      timeOrigin: performance.timeOrigin
+    };
+    window.__forgeSwitchLifecycle = {
+      beforeunload: 0,
+      pagehide: 0,
+      unload: 0,
+      load: 0,
+      pageshow: 0
+    };
+    for (const name of Object.keys(window.__forgeSwitchLifecycle)) {
+      window.addEventListener(name, () => {
+        window.__forgeSwitchLifecycle[name] += 1;
+      });
+    }
+    window.__forgeDownstreamBackgroundKeys = 0;
+    document.addEventListener('keydown', event => {
+      if (event.ctrlKey && event.altKey && event.code === 'KeyB') {
+        window.__forgeDownstreamBackgroundKeys += 1;
+      }
+    });
+    return {
+      scene: String(runtime.currentScene),
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      overlayGeneration: runtime.overlayGeneration
+    };
+  });
+
+  const repeated = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'b',
+      code: 'KeyB',
+      ctrlKey: true,
+      altKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true
+    });
+    const accepted = document.dispatchEvent(event);
+    return {
+      accepted,
+      defaultPrevented: event.defaultPrevented,
+      scene: String(window.__wukongCodexForgeRuntimeV13.currentScene),
+      renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
+      downstream: window.__forgeDownstreamBackgroundKeys
+    };
+  });
+  assert.deepEqual(repeated, {
+    accepted: true,
+    defaultPrevented: false,
+    scene: baseline.scene,
+    renderCount: baseline.renderCount,
+    downstream: 1
+  });
+  await page.evaluate(() => { window.__forgeDownstreamBackgroundKeys = 0; });
+
+  await page.keyboard.press('Control+Alt+B');
+  await page.waitForFunction(() => window.__forgeDelayedDecodes.length === 1);
+  const waiting = await page.evaluate(() => {
+    const references = window.__forgeSwitchReferences;
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const layers = [...document.querySelectorAll('[data-forge-background-layer]')].map(layer => {
+      const image = layer.querySelector('[data-forge-background-image]');
+      return {
+        active: layer.dataset.forgeActive === 'true',
+        opacity: Number.parseFloat(getComputedStyle(layer).opacity),
+        source: image.dataset.forgeBackgroundSource || '',
+        hasSource: Boolean(image.getAttribute('src')),
+        decoded: image.dataset.forgeDecoded === 'true',
+        imageBackground: getComputedStyle(image).backgroundColor
+      };
+    });
+    return {
+      sameDocument: references.document === document,
+      sameRuntime: references.runtime === runtime,
+      sameStyle: references.style === document.getElementById('wukong-forge-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameMarks: references.marks.length === document.querySelectorAll('[data-forge-mark]').length &&
+        references.marks.every((mark, index) => mark === document.querySelectorAll('[data-forge-mark]')[index]),
+      sameStyleText: references.styleText === references.style.textContent,
+      sameUrl: references.url === location.href,
+      sameHistoryLength: references.historyLength === history.length,
+      sameNavigationEntries: references.navigationEntries === performance.getEntriesByType('navigation').length,
+      sameTimeOrigin: references.timeOrigin === performance.timeOrigin,
+      lifecycle: { ...window.__forgeSwitchLifecycle },
+      downstream: window.__forgeDownstreamBackgroundKeys,
+      scene: String(runtime.currentScene),
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      overlayGeneration: runtime.overlayGeneration,
+      backgroundReady: document.documentElement.dataset.forgeBackgroundReady === 'true',
+      preloadInFlight: runtime.preloadRequests.size,
+      layers
+    };
+  });
+  assert.equal(waiting.sameDocument, true);
+  assert.equal(waiting.sameRuntime, true);
+  assert.equal(waiting.sameStyle, true);
+  assert.equal(waiting.sameOverlay, true);
+  assert.equal(waiting.sameMarks, true);
+  assert.equal(waiting.sameStyleText, true);
+  assert.equal(waiting.sameUrl, true);
+  assert.equal(waiting.sameHistoryLength, true);
+  assert.equal(waiting.sameNavigationEntries, true);
+  assert.equal(waiting.sameTimeOrigin, true);
+  assert.deepEqual(waiting.lifecycle, { beforeunload: 0, pagehide: 0, unload: 0, load: 0, pageshow: 0 });
+  assert.equal(waiting.downstream, 0);
+  assert.equal(waiting.scene, baseline.scene);
+  assert.equal(waiting.refreshCount, baseline.refreshCount);
+  assert.equal(waiting.renderCount, baseline.renderCount);
+  assert.equal(waiting.overlayGeneration, baseline.overlayGeneration);
+  assert.equal(waiting.backgroundReady, true);
+  assert.equal(waiting.preloadInFlight, 1);
+  assert.equal(waiting.layers.filter(layer => layer.active).length, 1);
+  assert.equal(waiting.layers.filter(layer => layer.decoded && layer.hasSource).length, 1);
+  const waitingIncoming = waiting.layers.find(layer => !layer.active && layer.hasSource);
+  assert.ok(waitingIncoming);
+  assert.equal(waitingIncoming.opacity, 0);
+  assert.equal(waitingIncoming.decoded, false);
+  assert.equal(waitingIncoming.imageBackground, 'rgba(0, 0, 0, 0)');
+
+  await page.evaluate(() => window.__forgeDelayedDecodes[0].resolve());
+  await page.waitForFunction(previous => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    return String(runtime.currentScene) !== previous && runtime.transitionInFlight;
+  }, baseline.scene);
+  await page.waitForTimeout(90);
+  const transitioning = await page.evaluate(() => {
+    const references = window.__forgeSwitchReferences;
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const layers = [...document.querySelectorAll('[data-forge-background-layer]')].map(layer => ({
+      active: layer.dataset.forgeActive === 'true',
+      opacity: Number.parseFloat(getComputedStyle(layer).opacity),
+      decoded: layer.querySelector('[data-forge-background-image]').dataset.forgeDecoded === 'true',
+      hasSource: Boolean(layer.querySelector('[data-forge-background-image]').getAttribute('src')),
+      imageBackground: getComputedStyle(layer.querySelector('[data-forge-background-image]')).backgroundColor
+    }));
+    return {
+      sameDocument: references.document === document,
+      sameRuntime: references.runtime === runtime,
+      sameStyle: references.style === document.getElementById('wukong-forge-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameStyleText: references.styleText === references.style.textContent,
+      lifecycle: { ...window.__forgeSwitchLifecycle },
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      overlayGeneration: runtime.overlayGeneration,
+      preloadInFlight: runtime.preloadRequests.size,
+      layers
+    };
+  });
+  assert.equal(transitioning.sameDocument, true);
+  assert.equal(transitioning.sameRuntime, true);
+  assert.equal(transitioning.sameStyle, true);
+  assert.equal(transitioning.sameOverlay, true);
+  assert.equal(transitioning.sameStyleText, true);
+  assert.deepEqual(transitioning.lifecycle, { beforeunload: 0, pagehide: 0, unload: 0, load: 0, pageshow: 0 });
+  assert.equal(transitioning.refreshCount, baseline.refreshCount);
+  assert.equal(transitioning.renderCount, baseline.renderCount + 1);
+  assert.equal(transitioning.overlayGeneration, baseline.overlayGeneration);
+  assert.equal(transitioning.preloadInFlight, 0);
+  assert.equal(transitioning.layers.filter(layer => layer.decoded && layer.hasSource).length, 2);
+  assert.ok(transitioning.layers.every(layer => layer.imageBackground === 'rgba(0, 0, 0, 0)'));
+  const incoming = transitioning.layers.find(layer => layer.active);
+  const outgoing = transitioning.layers.find(layer => !layer.active);
+  assert.ok(incoming.opacity > .03 && incoming.opacity < .97, `invalid incoming opacity ${incoming.opacity}`);
+  assert.equal(outgoing.opacity, 1);
+
+  const changed = await waitForSceneChange(page, baseline.scene, 'battle');
+  assert.notEqual(changed.scene, baseline.scene);
+  await page.waitForTimeout(800);
+  const settled = await page.evaluate(() => {
+    const references = window.__forgeSwitchReferences;
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
+    const inactiveImage = inactive.querySelector('[data-forge-background-image]');
+    return {
+      sameDocument: references.document === document,
+      sameRuntime: references.runtime === runtime,
+      sameStyle: references.style === document.getElementById('wukong-forge-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameMarks: references.marks.length === document.querySelectorAll('[data-forge-mark]').length &&
+        references.marks.every((mark, index) => mark === document.querySelectorAll('[data-forge-mark]')[index]),
+      sameStyleText: references.styleText === references.style.textContent,
+      sameUrl: references.url === location.href,
+      sameHistoryLength: references.historyLength === history.length,
+      sameNavigationEntries: references.navigationEntries === performance.getEntriesByType('navigation').length,
+      sameTimeOrigin: references.timeOrigin === performance.timeOrigin,
+      lifecycle: { ...window.__forgeSwitchLifecycle },
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      overlayGeneration: runtime.overlayGeneration,
+      transitionInFlight: runtime.transitionInFlight,
+      preloadInFlight: runtime.preloadRequests.size,
+      loadedLayers: [...document.querySelectorAll('[data-forge-background-image]')].filter(image => (
+        image.dataset.forgeBackgroundSource &&
+        image.dataset.forgeDecoded === 'true' &&
+        image.getAttribute('src')
+      )).length,
+      inactiveHasSource: Boolean(inactiveImage.getAttribute('src')),
+      inactiveTrackedSource: inactiveImage.dataset.forgeBackgroundSource || ''
+    };
+  });
+  assert.equal(settled.sameDocument, true);
+  assert.equal(settled.sameRuntime, true);
+  assert.equal(settled.sameStyle, true);
+  assert.equal(settled.sameOverlay, true);
+  assert.equal(settled.sameMarks, true);
+  assert.equal(settled.sameStyleText, true);
+  assert.equal(settled.sameUrl, true);
+  assert.equal(settled.sameHistoryLength, true);
+  assert.equal(settled.sameNavigationEntries, true);
+  assert.equal(settled.sameTimeOrigin, true);
+  assert.deepEqual(settled.lifecycle, { beforeunload: 0, pagehide: 0, unload: 0, load: 0, pageshow: 0 });
+  assert.equal(settled.refreshCount, baseline.refreshCount);
+  assert.equal(settled.renderCount, baseline.renderCount + 1);
+  assert.equal(settled.overlayGeneration, baseline.overlayGeneration);
+  assert.equal(settled.transitionInFlight, false);
+  assert.equal(settled.preloadInFlight, 0);
+  assert.equal(settled.loadedLayers, 1);
+  assert.equal(settled.inactiveHasSource, false);
+  assert.equal(settled.inactiveTrackedSource, '');
+  await page.evaluate(RESTORE_EXPRESSION);
 });
 
 test('V13 bounds pending background decoding to one request and cancels it on replacement and restore', async () => {
@@ -989,56 +1443,32 @@ test('V13 bounds pending background decoding to one request and cancels it on re
   await page.route('http://wukong-loader.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-loader.test/');
   await page.evaluate(() => {
-    window.__forgeFakeImages = [];
-    window.Image = class ForgeHangingImage {
-      constructor() {
-        this.onload = null;
-        this.onerror = null;
-        this.complete = false;
-        this.naturalWidth = 0;
-        this.canceled = false;
-        this._src = '';
-        window.__forgeFakeImages.push(this);
-      }
-      set src(value) {
-        this._src = value;
-        if (value === '') this.canceled = true;
-      }
-      get src() {
-        return this._src;
-      }
-      decode() {
-        return Promise.resolve();
-      }
+    window.__forgeDecodeControls = [];
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => window.__forgeDecodeControls.push({ image: this, resolve }));
     };
   });
   const initialApply = page.evaluate(expression);
-  await page.waitForFunction(() => window.__forgeFakeImages?.length === 1);
-  await page.evaluate(() => {
-    const initial = window.__forgeFakeImages[0];
-    initial.complete = true;
-    initial.naturalWidth = 32;
-    initial.onload?.();
-  });
+  await page.waitForFunction(() => window.__forgeDecodeControls?.length === 1);
+  await page.evaluate(() => window.__forgeDecodeControls[0].resolve());
   await initialApply;
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 0);
 
   await enterThreadState(page);
   await waitForRuntime(page, 'surface', 'thread');
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
-  assert.equal(await page.evaluate(() => window.__forgeFakeImages.length), 2);
+  assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
 
-  await page.evaluate(() => document.querySelector('[data-native-slot="new-task"]')?.click());
   await installLanding(page);
   await waitForRuntime(page, 'surface', 'landing');
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 0);
-  assert.equal(await page.evaluate(() => window.__forgeFakeImages.length), 2);
-  assert.equal(await page.evaluate(() => window.__forgeFakeImages[1].canceled), true);
+  assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
+  assert.equal(await page.evaluate(() => Boolean(window.__forgeDecodeControls[1].image.getAttribute('src'))), false);
 
   await enterThreadState(page);
   await waitForRuntime(page, 'surface', 'thread');
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
-  assert.equal(await page.evaluate(() => window.__forgeFakeImages.length), 3);
+  assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 3);
 
   await page.evaluate(() => {
     window.__retiredForgeRuntime = window.__wukongCodexForgeRuntimeV13;
@@ -1047,32 +1477,32 @@ test('V13 bounds pending background decoding to one request and cancels it on re
   assert.deepEqual(
     await page.evaluate(() => ({
       pending: window.__retiredForgeRuntime.preloadRequests.size,
-      images: window.__forgeFakeImages.map(image => ({
-        canceled: image.canceled,
-        onload: image.onload,
-        onerror: image.onerror
+      images: window.__forgeDecodeControls.map(control => ({
+        hasSource: Boolean(control.image.getAttribute('src')),
+        onload: control.image.onload,
+        onerror: control.image.onerror
       }))
     })),
     {
       pending: 0,
       images: [
-        { canceled: true, onload: null, onerror: null },
-        { canceled: true, onload: null, onerror: null },
-        { canceled: true, onload: null, onerror: null }
+        { hasSource: false, onload: null, onerror: null },
+        { hasSource: false, onload: null, onerror: null },
+        { hasSource: false, onload: null, onerror: null }
       ]
     }
   );
 });
 
-test('V13 keeps its background inert in forced-colors mode and its scene-zero veil wins appended variables', async () => {
-  assert.match(styleSheet, /html:root\.forge-ink-mountain\[data-forge-scene="0"\]/);
+test('V51.7 keeps its background inert in forced-colors mode and accepts generated per-scene veils', async () => {
+  assert.doesNotMatch(styleSheet, /html:root\.forge-ink-mountain\[data-forge-scene="0"\]/);
   const page = await browser.newPage({ viewport: { width: 1024, height: 700 } });
   await page.setContent(runtimeFixtureHtml);
   await page.evaluate(expression);
   const veil = await page.locator('html').evaluate(element => (
     getComputedStyle(element).getPropertyValue('--forge-scene-veil')
   ));
-  assert.match(veil, /rgba\(13, 15, 14, (?:0)?\.79\)/);
+  assert.match(veil, /rgba\(12,14,13,(?:0)?\.3\)/);
   await page.emulateMedia({ forcedColors: 'active' });
   assert.equal(
     await page.locator('#wukong-forge-background').evaluate(element => getComputedStyle(element).display),

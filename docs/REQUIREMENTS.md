@@ -1,6 +1,6 @@
 # 大圣归来 Codex 样式层 — 需求与验收
 
-> **V50 现行发布合同。** 下表延续 V15 的视觉/几何编号；V49 及更早证据作为历史保留，冲突处以 `CURRENT_GOAL.md`、V15-01、V15-04、V15-17、V15-40 至 V15-42 和本表为准。
+> **V51.9 现行发布合同。** 下表延续 V15 的视觉/几何编号；旧版本证据作为历史保留，冲突处以 `CURRENT_GOAL.md`、V15-01、V15-04、V15-17、V15-40 至 V15-48 和本表为准。
 
 | ID | V15 需求 | 验收方法 |
 | --- | --- | --- |
@@ -17,8 +17,8 @@
 | V15-11 | 所有输入相关纸面统一到最新参考的暖灰黄赭综合色阶，当前重建目标 `RGB(135,117,93)`、实际四类产物中位色 `RGB(131–135,111–117,86–93)`；主框、strip、pill 和 tile 必须同源重建，不能靠运行时 filter 变色 | 产物尺寸/median/std/暗纹理对比度测试，CSS fallback/filter 审计与四状态无头截图 |
 | V15-12 | 两只 Hatch Pet 必须从用户已否决的旧 canonical 完全断开：小天命人 base 同时具备正确双足与完整神锋连续链；小八戒 base 同时具备成年游戏骨相与完整、可逐枚计数的九齿钉耙；母版未过门不得生成动作 | 新 run source lock、base 四项/五项白名单、依赖任务状态和用户母版审查 |
 | V15-13 | 两只宠物的最终像素动作均不得镜像；左右跑独立生成，装备手性、武器端向与不对称衣装保持连续。小八戒 hover 为持耙捧腹大笑，小天命人运行态棍花只使用录像可证明的背面节奏 | row prompt/manifest 派生策略、逐帧武器连续性、左右手性与动作语义盲审 |
-| V15-14 | 活动背景与 UI 位图除压缩字节上限外必须有解码像素硬门：单背景 ≤12,000,000 px、图库唯一文件总计 ≤32,000,000 px、任意两张最大背景合计 ≤16,000,000 px、单 UI/装饰位图 ≤4,194,304 px；尺寸头无效或超限时必须在 payload 组装前失败 | JPEG/PNG/WebP 头解析、实际 9 图与 8 UI 资产统计、内存内 100,000×100,000 PNG 拒绝测试、最小包导入测试 |
-| V15-15 | 用户否决的 `destined-afterimage.jpg` 与 `yaksha-king-rift.jpg` 必须从 active/default/native preview/最小包全部撤下，但本地文件不得删除；活动图库固定为 2 主战斗 + 2 次级战斗 + 5 风景 | active/default 深比较、最小包排除断言、真实 Codex 截图 |
+| V15-14 | 活动背景与 UI 位图除压缩字节上限外必须有解码像素硬门：单背景 ≤12,000,000 px、图库唯一文件总计 ≤48,000,000 px、任意两张最大背景合计 ≤16,000,000 px、单 UI/装饰位图 ≤4,194,304 px；尺寸头无效或超限时必须在 payload 组装前失败 | JPEG/PNG/WebP 头解析、实际 22 图与活动 UI 资产统计、内存内 100,000×100,000 PNG 拒绝测试、最小包导入测试 |
+| V15-15 | 用户否决或明确删除的活动图必须退出 active/default/native preview/最小包，但历史源文件不得批量删除；当前图库固定为 B01–B13 十三张战斗与 S01–S09 九张风景 | active/default 深比较、22 个唯一槽位、最小包排除断言、真实 ChatGPT 截图 |
 | V15-16 | 新建页只保留“悟空”字标与“此去，欲破何局？”；原生“新建任务”和描述说明在主题激活时视觉透明，但 DOM、文本、ARIA、布局占位和停用恢复不得改变 | 首帧自动标记、computed opacity、前后 DOMRect/innerText、延迟挂载与 restore 测试 |
 | V15-17 | 主输入器的 surface、editor shell、editor、footer、按钮、padding、宽高、底部锚点和响应式结果全部沿用原生实时布局，不得声明主题比例、高度或安全内距。悟空纸张仍保持长方形，只在同一原生矩形内由 `pointer-events:none` 的 `::before` 裁出四个 8px 角；宿主不裁切，矩形命中区不变 | 360/400/560/736/1600 响应式全 DOMRect 比较、真实 renderer 主题开关前后最大差 `0`、按钮身份/layout 深比较、四角 paint 与 forced-colors 回退 |
 | V15-18 | 排队消息与进行中目标必须保留官方 above-composer stack 的真实生产拓扑：一个外层 queue panel 内含 N 个 internal queue item，再接一个外层 goal panel。只有整组首个外层 panel 拥有左上/右上两个外部角；后续外层 panel 直边承接。每个内部消息拥有独立纸纹与原生 1px 接缝，不得提升为独立外层卡片，也不得把一张总背景按条目数拉长。独立计划/变更进度 pill 仍为四周圆角 | 当前 ASAR 解包源码、guided/multi-guided fixture、outer panel / internal item 数量、固定顶饰高度、原生 gap、pill radius、相邻行与控件 DOMRect 全等 |
@@ -38,14 +38,20 @@
 | V15-32 | 用户已将两只 Hatch Pet 整体延期；当前交付不得继续修改其造型、动作、武器、图集、发布策略或本地安装状态，也不得用宠物未通过阻断其余非宠物主题与最终生命周期验收 | Git 精确路径审计、宠物目录与策略无本轮 diff、当前目标/分工/工作日志一致性 |
 | V15-33 | 正式受管启动链不得保留 PowerShell 进程或依赖固定周期 renderer target 轮询；必须使用官方包内 Node、append-only bridge 与事件驱动 host，并跟随官方 ChatGPT 根进程退出 | 快捷方式 target/arguments、bridge 源码、Target/Page/Runtime 事件合同、根进程退出、项目 host/端口归零 |
 | V15-34 | 移除保留式主题包或 package marker 后，受管 bridge 必须在下一次启动直接回退官方 `ChatGPT.exe`；恢复失败必须 fail closed，不得把残留主题写成成功 | 隔离 marker 移除/恢复、原生状态验证、无主题 DOM 标记、无残留 host/监听端口 |
-| V15-35 | 受管入口边界必须明示：安装器只接管其保存并重建的开始菜单入口；当前已打开的非受管窗口不强制重写，WindowsApps/AUMID/协议/第三方快捷方式可能绕过 | 适配器事件记录、双快捷方式一致性、便携说明与真实安装核验 |
+| V15-35 | 受管入口边界必须明示：安装器只接管其保存并重建的用户开始菜单 `ChatGPT.lnk`；当前已打开的非受管窗口不强制重写，WindowsApps/AUMID/协议/第三方快捷方式可能绕过。Store 覆盖该链接后 verifier 必须明确失败并要求修复 | 适配器事件记录、单一原生名称/图标/bridge 验证、Store 覆盖失败合同、便携说明与真实安装核验 |
 | V15-36 | 本轮最终发布门排除两个延期宠物与已取消葫芦；其余主题、资源、生命周期、文档与分段 push 完成后即可结束当前目标 | 宠物/葫芦路径零 diff、非宠物定向测试、真实单实例证据、最终 Git/远端一致性 |
 | V15-37 | 环境卡只能由最外层绘制一张连续纸面；`环境信息`、`子智能体`、`后台进程`、`来源` 标题不得另画深色标题条、阴影或独立圆角。当前 `data-thread-scroll-footer` 只允许清除其内层渐隐 paint，不得删除 sticky footer、滚动障碍或命中区 | 当前 ASAR 来源锁、7 行/3 分区/主标题 + 3 分区标题映射、标题 computed paint 透明断言、卡片/行/按钮/footer DOMRect 前后全等与整页 fixture |
 | V15-38 | 真实整页验收只能在原生侧栏范围内点击指定任务；截图前必须再次同时证明该任务仍为 current/selected，且 thread/scenery/queue/goal 门仍成立，禁止因同名工作区文本或旧任务状态生成伪通过截图 | 取证脚本静态合同、侧栏 scoped locator、截图前最终双重门禁顺序断言、失败/成功共享归零路径 |
 | V15-39 | 环境卡主标题的原生 paint 可能位于标题本体或其 `bg-token-dropdown-background` 祖先承载层；运行时必须只沿已定位标题到官方卡片的分支清除这些承载层，并同时清除主标题及三个官方 Section 直属 header 的 `::before` / `::after` paint。不得扩大到卡内其他节点，也不得改变 300px 外卡、Section、行、按钮、折叠、滚动、ARIA 或命中区 | 当前 ASAR 结构来源、带独立标题承载层与伪元素的回归夹具、注入前深色 paint 先验断言、注入后基础层/双伪元素透明断言、全部 DOMRect 与按钮命中前后全等、真实完整页复验 |
 | V15-40 | composer、submit、环境卡/行和显式 selected/current 侧栏行必须由稳定原生选择器首帧直达；React 重挂载后不得先出现原生灰面、错误选中宽度或旧选中残影，再等待 observer 修复 | 移除所有 marker 后同步克隆/重挂载，在同一 JS turn 比较 paper、箭头、环境分隔、单/多对话 selected 宽度和旧行状态 |
-| V15-41 | 每个 renderer 每种模式固定一张场景；同模式 task/project/history/hash 与流式文本变化不得换图、重解码或交叉淡变。只在 landing/thread 模式变化时执行 220ms 过渡，隐藏页面暂停刷新，恢复时合并一次 | 200 次流式 mutation、100 次 history 变化、隐藏/恢复、单请求取消、解码 URL 复用、最多两个 follow-up timer 与稳态单纹理测试 |
-| V15-42 | 正式发布必须新建时间戳 append-only release，不能用原地同步替代版本化安装；安装后两个开始菜单入口、bridge、marker 和仓库/安装 runtime 哈希必须通过 verifier。宠物批准集合为空时不得触碰既有宠物目录或状态 | `package-runtime` 目标已存在即拒绝、保留式安装输出、双入口 verifier、旧 release 原始 SHA 恢复、新 release CSS/plan SHA、宠物 no-op 输出 |
+| V15-41 | 同模式 task/project/history/hash 与流式文本变化不得自行换图、重解码或交叉淡变；背景推进只能来自 V15-46 的显式事件牌堆。landing/thread 模式变化以 420ms 单向叠化过渡到该模式当前选定场景：旧层保持完全不透明，新层置顶淡入，合成 alpha 不得下坠；隐藏页面暂停刷新，恢复时合并一次 | 200 次流式 mutation、100 次 history 变化、隐藏/恢复、单请求取消、叠化中点合成 alpha、最多两个 follow-up timer 与稳态单纹理测试 |
+| V15-42 | V50 历史正式发布必须新建时间戳 append-only release，不能用原地同步替代版本化安装；安装后两个开始菜单入口、bridge、marker 和仓库/安装 runtime 哈希必须通过 verifier。宠物批准集合为空时不得触碰既有宠物目录或状态 | `package-runtime` 目标已存在即拒绝、保留式安装输出、双入口 verifier、旧 release 原始 SHA 恢复、新 release CSS/plan SHA、宠物 no-op 输出 |
+| V15-43 | V51.3 仓库模式不得创建独立命名的 Wukong/主题入口；迁移只能在确认旧链接目标为 Codex 内置 Node、bridge 位于本项目 LocalAppData 目录后，先备份再定点删除。最终唯一入口仍启动官方 `ChatGPT.exe`，仓库缺失时回退原生 | 单入口安装/验证合同、旧入口所有权与备份先后断言、无 WMI/CIM/常驻拦截、仓库 marker 缺失回退 |
+| V15-44 | V51.4 必须让原始 Store、开始菜单与任务栏入口在保留官方 ChatGPT/Codex 名称、图标、包身份、正式 profile 和 `ChatGPT.exe` 的同时进入仓库主题链。用户级监督器只能通过 `SetWinEventHook(EVENT_OBJECT_SHOW)` 处理安装后新显示的窗口，使用 `QueryFullProcessImageNameW` 精确确认当前 `OpenAI.Codex\app\ChatGPT.exe` 后才切到 repository bridge；正式重启使用 manifest AUMID + `IApplicationActivationManager`。稳态不得使用 WMI/CIM、进程或 target 轮询、服务、计划任务、IFEO/DLL；marker 消失后必须撤销自身 HKCU Run 并退出，恢复原生。测试通过前不得触碰当前窗口或声称实机完成 | C# 编译与 WinEvent/路径/单实例/重启预算静态合同，PowerShell 5.1 解析与 AUMID/UTF-8 Base64 激活合同，installer ready/Run/state 证据，无 WMI/CIM/steady polling 扫描，聚焦与全量测试后一次受控 Store/任务栏原生入口、`renderer-verified`、marker 删除恢复闭环 |
+| V15-45 | V51.5 切换对话、托盘恢复和既有受管窗口重附着不得重启；只有所有官方进程完全退出后的原始 AUMID 冷启动可因 remote-debugging 参数无法事后加入而快速接管一次。正式激活必须由编译 `runtime/activate-appx.cs` 直接调用 `IApplicationActivationManager` 并发送 `ManagedLaunch`，不得启动 PowerShell、`Get-AppxPackage` 或 `Add-Type`。监督器对每个精确路径匹配窗口只执行一次 `HasCodexCdp`，不得保留 6 秒循环；零双启动日常入口是同名官方图标的 Start Menu `ChatGPT.lnk`。全链不得使用 WMI/CIM | 切换/托盘/managed signal 不重启合同，编译激活器与命名事件合同，单次 HasCodexCdp/无循环静态断言，同名快捷方式与官方图标验证，45/45 聚焦 + 27/27 补充定向；全量、热更新后再执行一次原始 AUMID 冷启动实机门 |
+| V15-46 | 活动 13 战斗 + 9 风景图库分别使用持久化固定编号序列：真实“新建任务”事件只在距上次自动推进至少 20 分钟时推进，`Ctrl+Alt+B` 手动推进当前模式下一张，`Ctrl+Alt+Shift+B` 手动退回当前模式上一张，两者均在本模式内循环且不受该冷却限制；普通任务/项目/history/hash/stream/resize/mutation 不推进。隐藏页只合并一次待请求并在恢复后执行；不得新增 interval、轮询、WMI/CIM、PowerShell 或进程，且继续满足单解码请求、稳态单纹理和过渡双纹理上限 | 两组完整 B01–B13/S01–S09 双向顺序与回绕测试、旧牌堆迁移、冷却边界、两组手动快捷键、隐藏/恢复合并、preload/layer 资源遥测与静态无 interval/WMI/CIM 扫描 |
+| V15-47 | `Ctrl+Alt+B` 与 `Ctrl+Alt+Shift+B` 必须在同一 document、主题 runtime、style、overlay 与主题标记节点上原位切换当前模式的下一张或上一张，不得改变 battle/scenery 模式，也不得触发页面导航、页面或主题 reload、主题 refresh 或重建；目标图必须由最终绘制的同一 DOM `<img>` 自身完成 decode 后才淡入，等待期间旧图保持可见，新图底色透明，命中的快捷键不得继续传播。稳态一纹理、过渡双纹理与单一在途解码上限保持不变 | 两组真实键盘输入、双向回绕、延迟 decode、document/runtime/style/overlay/标记引用全等、URL/history/navigation/lifecycle 零变化、refresh/render/generation 计数、等待/过渡/稳态图层与透明底色合同 |
+| V15-48 | 新增背景不得通过运行时亮度/饱和度/对比度滤镜改色；只允许确定性裁边、等比缩放与 JPEG 编码。战斗与风景的 per-scene veil 应尽量降低，但每张场景在 tone + 双层场景 veil + 模式横纵遮罩模型下的正文对比不得低于 4.5:1；不能直接比较不同 tone 的原始 veil 数值来判断最终亮度 | 源资产与输出尺寸/字节、脚本四边裁切边界、22 场景逐项对比度、battle/scenery 最终背景亮度、无图片 filter 静态合同与实机视觉验收 |
 
 V50 当前证据边界：保留式 release `0.13.0-20260808-121354` 已新建并通过双入口 verifier；仓库与安装副本的 CSS/注入计划 SHA-256 一致，旧 `0.13.0-20260803-191843` 中曾用于验收同步的两份文件已按其安装时 Git 检查点恢复原始 SHA。同一个真实 `2050×1106 @ 125%` 任务中已同时出现 queue/goal、300px 环境卡与四角长方形输入器；原生/主题 surface 均为 `736×98px`，完整比较最大 DOMRect 差为 `0`，四角 paint 保留。核心联合合同 45/45、非宠物增量 19/19、UI 材质 4/4 通过。不包含两只延期宠物或已取消葫芦。
 
@@ -53,7 +59,7 @@ V50 当前证据边界：保留式 release `0.13.0-20260808-121354` 已新建并
 
 V15-05 / V15-16 当前技术候选使用官方“悟空”书法生成 336×336 深/浅透明 WebP，分别约 25–34 KiB；以原生 56×56 槽位为锚点绘制 168×168 视觉层，有效边界约为 141×96 px。官方源 SHA、四边透明、上移量、深浅场景映射、原生 host 几何不变、两行原生文本视觉隐藏与最小包门禁进入定向测试；最新四战斗场景无头证据为 `artifacts/test-runs/v16-landing-threefold-20260728T3/`，仍待用户实机视觉验收。
 
-V15-14 / V15-15 当前实测：9 张唯一活动背景共 19,258,880 px，最大两张合计 4,743,680 px；8 张活动 UI WebP 单张最大 580,608 px。除用户指定的 2560×1043 杨戬超宽构图外，其余活动背景均至少 1920×1080；低分辨率 `great-sage-return.jpg`、被否决候选与夜叉王裂焰图均不进入运行包。
+V15-14 / V15-15 当前实测：22 张唯一活动背景共 45,201,592 px、8,355,513 bytes，最大两张合计 5,337,600 px；8 张活动 UI WebP 单张最大 580,608 px。活动背景满足 960p-wide、批准的超宽构图或明确的源分辨率例外；低分辨率历史 `great-sage-return.jpg`、被否决候选与夜叉王裂焰图均不进入运行包。
 
 V50 输入器当前技术候选已通过定向运行时与真实 renderer 几何合同：surface、editor shell、editor、footer、按钮和 padding 完全沿用原生，只在同一矩形内绘制四个角。V22 joined stack 的“一个 queue 外层面板 + N 个内部消息叶片 + 一个 goal 外层面板”生产拓扑继续有效；guided / multi-guided 夹具证明新增消息只增加内部纸纹叶片，整组首个外层面板才拥有两个上角，后续目标层直边承接，独立 pill 全圆。V17/V20 的主题高度比例与 V21 的“每条消息一个 outer panel”继续保留为已被取代的历史证据。
 

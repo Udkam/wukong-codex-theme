@@ -1965,6 +1965,82 @@ test('V16 maps the native guided stack once and remaps context without a resize 
   await page.close();
 });
 
+test('V51.7 strengthens progress status contrast without moving native content', async () => {
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 820 },
+    deviceScaleFactor: nativeUiBaseline.rendererDeviceScaleFactor
+  });
+  await page.route('http://wukong-v51-progress.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-v51-progress.test/');
+  await installComposerState(page, 'guided');
+
+  const readProgressParts = () => {
+    const pill = document.querySelector('[data-fixture-control="plan"]');
+    const icon = pill.querySelector('svg');
+    const textParts = [...pill.querySelectorAll('span')];
+    const added = textParts.find(element => /^[+\uFF0B]\s*\d/u.test(element.textContent.trim()));
+    const removed = textParts.find(element => /^[-\u2212\uFF0D]\s*\d/u.test(element.textContent.trim()));
+    const rectOf = element => {
+      const rect = element.getBoundingClientRect();
+      return [rect.x, rect.y, rect.width, rect.height];
+    };
+    return {
+      pill: rectOf(pill),
+      icon: rectOf(icon),
+      added: rectOf(added),
+      removed: rectOf(removed)
+    };
+  };
+  const before = await page.evaluate(readProgressParts);
+
+  await page.evaluate(expression);
+  await page.waitForFunction(() => (
+    document.querySelectorAll('.forge-progress-status-icon').length === 1 &&
+    document.querySelectorAll('.forge-diff-added').length === 1 &&
+    document.querySelectorAll('.forge-diff-removed').length === 1
+  ));
+
+  const after = await page.evaluate(readProgressParts);
+  for (const [part, beforeRect] of Object.entries(before)) {
+    after[part].forEach((value, index) => {
+      assert.ok(
+        Math.abs(value - beforeRect[index]) <= .25,
+        `${part} rect[${index}] changed from ${beforeRect[index]} to ${value}`
+      );
+    });
+  }
+
+  const paint = await page.evaluate(() => {
+    const icon = document.querySelector('.forge-progress-status-icon');
+    const circle = icon.querySelector('circle');
+    const added = document.querySelector('.forge-diff-added');
+    const removed = document.querySelector('.forge-diff-removed');
+    return {
+      iconColor: getComputedStyle(icon).color,
+      circleStroke: getComputedStyle(circle).stroke,
+      circleStrokeWidth: getComputedStyle(circle).strokeWidth,
+      addedColor: getComputedStyle(added).color,
+      removedColor: getComputedStyle(removed).color,
+      addedStrokeWidth: getComputedStyle(added).webkitTextStrokeWidth,
+      removedStrokeWidth: getComputedStyle(removed).webkitTextStrokeWidth
+    };
+  });
+  assert.equal(paint.iconColor, 'rgb(6, 63, 97)');
+  assert.equal(paint.circleStroke, 'rgb(6, 63, 97)');
+  assert.equal(paint.circleStrokeWidth, '1.65px');
+  assert.equal(paint.addedColor, 'rgb(6, 69, 33)');
+  assert.equal(paint.removedColor, 'rgb(120, 23, 24)');
+  assert.equal(paint.addedStrokeWidth, '0.18px');
+  assert.equal(paint.removedStrokeWidth, '0.18px');
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  assert.equal(await page.locator('[data-forge-mark]').count(), 0);
+  await page.close();
+});
+
 test('V38 clears only the source-backed thread footer fade without changing native geometry', async () => {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 820 },

@@ -1,60 +1,48 @@
-Wukong Codex Forge 0.13.0 - release candidate
+Wukong Codex Forge 0.14.7
 
-CURRENT V34 RELEASE CANDIDATE
+CURRENT V51.9 ORDERED 22-BACKGROUND GALLERY
 
-1. Keep this extracted directory intact.
-2. The formal Start Menu chain is: Codex embedded Node -> append-only bridge -> event-driven lifecycle host -> official ChatGPT. It does not keep PowerShell alive and does not use a periodic renderer-target poll.
-3. The active theme preserves the native Codex layout, wording, DOM order and hit boxes while repainting existing full-window backgrounds, landing mark, sidebar/top-bar entries, composer, queued-message/goal stack, progress pill and Environment card.
-4. New-task pages use the battle pool and conversation pages use the scenery pool. Stable states hold one decoded texture; a bounded crossfade holds at most two, with no preload, permanent filter or permanent will-change.
-5. The composer is the approved short scroll shape, about 736 x 100 CSS pixels at the maximum native column width. A queue remains one native outer panel with one paper leaf per message, followed by the native goal panel; only the first outer panel has the two external top corners.
-6. Pets are deferred and excluded from this release gate. releasedPetIds is empty; startup preserves all existing Codex pet directories, selection, payloads and metadata without installing or modifying a candidate.
-7. No ChatGPT.exe, app.asar, WindowsApps file or official configuration is modified. No source or existing local file is deleted, moved or overwritten.
+This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
 
-The event host follows the official ChatGPT root process, subscribes to browser Target/Page/Runtime events, and exits when that root exits. Removing the retained theme package makes the append-only bridge fall back to the official native ChatGPT executable on the next managed launch. Direct WindowsApps/AUMID/protocol/third-party entries can bypass this managed Start Menu chain. The currently open unmanaged Codex window is never force-rewritten.
+INSTALL AND START
 
-The two deferred pets and the canceled gourd are not part of this release gate. Retained release 0.13.0-20260801-144611 is installed, both managed Start Menu entries use the Codex embedded Node bridge, and focused lifecycle/restore contracts pass 23/23 with the minimal package contract at 1/1. Fixture screenshots remain technical evidence rather than user visual approval; the only remaining gate is one complete-page managed Codex capture with queue/goal state, followed by exact root/host/port cleanup.
+1. Exit ChatGPT completely before the first managed launch, including its tray/background instance.
+2. Run install-theme.cmd once from this repository-backed package.
+3. Run start-theme.cmd. The visible process and window remain the official ChatGPT application.
+4. After installation, use the Start Menu entry named ChatGPT with the official icon. Normal task switching and tray restore do not require a restart.
+5. If the Store package updates or repairs its shortcut, run install-theme.cmd again.
 
-HISTORICAL V12 INSTRUCTIONS (retained; superseded above)
+BACKGROUND CONTRACT
 
-1. Keep this extracted directory intact.
-2. Double-click start-theme.cmd once. It starts the managed theme path and safely adapts the user's normal Start Menu ChatGPT shortcut.
-3. V12 changes only the full-window background in the active runtime. It does not style the sidebar, top bar, Environment card, messages, composer or buttons.
-4. New-task pages rotate through the battle pool. Conversation pages rotate through the scenery pool. Both layers use cover and a bounded crossfade.
-5. Composer redesigns remain review-only until explicitly approved; no rejected V1, V2 or V3 composer asset is injected.
-6. Double-click stop-theme.cmd to restore the open managed renderer to native appearance. No file is deleted.
-7. If this extracted theme directory is absent, the retained launch bridge starts the official Store ChatGPT.exe in native mode.
+The runtime keeps a 22-image gallery (13 battle + 9 scenery) in persistent numbered sequences. Manual switching never shuffles or repeats randomly:
 
-Native Hatch Pet release state is controlled by pets/release-policy.json. No rebuilt base currently has explicit user approval, so the released set is empty and startup preserves every existing Codex pet directory, selection, payload, and metadata record without creating or changing anything. Once a future base is approved, its stable discovery directory and hash-versioned payload junctions will retain every prior payload append-only.
+B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13
+S01 -> S02 -> S03 -> S04 -> S05 -> S06 -> S07 -> S08 -> S09
 
-The currently open unmanaged Codex window is not force-closed or rewritten. Installing 0.11.0 updates the retained package and Start Menu bridge for the next managed launch; it does not modify ChatGPT.exe, app.asar, WindowsApps or official configuration.
+Ctrl+Alt+B advances the visible mode by one slot, while Ctrl+Alt+Shift+B moves back by one slot. Both shortcuts wrap only within the current battle or scenery sequence. They do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. A real New Task action may auto-advance only after the 20-minute cooldown. Ordinary task/history/hash/stream/resize/mutation activity does not rotate backgrounds. There is no timer rotation, steady poll, WMI/CIM query, service, or scheduled task.
 
-HISTORICAL V11 INSTRUCTIONS (retained; superseded above)
+The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
 
-1. Keep this extracted directory intact.
-2. Double-click start-theme.cmd once. It starts a themed Codex window and safely adapts the user's normal Start Menu ChatGPT shortcut.
-3. Later launches from that normal ChatGPT shortcut use this theme automatically while this directory exists.
-4. Double-click stop-theme.cmd to restore the open themed renderer to native appearance. No file is deleted.
-5. If this extracted theme directory is absent, the retained short launch bridge dynamically starts the current official Store ChatGPT.exe in native mode.
+CUSTOM BACKGROUNDS
 
-V11 keeps the native Codex layout and wording, but replaces the shapes and materials of existing sidebar actions, the composer, the send control and the Environment card. It uses one full-window cover background with per-scene contrast and keeps assistant answers frameless. It adds no theme sidebar, footer, toggle, status panel, label or emoji.
+Run scripts\prepare-background.ps1 with -Slot B01..B13 or S01..S09 and -InputPath. The script accepts B01..B99 and S01..S99 for future manifest expansion. Existing slots require -Force. The script leaves the source file unchanged, does not upscale, and defaults to a maximum 1920x1080 JPEG at quality 90. Optional CropTop/CropRight/CropBottom/CropLeft values remove source-image borders before scaling. Transparent pixels are placed on black. themes\active.json is the only active manifest. Playback order is controlled by each entry's matching slot/order pair; numbering must stay unique and contiguous inside each mode. To add a scene, prepare the next B or S file and append a complete gallery entry. See README.md for examples and the 48,000,000 decoded-pixel budget.
 
-Little Wukong and Little Bajie are being rebuilt as Codex v2 Hatch Pet packages, not static page overlays. Wukong uses the Destined One's Yaksha's Outrage Armor and the correct Beast Staff Shenfeng. Bajie follows the official INART 1/12 figure with a friendlier face and a complete nine-toothed rake. Neither unapproved historical package is included in this portable runtime, and the page theme does not include a gourd motif.
+After replacing a background, run stop-theme.cmd and then start-theme.cmd to reload the same reusable official renderer. If no reusable managed channel remains, exit ChatGPT completely and start it once through the managed ChatGPT entry.
 
-The pet installer validates the packaged release policy before resolving or creating the active Codex pets directory. With the current empty approved set it exits without creating a discovery folder, junction, event log, or Codex home. Future approved packages will use real discovery folders and nested payload junctions without Administrator or Developer Mode; no ChatGPT application file is modified.
+LIFECYCLE AND RESTORE
 
-The adapter preserves every prior shortcut in append-only history before changing it. It does not modify ChatGPT.exe, app.asar, WindowsApps, signatures or Codex config.toml. It does not install a service or startup task. The watcher exits after roughly 13.6 seconds without any Codex renderer. If Windows hides the window but retains its renderer in the tray process, the same watcher remains bound; launching ChatGPT again reopens that exact profile through the official launch route.
-It uses the Node runtime already bundled with the official Microsoft Store Codex package and a dependency-free loopback protocol client; no npm install is required.
-Runtime profile, requests and events stay under .wukong-runtime inside this extracted directory. Versioned shortcut backups and bridge scripts stay under %USERPROFILE%\.codex\themes\wukong-codex-forge\history so that no previous content is overwritten or deleted.
+The formal daily path is:
 
-Direct execution of the WindowsApps ChatGPT.exe, Store AUMID, protocol links or third-party shortcuts bypasses the safe adapter and launches the official native app.
+Codex embedded Node -> repository bridge -> event-driven lifecycle host -> official ChatGPT
 
-HISTORICAL 0.8.0 INSTRUCTIONS (retained; superseded above)
+The compiled AUMID activator starts the official application without starting PowerShell, Get-AppxPackage or Add-Type during the daily launch. PowerShell is used only for explicit installation, maintenance, background preparation, or disable commands.
 
-1. Keep this extracted directory intact.
-2. Double-click start-theme.cmd. It starts Codex and the local theme watcher together.
-3. To return the open themed window to native appearance, double-click stop-theme.cmd.
-4. Close that Codex window before deleting this extracted directory. A later ordinary Codex launch is native.
+Run stop-theme.cmd or remove-theme.cmd to restore the open renderer to verified native DOM state without terminating ChatGPT. Removing the repository or package.json marker makes the supervisor unregister itself; later launches remain native.
 
-The package does not modify ChatGPT.exe, app.asar, WindowsApps, Codex config.toml, or the official Codex shortcut.
-It uses the Node runtime already bundled with the official Microsoft Store Codex package and a dependency-free loopback protocol client; no npm install is required.
-All runtime state stays under .wukong-runtime inside this extracted directory.
+RELEASE SCOPE
+
+releasedPetIds is empty. Pets are deferred and excluded from this release gate. Historical themes, rejected motifs, development tools, tests, docs, and node_modules are excluded from this minimal runtime package.
+
+For full setup, customization, troubleshooting, asset notices, and licensing, read README.md.
+
+Some background images were collected online or supplied by users. Rights remain with their respective owners. If you are a rights holder and believe an included asset infringes your rights, email chenlj89@mail2.sysu.edu.cn; the maintainer will review and remove verified infringing material.

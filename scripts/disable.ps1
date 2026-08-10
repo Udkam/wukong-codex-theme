@@ -1,204 +1,73 @@
 [CmdletBinding()]
 param(
     [string]$Root = (Split-Path $PSScriptRoot -Parent),
-    [switch]$Portable
+    [switch]$Portable,
+    [switch]$Repository
 )
 
 $ErrorActionPreference = 'Stop'
-$controlled = [IO.Path]::GetFullPath((Join-Path $env:USERPROFILE '.codex\themes\wukong-codex-forge'))
-$appRoot = [IO.Path]::GetFullPath($Root)
-$releaseMarker = Join-Path (Split-Path $appRoot -Parent) 'release.json'
-$isPortable = if ($PSBoundParameters.ContainsKey('Portable')) {
-    [bool]$Portable
+$rootPath = [IO.Path]::GetFullPath($Root)
+$releaseMarker = Join-Path (Split-Path $rootPath -Parent) 'release.json'
+$repositoryMode = if ($PSBoundParameters.ContainsKey('Repository')) {
+    [bool]$Repository
 }
 else {
-    -not (Test-Path -LiteralPath $releaseMarker)
+    -not $Portable -and -not (Test-Path -LiteralPath $releaseMarker)
 }
-$packageDefinition = Join-Path $appRoot 'package.json'
-if (-not (Test-Path -LiteralPath $packageDefinition)) {
-    throw 'Theme package marker package.json is missing.'
+
+if ($Portable -and $repositoryMode) {
+    throw 'Repository and portable disable modes are mutually exclusive.'
+}
+
+$packageDefinition = Join-Path $rootPath 'package.json'
+$lifecycleHost = Join-Path $rootPath 'runtime\host.mjs'
+if (-not (Test-Path -LiteralPath $packageDefinition -PathType Leaf) -or -not (Test-Path -LiteralPath $lifecycleHost -PathType Leaf)) {
+    throw 'Theme source is incomplete; live native restoration cannot be requested from this directory.'
 }
 $themePackage = Get-Content -LiteralPath $packageDefinition -Raw -Encoding UTF8 | ConvertFrom-Json
 if ([string]$themePackage.name -ne 'wukong-codex-forge') {
     throw 'Theme package marker is invalid.'
 }
-$stateRoot = if ($isPortable) { Join-Path $appRoot '.wukong-runtime' } else { $controlled }
-$injector = Join-Path $appRoot 'runtime\injector.mjs'
-$lifecycleHost = Join-Path $appRoot 'runtime\host.mjs'
-if (-not (Test-Path -LiteralPath $injector)) {
-    throw "Managed injector is missing: $injector"
-}
-if (-not (Test-Path -LiteralPath $lifecycleHost)) {
-    throw "Managed lifecycle host is missing: $lifecycleHost"
-}
 
 $package = Get-AppxPackage -Name 'OpenAI.Codex' | Select-Object -First 1
 if (-not $package) { throw 'Official OpenAI.Codex Store package was not found.' }
 $node = Join-Path $package.InstallLocation 'app\resources\cua_node\bin\node.exe'
-if (-not (Test-Path -LiteralPath $node)) { throw 'The Node runtime bundled with OpenAI.Codex was not found.' }
-
-$profilePath = if ($isPortable) {
-    Join-Path $stateRoot 'profile'
-} else {
-    [IO.Path]::GetFullPath((Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'Codex\web\Codex'))
-}
-$activePortPath = Join-Path $profilePath 'DevToolsActivePort'
-$requestDirectory = Join-Path $stateRoot 'requests'
-$eventPath = Join-Path $stateRoot 'runtime-events.jsonl'
-if (-not (Test-Path -LiteralPath $stateRoot)) {
-    Write-Host 'No local Wukong runtime state exists; Codex is already using its native surface.'
-    return
+if (-not (Test-Path -LiteralPath $node -PathType Leaf)) {
+    throw 'The Node runtime bundled with OpenAI.Codex was not found.'
 }
 
-foreach ($managedPath in @($appRoot, $stateRoot, $profilePath, $requestDirectory)) {
-    if (Test-Path -LiteralPath $managedPath) {
-        $item = Get-Item -LiteralPath $managedPath -Force
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-            throw "Refusing disable: managed path is a reparse point: $managedPath"
-        }
+$hostArguments = @($lifecycleHost, '--signal-disable', '--root', $rootPath)
+if ($repositoryMode) { $hostArguments += '--repository' }
+elseif ($Portable) { $hostArguments += '--portable' }
+
+$hostOutput = @(& $node @hostArguments 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw "Event lifecycle host did not restore native state: $($hostOutput -join ' ')"
+}
+$responseLine = @($hostOutput | Where-Object { $_ -and ([string]$_).Trim().StartsWith('{') })[-1]
+if (-not $responseLine) {
+    throw 'Event lifecycle host returned no machine-readable disable evidence.'
+}
+try {
+    $response = $responseLine | ConvertFrom-Json
+}
+catch {
+    throw 'Event lifecycle host returned invalid disable evidence.'
+}
+
+if ([string]$response.state -eq 'disable') {
+    if ([bool]$response.result.deferredNative) {
+        Write-Host 'No renderer was visible; the event host stopped and the next unthemed launch will use the native surface.'
+    }
+    else {
+        Write-Host 'The running ChatGPT renderer was restored to verified native DOM state and left open.'
     }
 }
-
-function Get-ManagedLifecycleProcesses {
-    return @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
-        $_.Name -in @('node.exe', 'ChatGPT.exe') -and
-        $_.CommandLine -and
-        [regex]::IsMatch($_.CommandLine, 'runtime[\\/](?:host|watch)\.mjs', [Text.RegularExpressions.RegexOptions]::IgnoreCase) -and
-        $_.CommandLine.IndexOf($appRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
-    })
+elseif ([string]$response.state -eq 'not-running') {
+    Write-Host 'No repository lifecycle host is running; there is no active managed renderer to restore.'
+}
+else {
+    throw "Unexpected lifecycle disable result: $($response | ConvertTo-Json -Compress)"
 }
 
-$requestPrefix = [IO.Path]::GetFullPath($requestDirectory).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
-$requests = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-$watchers = Get-ManagedLifecycleProcesses
-$deferredNative = $false
-$eventHosts = @($watchers | Where-Object {
-    [regex]::IsMatch([string]$_.CommandLine, 'runtime[\\/]host\.mjs', [Text.RegularExpressions.RegexOptions]::IgnoreCase)
-})
-if ($eventHosts.Count -gt 1) {
-    throw 'Multiple lifecycle hosts claim this retained release; refusing ambiguous disable.'
-}
-if ($eventHosts.Count -eq 1) {
-    $hostArguments = @($lifecycleHost, '--signal-disable', '--root', $appRoot)
-    if ($isPortable) { $hostArguments += '--portable' }
-    $hostOutput = @(& $node @hostArguments 2>&1)
-    if ($LASTEXITCODE -ne 0) {
-        throw "Event lifecycle host did not restore native state: $($hostOutput -join ' ')"
-    }
-    try {
-        $hostResponse = ($hostOutput[-1] | ConvertFrom-Json)
-        $deferredNative = [bool]$hostResponse.result.deferredNative
-    }
-    catch {
-        throw 'Event lifecycle host returned invalid disable evidence.'
-    }
-}
-
-$latestBySession = @{}
-if ($watchers.Count -gt 0 -and (Test-Path -LiteralPath $eventPath)) {
-    foreach ($line in Get-Content -LiteralPath $eventPath -Encoding UTF8) {
-        if (-not $line -or -not $line.Trim()) { continue }
-        try { $event = $line | ConvertFrom-Json } catch { continue }
-        if ($event.session) { $latestBySession[[string]$event.session] = $event }
-    }
-    foreach ($event in $latestBySession.Values) {
-        if ($event.state -in @('watching', 'watching-event-driven') -and $event.disableRequest) {
-            try { $candidate = [IO.Path]::GetFullPath([string]$event.disableRequest) } catch { continue }
-            if ($candidate.StartsWith($requestPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-                [void]$requests.Add($candidate)
-            }
-        }
-    }
-}
-
-foreach ($watcher in $watchers) {
-    foreach ($match in [regex]::Matches([string]$watcher.CommandLine, '(?:"(?<quoted>[^"]+)"|(?<plain>\S+))')) {
-        $value = if ($match.Groups['quoted'].Success) { $match.Groups['quoted'].Value } else { $match.Groups['plain'].Value }
-        if (-not $value.EndsWith('.request', [StringComparison]::OrdinalIgnoreCase)) { continue }
-        try { $candidate = [IO.Path]::GetFullPath($value) } catch { continue }
-        if ($candidate.StartsWith($requestPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-            [void]$requests.Add($candidate)
-        }
-    }
-}
-
-foreach ($requestPath in $requests) {
-    [IO.File]::AppendAllText(
-        $requestPath,
-        "restore requested at $((Get-Date).ToString('o'))" + [Environment]::NewLine,
-        [Text.UTF8Encoding]::new($false)
-    )
-}
-
-$watcherDeadline = [DateTime]::UtcNow.AddSeconds(8)
-while ((Get-ManagedLifecycleProcesses).Count -gt 0 -and [DateTime]::UtcNow -lt $watcherDeadline) {
-    Start-Sleep -Milliseconds 250
-}
-if ((Get-ManagedLifecycleProcesses).Count -gt 0) {
-    throw 'Managed lifecycle host did not acknowledge the restore request; native state was not claimed.'
-}
-
-foreach ($requestPath in $requests) {
-    $confirmationPath = "$requestPath.confirmed.json"
-    if (-not (Test-Path -LiteralPath $confirmationPath)) { continue }
-    try {
-        $confirmationRecord = Get-Content -LiteralPath $confirmationPath -Raw -Encoding UTF8 | ConvertFrom-Json
-        if ([bool]$confirmationRecord.deferredNative -and [int]$confirmationRecord.targets -eq 0) {
-            $deferredNative = $true
-        }
-    } catch { }
-}
-
-$managedCodex = @(Get-CimInstance Win32_Process -Filter "Name='ChatGPT.exe'" -ErrorAction SilentlyContinue | Where-Object {
-    if (-not $_.CommandLine -or $_.CommandLine -match '(?:^|\s)--type=') { return $false }
-    if ($isPortable) { return $_.CommandLine.IndexOf($profilePath, [StringComparison]::OrdinalIgnoreCase) -ge 0 }
-    return $_.CommandLine -notmatch '(?:^|\s)--user-data-dir(?:=|\s)'
-})
-$port = $null
-if ($managedCodex.Count -gt 0) {
-    if (-not (Test-Path -LiteralPath $activePortPath)) {
-        throw 'Managed Codex is running, but its loopback theme channel file is missing.'
-    }
-    $portLine = [IO.File]::ReadAllLines($activePortPath, [Text.Encoding]::UTF8)[0]
-    $parsedPort = 0
-    if (-not [int]::TryParse($portLine, [ref]$parsedPort) -or $parsedPort -lt 1024 -or $parsedPort -gt 65535) {
-        throw 'Managed Codex returned an invalid loopback theme channel port.'
-    }
-    $port = $parsedPort
-    if (-not $deferredNative) {
-        Push-Location $appRoot
-        try {
-            & $node runtime/injector.mjs --restore $port
-            if ($LASTEXITCODE -ne 0) { throw 'Live native restoration failed.' }
-            & $node runtime/injector.mjs --assert-native $port
-            if ($LASTEXITCODE -ne 0) { throw 'Live native restoration could not be verified.' }
-        }
-        finally {
-            Pop-Location
-        }
-    }
-}
-
-$disableEvent = [ordered]@{
-    at = (Get-Date).ToString('o')
-    session = 'disable-' + [Guid]::NewGuid().ToString('N')
-    state = 'disable-confirmed'
-    port = $port
-    profilePath = $profilePath
-    appPath = $appRoot
-    portable = [bool]$isPortable
-    signaledRequests = @($requests)
-    retained = $true
-} | ConvertTo-Json -Compress
-[IO.File]::AppendAllText($eventPath, $disableEvent + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
-
-if ($managedCodex.Count -gt 0) {
-    if ($deferredNative) {
-        Write-Host 'No renderer was visible; the watcher was removed, so the next Codex window will open with its native surface.'
-    } else {
-        Write-Host 'The managed Codex window was restored to verified native DOM state and left open.'
-    }
-} else {
-    Write-Host 'No managed Codex window is running; future normal Codex launches remain native.'
-}
-Write-Host 'All theme releases, assets, logs and request records were retained.'
+Write-Host 'No process was terminated and no repository, shortcut, release, asset or log was deleted.'

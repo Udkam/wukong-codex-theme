@@ -8,14 +8,21 @@ import { browserIdentity, isProcessAlive, runWatcher } from '../runtime/watch.mj
 
 const read = file => fs.readFileSync(file, 'utf8');
 const publicScripts = {
-  install: read('scripts/install-preserving.ps1'),
+  install: read('scripts/install-repository.ps1'),
   launch: read('scripts/launch.ps1'),
   disable: read('scripts/disable.ps1'),
   hook: read('scripts/install-chatgpt-hook.ps1'),
   verifyAdapter: read('scripts/verify-launch-adapter.ps1'),
   start: read('scripts/start.ps1'),
+  appxActivator: read('runtime/activate-appx.ps1'),
   nativePets: read('scripts/install-native-pets.ps1')
 };
+
+test('repository start delegates one preflight to the verified Node bridge', () => {
+  assert.match(publicScripts.start, /& \$node \$bridge/);
+  assert.match(publicScripts.start, /\$bridgeExitCode -eq 4/);
+  assert.doesNotMatch(publicScripts.start, /Invoke-RestMethod|Get-Process -Name 'ChatGPT'|Start-Process/);
+});
 
 const parsePowerShell = file => {
   const absolute = path.resolve(file).replaceAll("'", "''");
@@ -31,10 +38,12 @@ const parsePowerShell = file => {
 
 test('all public and retained legacy lifecycle scripts parse', () => {
   for (const file of [
+    'scripts/install-repository.ps1',
     'scripts/install-preserving.ps1',
     'scripts/launch.ps1',
     'scripts/start.ps1',
     'scripts/install-native-pets.ps1',
+    'runtime/activate-appx.ps1',
     'scripts/install-chatgpt-hook.ps1',
     'scripts/verify-launch-adapter.ps1',
     'scripts/disable.ps1',
@@ -44,6 +53,17 @@ test('all public and retained legacy lifecycle scripts parse', () => {
     const result = parsePowerShell(file);
     assert.equal(result.status, 0, file + ' parse failure: ' + result.stdout + result.stderr);
   }
+});
+
+test('AppX activation helper resolves the official manifest and contains no WMI path', () => {
+  const helper = publicScripts.appxActivator;
+  assert.match(helper, /Get-AppxPackage -Name 'OpenAI\.Codex'/);
+  assert.match(helper, /AppxManifest\.xml/);
+  assert.match(helper, /app\\ChatGPT\.exe/);
+  assert.match(helper, /IApplicationActivationManager/);
+  assert.match(helper, /ActivateApplication/);
+  assert.match(helper, /FromBase64String/);
+  assert.doesNotMatch(helper, /Get-CimInstance|Get-WmiObject|Win32_Process|Get-NetTCPConnection|setInterval/i);
 });
 
 test('live capture closes only an explicitly owned transient debug session', () => {
@@ -179,13 +199,13 @@ test('V31 real capture failure evidence proves automatic owned cleanup', () => {
   assert.match(evidence.acceptanceBoundary, /final lifecycle/i);
 });
 
-test('public entries route only to the preserving and verified-disable lifecycle', () => {
+test('public entries route to repository-backed injection and verified disable', () => {
   const installEntry = read('install-theme.cmd');
   const removeEntry = read('remove-theme.cmd');
   const startEntry = read('start-theme.cmd');
   const stopEntry = read('stop-theme.cmd');
 
-  assert.match(installEntry, /scripts\\install-preserving\.ps1/i);
+  assert.match(installEntry, /scripts\\install-repository\.ps1/i);
   assert.doesNotMatch(installEntry, /scripts\\install\.ps1/i);
   assert.match(removeEntry, /scripts\\disable\.ps1/i);
   assert.doesNotMatch(removeEntry, /scripts\\restore\.ps1|-Uninstall/i);
@@ -193,10 +213,10 @@ test('public entries route only to the preserving and verified-disable lifecycle
   assert.match(stopEntry, /scripts\\disable\.ps1/i);
   assert.doesNotMatch(stopEntry, /-Portable/i);
   assert.doesNotMatch(removeEntry, /-Portable/i);
-  assert.match(publicScripts.disable, /\$PSBoundParameters\.ContainsKey\('Portable'\)/);
+  assert.match(publicScripts.disable, /\$PSBoundParameters\.ContainsKey\('Repository'\)/);
   assert.match(publicScripts.disable, /\$releaseMarker/);
 
-  for (const [name, script] of Object.entries({ install: publicScripts.install, launch: publicScripts.launch, disable: publicScripts.disable })) {
+  for (const [name, script] of Object.entries({ launch: publicScripts.launch, disable: publicScripts.disable })) {
     assert.match(script, /Get-AppxPackage -Name 'OpenAI\.Codex'/, `${name} does not resolve the official Codex package`);
     assert.match(script, /app\\resources\\cua_node\\bin\\node\.exe/, `${name} does not use Codex's embedded Node runtime`);
     assert.doesNotMatch(script, /Get-Command\s+node(?:\.exe)?\b/i, `${name} depends on an external Node installation`);
@@ -220,9 +240,10 @@ test('public entries route only to the preserving and verified-disable lifecycle
   }
 
   assert.doesNotMatch(publicScripts.install, /(?:upgrade|apply|restore)\s+--config|&\s*\$node\s+\$engine/i);
-  assert.match(publicScripts.install, /releases/);
-  assert.match(publicScripts.install, /release\.json/);
-  assert.match(publicScripts.install, /history/);
+  assert.match(publicScripts.install, /install-chatgpt-hook\.ps1/);
+  assert.match(publicScripts.install, /verify-launch-adapter\.ps1/);
+  assert.match(publicScripts.install, /-Repository/);
+  assert.doesNotMatch(publicScripts.install, /releases|release\.json|package-runtime|appTarget/);
   assert.match(publicScripts.launch, /--remote-debugging-address=127\.0\.0\.1/);
   assert.match(publicScripts.launch, /--remote-debugging-port=0/);
   assert.match(publicScripts.launch, /CODEX_ELECTRON_USER_DATA_PATH/);
@@ -257,9 +278,8 @@ test('public entries route only to the preserving and verified-disable lifecycle
       publicScripts.launch.indexOf("Write-RuntimeEvent 'watching'"),
     'launch records watching before the first renderer has verified the active theme'
   );
-  assert.match(publicScripts.disable, /\.wukong-runtime/);
-  assert.match(publicScripts.install, /install-chatgpt-hook\.ps1/);
-  assert.match(publicScripts.install, /appTarget 'scripts\\install-native-pets\.ps1'/);
+  assert.match(publicScripts.disable, /repositoryMode/);
+  assert.doesNotMatch(publicScripts.install, /install-native-pets\.ps1/);
   assert.match(publicScripts.hook, /BackupPrefix 'ChatGPT-before-wukong'/);
   assert.match(publicScripts.hook, /Copy-Item -LiteralPath \$Path -Destination \$backupPath/);
   assert.match(publicScripts.hook, /CreateShortcut\(\$Path\)/);
@@ -268,6 +288,11 @@ test('public entries route only to the preserving and verified-disable lifecycle
   assert.match(publicScripts.hook, /Assert-DirectManagedPath/);
   assert.match(publicScripts.hook, /Start Menu Programs directory/);
   assert.match(publicScripts.hook, /ChatGPT Start Menu shortcut/);
+  assert.match(publicScripts.hook, /entryPolicy = 'native-chatgpt-only'/);
+  assert.match(publicScripts.hook, /function Remove-LegacyManagedShortcut/);
+  assert.match(publicScripts.hook, /legacyBridgePath\.StartsWith\(\$bridgeRoot/);
+  assert.match(publicScripts.hook, /Copy-Item -LiteralPath \$Path -Destination \$retiredBackup/);
+  assert.match(publicScripts.hook, /\[IO\.File\]::Delete\(\$Path\)/);
   assert.match(publicScripts.hook, /launch adapter root/);
   assert.match(publicScripts.hook, /shortcut backup directory/);
   assert.match(publicScripts.hook, /launcher bridge directory/);
@@ -280,18 +305,19 @@ test('public entries route only to the preserving and verified-disable lifecycle
   assert.match(publicScripts.hook, /\[IO\.File\]::OpenRead\(\$Path\)/);
   assert.doesNotMatch(publicScripts.hook, /Get-FileHash/);
   assert.match(publicScripts.hook, /\$expectedTarget = \$node/);
+  assert.match(publicScripts.hook, /\$shortcut\.IconLocation = "\$chatGpt,0"/);
   assert.match(publicScripts.hook, /\$expectedArguments = "`"\$bridgePath`""/);
   assert.match(publicScripts.hook, /\$expectedArguments\.Length -ge 900/);
   assert.match(publicScripts.hook, /& \$node --check \$bridgePath/);
-  assert.match(publicScripts.hook, /const themeAvailable = fs\.existsSync\(marker\) && fs\.existsSync\(host\)/);
+  assert.match(publicScripts.hook, /const themeAvailable = \[marker, host, theme, style, \.\.\.\(portable \? \[\] : \[activator\]\)\]/);
   assert.match(publicScripts.hook, /const target = themeAvailable \? process\.execPath : official/);
   assert.match(publicScripts.hook, /spawn\(target, args/);
   assert.doesNotMatch(publicScripts.hook, /EncodedCommand|WindowsPowerShell|Get-CimInstance|runtime\[\\\\\/\]watch\\\.mjs/);
   assert.doesNotMatch(publicScripts.hook, /ShowWindowAsync|SetForegroundWindow|user32\.dll/i);
   assert.match(publicScripts.hook, /Generated ChatGPT Node launch bridge is invalid/);
-  assert.match(publicScripts.start, /install-chatgpt-hook\.ps1/);
-  assert.match(publicScripts.start, /install-native-pets\.ps1/);
-  assert.match(publicScripts.start, /launch\.ps1/);
+  assert.match(publicScripts.start, /install-repository\.ps1/);
+  assert.match(publicScripts.start, /bridgeHostPath/);
+  assert.doesNotMatch(publicScripts.start, /install-native-pets\.ps1|launch\.ps1|Get-CimInstance/);
   assert.match(publicScripts.nativePets, /New-Item -ItemType Junction/);
   assert.match(publicScripts.nativePets, /spriteVersionNumber 2/);
   assert.match(publicScripts.nativePets, /native-pet-links\.jsonl/);
@@ -323,31 +349,24 @@ test('public entries route only to the preserving and verified-disable lifecycle
 
 test('disable is fail-closed and records success only after native-state verification', () => {
   const disable = publicScripts.disable;
-  const launch = publicScripts.launch;
+  const host = read('runtime/host.mjs');
   const injector = read('runtime/injector.mjs');
 
-  assert.match(disable, /Get-ManagedLifecycleProcesses/);
-  assert.match(disable, /runtime\[\\\\\/\]\(\?:host\|watch\)\\\.mjs/);
   assert.match(disable, /--signal-disable/);
+  assert.match(disable, /--repository/);
   assert.match(disable, /Event lifecycle host did not restore native state/);
-  assert.match(disable, /Managed lifecycle host did not acknowledge the restore request; native state was not claimed/);
-  assert.match(disable, /runtime\/injector\.mjs --restore \$port/);
-  assert.match(disable, /runtime\/injector\.mjs --assert-native \$port/);
-  assert.match(disable, /Live native restoration could not be verified/);
-  assert.match(disable, /state = 'disable-confirmed'/);
-  assert.ok(
-    disable.indexOf('runtime/injector.mjs --assert-native $port') < disable.indexOf("state = 'disable-confirmed'"),
-    'disable success is recorded before native state is verified'
-  );
-  assert.match(launch, /\$injectorPath --assert-native \$port/);
-  assert.match(launch, /Write-RuntimeEvent 'disable-failed'/);
+  assert.doesNotMatch(disable, /Get-CimInstance|Get-WmiObject|Stop-Process|taskkill/);
+  assert.match(host, /await Promise\.all\(targets\.map\(target => evaluate\(target, RESTORE_EXPRESSION\)\)\)/);
+  assert.match(host, /states\.every\(isNativeThemeState\)/);
+  assert.match(host, /native-restore-failed/);
+  assert.match(host, /theme-removed-verified/);
   assert.match(injector, /--assert-native/);
   assert.match(injector, /states\.every\(isNativeThemeState\)/);
 });
 
 test('retained legacy entry files delegate before archived mutation history', () => {
   for (const [file, delegate] of [
-    ['scripts/install.ps1', 'install-preserving.ps1'],
+    ['scripts/install.ps1', 'install-repository.ps1'],
     ['scripts/restore.ps1', 'disable.ps1']
   ]) {
     const script = read(file);
@@ -363,6 +382,15 @@ test('retained legacy entry files delegate before archived mutation history', ()
 test('renderer target selection defaults to Codex app pages and gates local development explicitly', () => {
   assert.equal(isCodexTarget({ type: 'page', url: 'app://codex/index.html' }), true);
   assert.equal(isCodexTarget({ type: 'page', title: 'Codex', url: 'app://-/index.html' }), true);
+  assert.equal(isCodexTarget({
+    type: 'page',
+    title: 'Codex',
+    url: 'app://-/index.html?initialRoute=%2Favatar-overlay'
+  }), false);
+  assert.equal(isCodexTarget({
+    type: 'page',
+    url: 'app://codex/index.html?initialRoute=/avatar-overlay'
+  }), false);
   assert.equal(isCodexTarget({ type: 'page', title: 'Other', url: 'app://-/index.html' }), false);
   assert.equal(isCodexTarget({ type: 'page', url: 'http://127.0.0.1:3000/' }), false);
   assert.equal(isCodexTarget(

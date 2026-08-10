@@ -35,9 +35,17 @@ export async function getBrowserVersion(port) {
 
 export const getTargets = port => requestJson(port, '/json/list');
 
+export const isCodexAvatarOverlayTarget = target => {
+  try {
+    return new URL(target?.url || '').searchParams.get('initialRoute') === '/avatar-overlay';
+  } catch {
+    return false;
+  }
+};
+
 export const isCodexTarget = (target, options = {}) => {
   const allowLocalDevelopment = options.allowLocalDevelopment ?? process.env.WUKONG_ALLOW_LOCAL_CDP === '1';
-  return target?.type === 'page' && (
+  return target?.type === 'page' && !isCodexAvatarOverlayTarget(target) && (
     /^app:\/\/codex\//.test(target.url || '') ||
     (target.title === 'Codex' && /^app:\/\/-\/index\.html(?:[?#]|$)/.test(target.url || '')) ||
     (allowLocalDevelopment && /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\//.test(target.url || ''))

@@ -26,8 +26,8 @@ test('active page payload contains backgrounds and paint-only UI assets; pets re
   assert.match(payload.variables, /--forge-motif-xiangfei-gourd:none/);
   assert.doesNotMatch(payload.variables, /--forge-motif-little-(?:wukong|bajie):/);
   assert.doesNotMatch(payload.variables, /forge-motif-(?:yaksha|fanged-cyan)/);
-  assert.match(payload.variables, /--forge-battle-scenes:0 1 2 3/);
-  assert.match(payload.variables, /--forge-scenery-scenes:4 5 6 7 8/);
+  assert.match(payload.variables, /--forge-battle-scenes:0 1 2 3 9 10 11 12 13 18 19 20 21/);
+  assert.match(payload.variables, /--forge-scenery-scenes:4 5 6 7 8 14 15 16 17/);
   assert.doesNotMatch(payload.variables, /--forge-primary-scene-count:/);
 
   const modes = activeTheme.background.gallery.map(scene => scene.mode);
@@ -35,7 +35,15 @@ test('active page payload contains backgrounds and paint-only UI assets; pets re
   assert.ok(modes.includes('battle-secondary'));
   assert.ok(modes.includes('scenery'));
   assert.equal(activeTheme.schemaVersion, 3);
-  assert.equal(new Set(activeTheme.background.gallery.map(scene => scene.tone)).size, 9);
+  assert.equal(activeTheme.background.gallery.length, 22);
+  assert.deepEqual(
+    activeTheme.background.gallery.filter(scene => scene.mode.startsWith('battle')).sort((a, b) => a.order - b.order).map(scene => scene.slot),
+    ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09', 'B10', 'B11', 'B12', 'B13']
+  );
+  assert.deepEqual(
+    activeTheme.background.gallery.filter(scene => scene.mode === 'scenery').sort((a, b) => a.order - b.order).map(scene => scene.slot),
+    ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09']
+  );
 });
 
 test('native definition stays within the current Codex chrome theme schema', () => {
@@ -44,7 +52,7 @@ test('native definition stays within the current Codex chrome theme schema', () 
   assert.ok(identities.includes('desktop.appearanceTheme'));
   assert.ok(identities.includes('desktop.appearanceDarkChromeTheme.accent'));
   assert.ok(identities.includes('desktop.appearanceDarkChromeTheme.semanticColors.skill'));
-  assert.equal(fs.statSync('themes/assets/great-sage-staff.jpg').size < 400_000, true);
+  assert.equal(fs.statSync('themes/backgrounds/battle-02.jpg').size < 400_000, true);
 });
 
 test('install and uninstall round-trip only managed native appearance values', () => {

@@ -1,10 +1,65 @@
 # 当前进行中目标
 
-更新时间：2026-08-08
+更新时间：2026-08-11
 
 本文件是本项目当前唯一执行基线。后续旧方案、旧截图和旧文档若与本文件冲突，以本文件为准。
 
-## V50.1 范围冻结与启动链热修复状态（2026-08-08）
+## V51.9 二十二图画廊与低遮罩可读性候选（2026-08-11）
+
+- 活动图库为 22 张：战斗 `B01..B13`、风景 `S01..S09`。用户指定的旧 B06/S04 已退出活动画廊，新图原位占用这两个槽位；其余新增图追加为 B10–B13，未受影响的既有场景索引保持不变。
+- 两组继续使用固定编号序列并独立回绕。持久状态仍为版本 3；旧的 18 图顺序会按当前 22 图规范序列重建，同时保留仍然有效的当前场景索引。
+- `Ctrl+Alt+B` 切换当前模式的下一张，`Ctrl+Alt+Shift+B` 切换当前模式的上一张；两者都只在当前战斗或风景序列内循环，并且不触发页面刷新、主题重载或主题重建。
+- 新图只做等比缩放和 JPEG 编码；B06 额外裁掉源图实测上下黑边。运行时不添加亮度、饱和度或对比度滤镜，尽量保留原色。
+- 战斗和风景均把每图 veil 降至可读性边界附近；当前模型最低正文对比度分别为战斗 `4.501:1`、风景 `4.511:1`，战斗平均背景亮度仍高于风景。S06/S07 已在可读性下限附近，因此不再继续减遮罩。
+- 22 张 JPEG 合计 `8,355,513 bytes`、`45,201,592 px`，最大双图过渡 `5,337,600 px`，仍处于 24 MiB / 48,000,000 px / 16,000,000 px 三重预算内。定向资源、色板、顺序与原位切图测试 22/22 通过。
+- `scripts/prepare-background.ps1` 现接受 B/S 01–99，并提供有界四边源像素裁切参数；默认行为仍是不放大、最大 1920×1080、JPEG 质量 90。
+
+## V51.8 原位切图、全量编号背景与可读性候选（2026-08-11）
+
+- 活动图库扩展为 18 张：战斗 `B01..B09`、风景 `S01..S09`。原有 4 张战斗和 5 张风景保留，本轮追加 5 张战斗和 4 张风景；压缩文件合计 `5,887,434 bytes`，解码总量 `37,329,592 px`。
+- 两组都使用固定编号顺序，不再洗牌：`B01 -> ... -> B09` 与 `S01 -> ... -> S09`，到末尾后回到本组 B01/S01。持久状态版本 3 会把旧随机牌堆迁移为有序游标，同时保留当前可见场景。
+- 普通项目/对话切换、history/hash、流式文字、DOM 对账与 resize 不推进序列。只有真实点击“新建任务”且距上次自动推进至少 20 分钟时才自动推进；`Ctrl+Alt+B` 只推进当前模式且不受自动冷却限制。
+- 页面隐藏时不创建解码请求，只合并一次待推进意图；新图由最终绘制的同一个 DOM `<img>` 完成 `decode()` 前，旧图持续可见。`Ctrl+Alt+B` 不导航、不刷新主题、不重建 style/overlay/主题标记；切换继续使用 420 ms 单向叠化、透明新图底层、单一在途解码、稳态一纹理与过渡期最多两纹理。
+- 新增 `scripts/prepare-background.ps1`，用户可按 B/S 槽位替换自己的背景；默认不放大、最大 1920×1080、JPEG 质量 90，活动清单仍只有 `themes/active.json`。
+- 进度胶囊的完成圈、增加数和删除数改为深青蓝、深绿和深红，并以 paint-only 描边提高纸面上的可读性；DOMRect、间距与命中区保持原生全等。
+- 不创建 interval、周期轮询、WMI/CIM、服务或额外进程。V51.5 原生入口保持不变；全量验证为 101 通过、9 个环境型跳过、0 失败，既有 renderer 已完成无重启热刷新并达到 `renderer-verified`，仍保留用户视觉验收边界。
+
+## V51.5 低开销原生入口候选（2026-08-10）
+
+- 切换项目/对话、再次显示已有窗口和托盘恢复必须复用当前官方受管 renderer，不得关闭或重启 `ChatGPT.exe`。本候选实现及聚焦测试期间，当前主题窗口均未重启。
+- 只有全部官方 ChatGPT/Codex 进程完全退出，随后从原始 Store/任务栏 AUMID 冷启动时，才允许一次快速接管；这是因为 `--remote-debugging-*` 只能在 Electron/Chromium 进程创建时提供，无法事后加入。该原始 AUMID 冷启动实机门当前仍待执行。
+- `runtime/activate-appx.cs` 编译后直接调用 `IApplicationActivationManager` 激活安装器已验证的 AUMID，并在激活前发送 `ManagedLaunch` 命名信号。正式启动链不再调用 PowerShell、`Get-AppxPackage` 或运行时 `Add-Type`。
+- 原生入口监督器对每个 WinEvent 新窗口先做精确 `QueryFullProcessImageNameW` 路径核对，再且只执行一次 `HasCodexCdp`；V51.4 的最长 6 秒重复核对已经移除。命中 `ManagedLaunch` 的窗口直接跳过接管，避免 bridge 自触发。
+- 零双启动的日常方式是使用并固定用户 Start Menu 的 `ChatGPT.lnk`。它保持官方 ChatGPT 名称和图标，但直接进入 repository bridge 与编译 AUMID 激活器；原始 Store/AUMID 入口仍由监督器保护，在真正冷启动时可能发生上述一次快速接管。
+- 稳态只等待 `SetWinEventHook(EVENT_OBJECT_SHOW)`、`ManagedLaunch`、marker 文件事件、进程退出和 DevTools Target/Page/Runtime 事件；不使用 WMI/CIM、固定周期进程扫描、renderer target 轮询、服务或计划任务。
+- 当前证据边界：聚焦合同 45/45 与补充定向合同 27/27 已通过，当前主题窗口未重启；全量测试与热更新安装待执行，原始 AUMID 冷启动实机验收未执行，不得把 V51.5 写成已完成。
+
+## V51.4 原生入口监督候选（历史，2026-08-10）
+
+- 用户可见入口、应用名称、图标、Store 包身份、正式 profile 与实际 `ChatGPT.exe` 均保持官方 ChatGPT/Codex；不创建独立 `Wukong Codex` 应用，不修改 WindowsApps、`app.asar`、签名或官方配置。
+- V51.4 增加当前用户级原生入口监督器：以 `SetWinEventHook(EVENT_OBJECT_SHOW)` 接收新窗口事件，并以 `QueryFullProcessImageNameW` 精确核对该窗口是否属于当前 `OpenAI.Codex` 包内的 `app\ChatGPT.exe`。只在新窗口未受仓库管理时切到 repository bridge；不按名称批量结束进程，也不处理安装前已经存在的窗口。
+- 原始 Store、开始菜单与任务栏入口无需改名或另建可见快捷方式。监督器只登记到当前用户 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`，不安装服务、计划任务、DLL/IFEO，也不使用 WMI/CIM。
+- repository bridge 在非便携模式通过 `IApplicationActivationManager` 激活从当前 AppxManifest 精确解析的 AUMID；版本化 WindowsApps EXE 路径只用于身份核对，最终仍由官方包完成激活和窗口承载。
+- 稳态只等待 WinEvent、marker 文件事件以及 DevTools Target/Page/Runtime 事件；不设置固定周期进程扫描或 renderer target 轮询。新窗口后的路径、通道与切换核对均为有界启动工作。
+- 仓库或 `package.json` marker 消失时，renderer host 先恢复并验证原生 DOM；监督器通过文件事件撤销自身 HKCU Run 项并退出。之后原始官方入口保持原生，LocalAppData 中不保留可独立运行主题的资产副本。
+- 本检查点只记录候选实现与合同。当前已打开的 Codex 窗口在聚焦和全量测试通过前未被关闭、重启或改写；V51.4 的受控 Store/任务栏原生入口实机验收仍为待测试，不得写成已经生效。
+
+## V51.3 仓库驻留注入历史状态（2026-08-10）
+
+- 公共交付从 append-only release 复制切换为 repository-backed runtime injection：Git checkout 是 CSS、图片、主题定义与事件 host 的唯一来源，`install-theme.cmd` 不再创建 `.codex\themes\wukong-codex-forge\releases\<版本>`。
+- 官方 `ChatGPT.exe` 是实际启动和承载 renderer 的进程，但二进制、`app.asar`、WindowsApps、签名与官方配置保持零写入；Codex 内置 Node 只通过 `127.0.0.1` DevTools 通道把主题应用到真实 renderer。
+- V51.3 取消所有独立命名入口。安装器只备份并更新用户开始菜单的原生 `ChatGPT.lnk`，保留官方名称、图标和最终 `ChatGPT.exe`；旧 `ChatGPT - Wukong Theme`、开始菜单/桌面 `Wukong Codex` 仅在目标为 Codex 内置 Node、参数属于本项目 bridge 目录时先备份再精确移除。
+- 本机已经证实 Store 可在安装后把同名 `ChatGPT.lnk` 恢复成官方直连入口；verifier 必须把它报告为真实失效并要求重跑 `install-theme.cmd`。固定图标/AUMID 仍可能绕过用户级 `.lnk`，在不修改签名包、不使用 IFEO/DLL/服务/常驻监听的安全边界内不能承诺无条件接管。
+- 仓库模式使用正式 Codex profile，同时把控制管道、请求和事件写入 `%LOCALAPPDATA%\WukongCodexForge\repository-state\<仓库路径散列>`，避免删除仓库后被 host 重新创建。主题资产不会复制到该状态目录。
+- bridge 在 `package.json`、host、活动主题或样式任一缺失时直接启动官方 EXE。若仓库在主题窗口运行期间消失，event watcher 先执行 `RESTORE_EXPRESSION` 并验证所有 renderer 已达到 native state，再退出。
+- 活动安装、启动和停用路径不得使用 WMI/CIM，不安装延期宠物，不启动旧 `launch.ps1` watcher 链；旧保留式 releases 仅作为历史证据留存，不再是当前启动源。
+- 2026-08-10 实机复核定位到“受管重启后仍无主题”的真实原因：浏览器通道先出现而首个 renderer 延迟创建，旧 host 首次得到 0 targets 后未收到目标事件。V51.2 增加最多 6 次、约 9.5 秒的启动阶段补偿探测；实机新通道 `19454` 已从 `waiting-for-renderer` 到达 `renderer-verified`。进入稳态后仍不轮询。
+- `start.ps1` 不再在安装器后重复 PowerShell 端口判断，而是同步调用同一个已验证 Node bridge 并处理退出码；bridge 只执行一次窄范围 `tasklist` 与最长 5 秒本地通道核对。整个日常链不使用 WMI/CIM。
+- 官方进程以 `detached: true` + `child.unref()` 启动；实机 `disabled-verified` 后 host 自然退出而 `ChatGPT.exe` 主窗口保持运行。临时移走 `package.json` 时已得到 `theme-removed-verified`，标记缺失期间 bridge 退出 0、未新增 runtime event 且 renderer 保持原生，随后标记恢复并重新注入成功。
+- 宠物使用独立 `initialRoute=/avatar-overlay` 透明 renderer；V51.2 在目标选择层排除该路由。实机主 renderer 保持 `runtimeV13=true`，宠物 renderer 的 style/class/background/runtime 全为 false，截图 alpha 审计为 96.24% 完全透明且非透明包围盒仅 105×125 的宠物本体。
+- 生命周期等待首个 DevTools 通道期间现在订阅同一 host signal；停用请求可立即返回 `disabled-before-channel`，不再等待 12 秒控制超时。该行为不使用 WMI/CIM、进程终止或固定轮询。
+
+## V50.1 历史范围冻结与启动链热修复状态（2026-08-08）
 
 - 本轮完成标准只包含非宠物主题、背景/过渡/覆盖、输入区与相邻原生状态、侧栏/顶部/环境卡、资源预算、正式生命周期、定向测试、文档与分段推送。
 - 小天命人和小八戒整体延期：不修改造型、动作、武器、图集、发布策略或本地安装状态，也不再阻塞本轮完成。
@@ -43,13 +98,13 @@
 ### 2. 背景与新建任务页
 
 - 新建任务页使用战斗背景池；进入已有对话后切换为风景背景池。
-- 每个 renderer 会话分别固定一张战斗图和一张风景图；同模式任务/项目切换不换图，只有 landing/thread 模式切换时使用 220 ms 低成本交叉淡化。
+- 战斗/风景分别使用持久化固定编号序列；同模式任务/项目切换、history/hash 与流式变化不推进。冷却后的真实新建任务或 `Ctrl+Alt+B` 才选择下一张；landing/thread 模式切换使用 420 ms 单向叠化，旧层不退透明、新层置顶淡入，避免中段亮度下坠。
 - 背景必须完整覆盖整个 Codex 窗口，不能只覆盖侧边栏或中央局部。
 - 战斗视觉以杨戬与大圣为主；用户最新否决的候选大圣图与原夜叉王裂焰图均退出活动图库和运行包，源文件只作保留证据。
 - 夜叉套、神锋、金箍棒等元素必须来源准确，不使用失真的手绘替代。
 - 风景模式使用用户认可的纯画面、场景与建筑素材，不采用普通战绩图或杂乱战斗截图。
 - 杨戬主背景使用用户指定的白底水墨对决图。
-- 当前活动图库为 9 张：2 张主战斗、2 张次级战斗、5 张风景；默认回退图为 1920×1080 的 `great-sage-staff.jpg`，不再回退到低分辨率 `great-sage-return.jpg`。
+- 当前活动图库为 22 张：`B01..B13` 十三张战斗与 `S01..S09` 九张风景；默认回退槽位为 `themes/backgrounds/battle-02.jpg`。
 - 新建任务页原生标题和 56×56 图案允许替换，但必须保留原生占位、尺寸与布局；当前活动候选为文案“此去，欲破何局？”与深/浅两套“悟空”书法字标，不再使用金箍棒模型缩略图。
 
 ### 3. 输入框
@@ -82,11 +137,12 @@
 
 ### 7. 最终随 Codex 启停
 
-正式实现与保留式安装已经完成；宠物延期不再阻断本阶段。
+V50–V51.4 的实现保留为历史；V51.5 正在把原生入口监督收敛为无需日常重启、无需 PowerShell 激活且单次判定的低开销候选，宠物延期不阻断本阶段。
 
-- 当前受管链使用 Codex 内置 Node、append-only bridge 与事件驱动 host，不保留 PowerShell watcher，也不通过固定周期轮询 renderer；Store 中转 PID 只记录为 launch PID，不再控制 host 的退出。
-- 保留式主题 marker 存在时进入主题 host；marker 或主题目录不存在时，同一 bridge 在下一次受管启动直接运行官方 `ChatGPT.exe`。
-- 当前已打开且没有 DevTools 通道的非受管窗口不强制改写；有效受管通道允许新 host 在确认 Codex target 后重新附着。浏览器通道断开后使用 4 秒有界重连，随后 host 自行退出。
+- 当前候选链使用用户级 `SetWinEventHook(EVENT_OBJECT_SHOW)` 监督器、Codex 内置 Node、repository bridge、编译 `activate-appx.cs` 与事件驱动 host；同名 Start Menu `ChatGPT.lnk` 保留官方名称/图标并提供零双启动日常入口。
+- 切换对话、托盘恢复与有效受管通道重附着均不重启。只有全部官方进程退出后的原始 AUMID 冷启动才可能快速接管一次，因为 remote-debugging 参数无法事后加入；每个精确路径匹配窗口只调用一次 `HasCodexCdp`。
+- 仓库 marker 存在时进入主题 host；marker 或仓库不存在时，监督器撤销 HKCU Run 并退出，原始官方入口保持原生。正式链不使用 WMI/CIM、固定周期进程扫描或稳态 renderer 轮询。
+- V51.5 聚焦 45/45 与补充定向 27/27 已通过且当前主题窗口未重启；全量、热更新和受控原始 AUMID 冷启动仍待执行，不能提前标为完成。
 
 ## 不可违反的约束
 
@@ -102,13 +158,13 @@
 ## 当前进度
 
 - 已完成 Codex 26.715.2305.0 UI 源码只读审计，锁定中央 `main-surface`、顶部渐变、新建任务标题和 56×56 图案的原生节点。
-- 已实现全窗口背景覆盖、新建页临时标题/图案，以及每个 renderer 会话各自固定的战斗/风景场景。
+- V13 当时已实现全窗口背景覆盖、新建页临时标题/图案，以及每个 renderer 会话各自固定的战斗/风景场景；现行 V51.7 已由第 209 条的两组编号序列取代该固定单景策略。
 - 已定位主题崩溃风险：旧实现启动时主动解码 11 张背景，并长期保留双全屏纹理、合成层和滤镜。
 - 已把背景运行时改为单请求按需解码并复用已解码 URL，过渡后清空旧层；同模式任务/history/hash 变化保持当前场景和单图层不动，首张背景仍须完成解码后才公开 ready。资源上限定向测试与真实 renderer 历史采样均证明稳态 1 张背景、0 个解码请求。
 - 已修复新建任务标题/图案只在缩放后出现的问题：120/420 ms 启动探针现在按各自期限真正执行，既有标题外壳内部后续挂载内容也会触发刷新，零尺寸标题/图标纳入 ResizeObserver；原项目名下划线在主题激活时隐藏。
 - 已补齐背景/路由竞态门禁：可见对话优先于仍在布局但 `opacity:0` 的旧新建页；背景覆盖层、活动层、图像层与 veil 在首次提交及窗口改为 `1001×733` 后均与视口 DOMRect 完全一致；交叉淡化中覆盖层被移除时会先恢复原生 paint，再以新 generation 重建单活动层。背景状态机 10/10、V15 原生表面 7/7 与最小包/保留式安装 4/4 通过，真实 Codex 视觉仍需后续单窗口里程碑验收。
 - 快速导航/提交的 follow-up timer 已改为“最新一组覆盖旧组”，任意时刻最多 2 个 route timer；隐藏页面不执行主题刷新，恢复可见时只合并刷新一次。流式回答的纯文本追加不进入表面结构信号，200 次连续文本 mutation 不增加 refresh/render 计数。
-- 已增加图片头级解码像素门禁：单背景不超过 1200 万像素、活动图库总计不超过 3200 万像素、过渡中两张最大图合计不超过 1600 万像素、单张 UI 材质不超过 419 万像素。当前 9 图图库实测总计 19,258,880 像素，最坏双图过渡 4,743,680 像素；伪造的 100,000×100,000 PNG 会在组装 payload 前被拒绝。
+- 已增加图片头级解码像素门禁：单背景不超过 1200 万像素、活动图库总计不超过 4800 万像素、过渡中两张最大图合计不超过 1600 万像素、单张 UI 材质不超过 419 万像素。当前 22 图图库实测总计 45,201,592 像素，最坏双图过渡 5,337,600 像素；伪造的 100,000×100,000 PNG 会在组装 payload 前被拒绝。
 - 低分辨率 `great-sage-return.jpg`、用户否决的候选大圣图与原夜叉王裂焰图均已退出活动图库和最小包；文件继续原位保留。
 - `themes/active.json` 已锁定为页面 payload 的唯一活动主题清单；含退役葫芦、旧宠物和旧构图参数的 `themes/ink-mountain.json` 继续原位保留为历史证据，但从最小运行包白名单中排除，不删除文件。
 - 已完成一次 V13.3 临时调试实审并在截图/采样后立即关闭；调试根进程、launcher、watcher、子进程和专用端口均已释放，后续继续执行同一纪律。
@@ -131,7 +187,7 @@
 - 用户已将两个宠物整体延期；现有候选、策略与安装状态保持不变，不再属于本轮完成条件，也不阻断最终非 PowerShell 生命周期工作。
 - V15 当时的侧栏/顶部入口状态矩阵曾覆盖五个顶部入口、一级项目/无项目对话、二级项目对话和四个应用菜单触发器；其中四个应用菜单的主题替换已被用户取消，现行合同以官方 paint 为准。其余 active、expanded、disabled、unread/running 与 forced-colors 证据仍作为历史基线保留。
 - 当前 Electron 的“文件/编辑/视图/帮助”触发页签和下拉内容全部保留官方 paint；下拉内容由主进程原生菜单绘制，不在 renderer DOM 中，测试夹具不得伪装成已改造原生应用菜单。
-- 金箍棒图案已从旧版约 40×34 px 的有效占位放大到原生槽位内约 50×42 px，112×112 资源为 3.2 KiB；1× fixture 可辨认完整端箍且无边缘裁切，原生几何不变。无头证据位于 `artifacts/test-runs/v15-native-surfaces-2026-07-25T04-49-40-653Z/`，用户实机验收仍未完成。
+- V15 当时的金箍棒图案曾从约 40×34 px 放大到原生槽位内约 50×42 px；该方案后来已退役，现行实现是由 `themes/active.json` 逐图选择深/浅版本的“悟空”字标。V15 无头证据继续保留为历史记录，不是现行视觉真值。
 - 宠物已进入 Hatch Pet v2 全量重做：新建 `little-wukong-v5-yaksha-shenfeng-canonical-rebuild-20260725` 与 `little-bajie-v4-inart-game-motion` 两个独立 run，待审批 id 分别为 `little-wukong-v5-yaksha-shenfeng` 与 `little-bajie-v4-inart-game-motion`，不复用旧冻结 id。两只 base 候选已分别通过完整神锋/双足与成年猪妖/完整九齿钉耙的本地门，并完成透明边缘与 192×208 留白验证；下一步是用户母版审计，未通过前不扩展动作。小天命人 schema row 4 改为双足落地、身高稳定的原地反应，不再生成跳跃动作。
 - V25 已把宠物发布门收口到唯一 `pets/release-policy.json`：`releasedPetIds` 当前为空，旧小八戒 v3 与旧小天命人 v4 均列入 `frozenPetIds`。准备脚本不读取旧候选，最小包不携带其 manifest/atlas/proof，安装器在解析空批准集合后、触碰 Codex 用户目录前直接无操作退出；仓库旧包、用户 discovery 目录、当前选择和既有事件记录全部保留不变。只有用户明确通过新母版后，才允许在独立检查点更新该策略。
 - V26 修复两个新 run 曾沿用旧包 id 的身份冲突：发布策略新增独立 `pendingPetIds`，loader、准备脚本与安装器强制 `released / pending / frozen` 三态两两互斥；新候选 request 与 verdict 同步使用独立 id。待审批候选仍不进入准备、最小包或安装链，旧冻结包也未被改写。
@@ -159,7 +215,8 @@
 - V45 单窗口联合重试在连续绿色样本后执行，V44 的草稿保护门按预期先于输入动作关闭：隔离 profile 仍保留上一轮由本项目写入但未被 Codex 接受的验收占位文本，因此 `attempted=false`，没有覆盖草稿、没有生成 PNG。失败路径再次证明原生恢复、watcher 确认、精确 PID 树、launcher 与随机端口全部释放。捕获器现只允许在现有草稿与本轮请求文本逐字一致时复用该本项目占位；任意不同文本继续失败闭合，绝不清空或覆盖。语法与生命周期定向合同 13/13 通过；真实联合整页门仍未完成。
 - V46 已按 V45 的自有草稿门复用逐字一致的验收占位，证明 `editorInitiallyEmpty=false`、`reusedExistingOwnedDraft=true`、`inputPrepared=true`；但 `Control+Enter` 后输入未清空且 queue 未出现，因此没有生成 PNG，原生恢复、watcher、root/owner 与随机端口再次全部释放。继续只读核对当前 `app.asar` 后确认：隔离 profile 没有 `composerEnterBehavior` 或 `followUpQueueMode` 覆盖，故官方默认 `composerEnterBehavior=enter` 生效；该模式下普通 `Enter` 才是默认 follow-up 提交，而 `Ctrl+Enter` 会被运行中拦截为一次性的反向动作。捕获器现改为先证明真实 ProseMirror 获得焦点，再由该编辑器自身发送普通 `Enter`；此修正仍需下一次绿色资源窗口下的唯一单窗口联合门证明。
 - V49 将任务切换中最常重建的 composer、编辑器壳、发送键、环境信息外卡/行和显式 selected/current 侧栏行改为稳定原生选择器直接绘制；新 DOM 在首次样式计算即获得主题 paint，不再等待 140–520 ms 的运行时标记后先闪回原生。动态标记继续承担 queue/goal、标题兼容和上下文判断，forced-colors 与停用恢复同时覆盖两条路径。侧栏直接规则只读取当前原生选中属性，因此单/多对话分支使用同一外层行宽，旧标记不会造成选中残影。
-- V49 同时把背景从“任务切换轮换”收敛为“每个 renderer 每种模式固定一景”：同模式的项目、任务、history、hash 与流式文本变化均不换图、不重解码；仅 landing/thread 模式变化执行 220 ms 淡变。隐藏文档暂停 refresh，恢复后只合并一次；解码 URL 缓存、过期待处理请求取消和最多两个 follow-up timer 共同限制运行成本。
+- V49 当时把背景从“任务切换轮换”收敛为“每个 renderer 每种模式固定一景”；V51.7 保留同模式的项目、任务、history、hash 与流式文本变化不换图、不重解码的低成本合同，但由第 209 条的显式编号顺序取代固定单景。隐藏文档暂停 refresh，恢复后只合并一次；解码 URL 缓存、过期待处理请求取消和最多两个 follow-up timer 共同限制运行成本。
+- V51.8 在 V51.7 的 18 个 B/S 编号槽位、固定顺序、用户替换脚本、进度胶囊高对比 paint 和标准 README 上，进一步把快捷切图改为“最终 DOM `<img>` 自身解码后原位淡入”。真实 `Ctrl+Alt+B` 合同证明 document/runtime/style/overlay/主题标记对象、URL、history、导航条目与 `refreshCount` 均不变；新图等待期旧图持续可见，过渡层没有暗纸底色，稳态仍只有一张纹理。全量结果为 101 通过、9 个环境型跳过、0 失败；当前官方 renderer 已通过控制通道无重启热刷新，实机状态为唯一 Codex target、两个 `IMG` 层、稳态 1 个已解码层和 0 个在途请求。
 - V49 最终真实联合取证使用唯一临时受管实例：完整页同屏包含原生顶部栏/侧栏、scenery 背景、真实 queue/goal、`736×100px` 主纸面和 `300px` 环境卡；主题稳态为 1 个已加载背景层、0 个解码请求。隐私相关原图和原始报告只留本机；可公开结论只记录几何、布尔门和 SHA-256。取证后 `disabled-verified`、原生状态 1/1、root/host 释放、CDP endpoint 不再接受连接且端口无 LISTENING。
 - V50 根据用户最终澄清撤销 `184:25 / 96–120px` 主题几何：仍保留长方形悟空纸张和四个切角，但 surface、editor shell、editor、footer、按钮、padding 与锚点全部逐项沿用原生。四角只画在同一矩形内的 `pointer-events:none` 伪元素上，宿主维持完整矩形命中区。
 - V50 为 thread footer 渐变、真实 Motion wrapper 内 progress fade，以及 portal 外 queue/goal stack 增加首帧原生直达规则；新 DOM 不再先出现黑带或原生灰面再等待 observer。生产拓扑、forced-colors 和停用恢复均由定向合同覆盖。
