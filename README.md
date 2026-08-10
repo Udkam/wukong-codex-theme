@@ -1,4 +1,4 @@
-# Wukong Codex Forge
+# Wukong Codex Theme
 
 为 Windows 官方 ChatGPT/Codex 桌面应用制作的《黑神话：悟空》风格主题。项目直接从本地 Git 仓库加载背景、纸面材质与样式，最终窗口仍由官方 `ChatGPT.exe` 承载；不会修改 `ChatGPT.exe`、`app.asar`、WindowsApps、应用签名或 Codex 配置，也不会创建一个独立的“Wukong Codex”应用。
 
@@ -25,11 +25,13 @@
 - 仓库必须保留在固定路径。主题资源直接从该 checkout 读取，不会复制为一套可脱离仓库运行的主题。
 - 仓库路径及关键输入文件不得经过 junction、符号链接或其他 reparse point；安装器会对此 fail closed。
 
+为保证旧版本无损升级，部分内部运行标识仍保留 `WukongCodexForge`、`wukong-forge` 和旧存储键。它们只是兼容性协议，不代表另一个应用或仓库；对外项目名、包标记与推荐本地目录统一为 `wukong-codex-theme`。
+
 ## 安装与首次启动
 
 ```powershell
-git clone https://github.com/Udkam/wukong-codex-forge.git
-cd wukong-codex-forge
+git clone https://github.com/Udkam/wukong-codex-theme.git
+cd wukong-codex-theme
 .\install-theme.cmd
 .\start-theme.cmd
 ```

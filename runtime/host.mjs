@@ -809,7 +809,7 @@ const validateThemeRoot = ({ paths, portable, repository, official }) => {
     assertDirectPath(required, 'Managed lifecycle file');
   }
   const marker = JSON.parse(fs.readFileSync(paths.markerPath, 'utf8').replace(/^\uFEFF/, ''));
-  if (marker.name !== 'wukong-codex-forge') throw Error('Theme package marker is invalid');
+  if (marker.name !== 'wukong-codex-theme') throw Error('Theme package marker is invalid');
   if (!portable && !repository) {
     const releaseMarker = path.join(path.dirname(paths.rootPath), 'release.json');
     assertDirectPath(releaseMarker, 'Managed release marker');

@@ -738,8 +738,8 @@ export const runtimeFixtureHtml = String.raw`
               </section>
               <section data-app-action-sidebar-section data-app-action-sidebar-section-heading="Projects">
                 <p class="sidebar-section">项目</p>
-                <div role="button" tabindex="0" aria-disabled="false" data-app-action-sidebar-project-row aria-expanded="true"><svg class="icon" viewBox="0 0 16 16"><path d="M2 4.5h4l1.2 1.5H14v6.5H2z"/></svg>wukong-codex-forge<button type="button" aria-label="项目更多操作" data-app-action-sidebar-project-show-all-toggle data-native-slot="project-internal-control">···</button></div>
-                <div data-app-action-sidebar-project-list-id="wukong-codex-forge">
+                <div role="button" tabindex="0" aria-disabled="false" data-app-action-sidebar-project-row aria-expanded="true"><svg class="icon" viewBox="0 0 16 16"><path d="M2 4.5h4l1.2 1.5H14v6.5H2z"/></svg>wukong-codex-theme<button type="button" aria-label="项目更多操作" data-app-action-sidebar-project-show-all-toggle data-native-slot="project-internal-control">···</button></div>
+                <div data-app-action-sidebar-project-list-id="wukong-codex-theme">
                   <div role="listitem"><div role="button" tabindex="0" aria-disabled="false" aria-roledescription="sortable"><div class="overflow-hidden"><div role="button" tabindex="0" aria-disabled="false" data-app-action-sidebar-thread-row data-app-action-sidebar-thread-active="true" aria-current="page" data-native-slot="project-active"><span data-thread-title>重设计黑神话悟空主题</span><span class="native-status-slot" data-native-status="running"><span class="animate-spin"><svg viewBox="0 0 24 24" fill="none"><path opacity=".3" d="M18 12A6 6 0 1 1 12 6" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 8 8" stroke="currentColor" stroke-width="2"/></svg></span></span><button type="button" aria-label="任务更多操作" data-native-slot="project-thread-menu" style="width:20px;height:20px">···</button></div></div></div></div>
                   <div role="listitem"><div role="button" tabindex="0" aria-disabled="false" aria-roledescription="sortable"><div class="overflow-hidden"><div role="button" tabindex="0" aria-disabled="false" data-app-action-sidebar-thread-row data-native-slot="project-wukong-secondary"><span data-thread-title>主题视觉验收</span></div></div></div></div>
                 </div>
@@ -886,7 +886,7 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
             <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
               <path d="M2 4.5h4l1.2 1.5H14v6.5H2z"/>
             </svg>
-            <span>wukong-codex-forge</span>
+            <span>wukong-codex-theme</span>
           </button>
           <button data-composer-navigation-target="environment">
             <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">

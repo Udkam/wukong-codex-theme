@@ -684,7 +684,7 @@ internal static class NativeEntrySupervisor
         IDictionary<string, object> marker = decoded as IDictionary<string, object>;
         object name;
         return marker != null && marker.TryGetValue("name", out name) &&
-            String.Equals(Convert.ToString(name, CultureInfo.InvariantCulture), "wukong-codex-forge", StringComparison.Ordinal);
+            String.Equals(Convert.ToString(name, CultureInfo.InvariantCulture), "wukong-codex-theme", StringComparison.Ordinal);
     }
 
     private static bool IsDirectPath(string value)

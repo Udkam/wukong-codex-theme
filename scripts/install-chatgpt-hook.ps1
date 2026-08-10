@@ -55,7 +55,7 @@ if (
     throw 'Wukong theme package is incomplete; the ChatGPT launch adapter was not installed.'
 }
 $themePackage = Get-Content -LiteralPath $packageDefinition -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$themePackage.name -ne 'wukong-codex-forge') {
+if ([string]$themePackage.name -ne 'wukong-codex-theme') {
     throw 'Wukong theme package marker is invalid.'
 }
 

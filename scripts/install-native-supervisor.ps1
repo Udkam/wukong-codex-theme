@@ -87,7 +87,7 @@ foreach ($requiredPath in @($rootPath, $markerPath, $sourcePath, $activatorSourc
 }
 
 $marker = Get-Content -LiteralPath $markerPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$marker.name -ne 'wukong-codex-forge') {
+if ([string]$marker.name -ne 'wukong-codex-theme') {
     throw 'Native supervisor install refused an invalid repository marker.'
 }
 

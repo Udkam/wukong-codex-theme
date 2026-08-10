@@ -178,7 +178,7 @@ test('event host arguments, official path derivation and pipe ownership are dete
   });
   assert.equal(resolved.profilePath, path.resolve('C:\\Users\\Test\\AppData\\Roaming\\Codex\\web\\Codex'));
   const repositoryResolved = resolveHostPaths({
-    root: 'C:\\checkout\\wukong-codex-forge',
+    root: 'C:\\checkout\\wukong-codex-theme',
     repository: true,
     env: {
       USERPROFILE: 'C:\\Users\\Test',
@@ -190,7 +190,7 @@ test('event host arguments, official path derivation and pipe ownership are dete
   assert.equal(
     repositoryResolved.stateRoot,
     repositoryStateRoot({
-      root: 'C:\\checkout\\wukong-codex-forge',
+      root: 'C:\\checkout\\wukong-codex-theme',
       env: { USERPROFILE: 'C:\\Users\\Test', LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' }
     })
   );
@@ -278,7 +278,7 @@ test('event watcher is bound to the browser channel rather than the Store relay 
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-channel-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   const signals = createHostSignals();
   const never = new Promise(() => {});
   let themed = false;
@@ -330,7 +330,7 @@ test('event watcher applies once, verifies active state, and restores before dis
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
 
   const target = { id: 'page-1', type: 'page', url: 'app://codex/index.html' };
   const commands = [];
@@ -399,7 +399,7 @@ test('removing the repository marker restores the live ChatGPT renderer before t
   const runRoot = path.join(os.tmpdir(), `wukong-repository-removal-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   let markerPresent = true;
   let themed = false;
   const never = new Promise(() => {});
@@ -449,7 +449,7 @@ test('disable fails closed when native restoration cannot be verified', async ()
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-fail-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   const signals = createHostSignals();
   const never = new Promise(() => {});
   let disablePromise;
@@ -495,7 +495,7 @@ test('event watcher retries a deferred large apply and reports bounded renderer 
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-retry-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   const signals = createHostSignals();
   const never = new Promise(() => {});
   const phases = [];
@@ -556,7 +556,7 @@ test('event watcher remains dormant until a delayed renderer appears', async () 
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-delayed-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   const signals = createHostSignals();
   const never = new Promise(() => {});
   const target = { id: 'page-delayed', type: 'page', url: 'app://codex/index.html' };
@@ -620,7 +620,7 @@ test('bounded startup probes recover a delayed renderer when the browser emits n
   const runRoot = path.join(os.tmpdir(), `wukong-event-host-probe-${process.pid}-${Date.now()}`);
   fs.mkdirSync(runRoot, { recursive: false });
   const markerPath = path.join(runRoot, 'package.json');
-  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-theme"}\n', { encoding: 'utf8', flag: 'wx' });
   const signals = createHostSignals();
   const never = new Promise(() => {});
   const target = { id: 'page-probed', type: 'page', url: 'app://codex/index.html' };

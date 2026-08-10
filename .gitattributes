@@ -1,0 +1,5 @@
+# Frozen pet proofs hash their working-tree files byte-for-byte.
+pets/*/pet.json text eol=lf
+pets/*/package-proof.json text eol=lf
+pets/release-policy.json text eol=lf
+pets/*/validation.json text eol=crlf

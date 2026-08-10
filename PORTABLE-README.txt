@@ -1,4 +1,4 @@
-Wukong Codex Forge 0.14.7
+Wukong Codex Theme 0.14.7
 
 CURRENT V51.9 ORDERED 22-BACKGROUND GALLERY
 

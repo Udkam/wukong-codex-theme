@@ -1,5 +1,12 @@
 # Local work log
 
+## 2026-08-11 — Wukong Codex Theme repository rename
+
+- Merged PR 1 into `main` at `ad0bef0`, renamed the public repository to `wukong-codex-theme`, and updated the canonical npm/package marker, current installer/runtime checks, Studio labels and user clone instructions.
+- Preserved `WukongCodexForge`, `wukong-forge`, the retained-release path and the existing Studio storage key as explicit upgrade-compatibility identifiers; historical release paths and evidence remain unchanged.
+- Added path-specific line-ending attributes for the frozen pet proof files so fresh Windows clones reproduce the reviewed byte hashes instead of depending on a previous checkout's Git settings.
+- Rename/lifecycle/minimal-package focused contracts passed 46/46. The final full gate passed 101 tests with 9 environment-only skips and 0 failures.
+
 ## 2026-08-01 — V34 event-driven lifecycle release candidate
 
 - Replaced the formal persistent PowerShell/watcher launch path with Codex embedded Node, an append-only bridge, `runtime/host.mjs`, and the official ChatGPT root process.

@@ -31,7 +31,7 @@ if ($rootItem.Attributes -band [IO.FileAttributes]::ReparsePoint) {
 }
 
 $packageDefinition = Get-Content -LiteralPath (Join-Path $rootPath 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$packageDefinition.name -ne 'wukong-codex-forge') {
+if ([string]$packageDefinition.name -ne 'wukong-codex-theme') {
     throw 'Repository-backed installation found an invalid package marker.'
 }
 

@@ -59,7 +59,7 @@ Assert-DirectPath -Path $hostPath -Label 'event lifecycle host'
 Assert-DirectPath -Path $legacyActivatorPath -Label 'legacy AppX activation helper'
 Assert-DirectPath -Path $activatorSourcePath -Label 'native AppX activation source'
 $marker = Get-Content -LiteralPath $markerPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$marker.name -ne 'wukong-codex-forge') {
+if ([string]$marker.name -ne 'wukong-codex-theme') {
     throw 'Launch adapter verification failed: package marker name is invalid.'
 }
 

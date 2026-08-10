@@ -25,7 +25,7 @@ if (-not (Test-Path -LiteralPath $packageDefinition -PathType Leaf) -or -not (Te
     throw 'Theme source is incomplete; live native restoration cannot be requested from this directory.'
 }
 $themePackage = Get-Content -LiteralPath $packageDefinition -Raw -Encoding UTF8 | ConvertFrom-Json
-if ([string]$themePackage.name -ne 'wukong-codex-forge') {
+if ([string]$themePackage.name -ne 'wukong-codex-theme') {
     throw 'Theme package marker is invalid.'
 }
 
