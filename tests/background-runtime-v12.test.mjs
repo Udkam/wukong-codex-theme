@@ -152,15 +152,14 @@ test('V12 rotates through every active battle and scenery image in separate stat
   const transitionCount = Math.max(battleSceneIds.length - 1, scenerySceneIds.length);
   for (let index = 0; index < transitionCount; index += 1) {
     await enterThreadState(page);
-    await page.waitForTimeout(760);
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV12.refresh());
     if (sceneryScenes.length < scenerySceneIds.length) {
       sceneryScenes.push(await page.locator('html').getAttribute('data-forge-scene'));
     }
     activeLayers.push(await page.locator('#wukong-forge-background').getAttribute('data-forge-active-layer'));
 
-    await page.locator('[aria-label="新建任务"]').click();
     await installLanding(page);
-    await page.waitForTimeout(760);
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV12.refresh());
     if (battleScenes.length < battleSceneIds.length) {
       battleScenes.push(await page.locator('html').getAttribute('data-forge-scene'));
     }

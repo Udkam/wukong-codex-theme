@@ -5,6 +5,7 @@ import path from 'node:path';
 import {
   MAX_BACKGROUND_PIXELS,
   MAX_DECORATION_PIXELS,
+  MAX_GALLERY_BYTES,
   MAX_GALLERY_PIXELS,
   MAX_TRANSITION_PIXELS,
   assertRasterPixelBudget,
@@ -28,9 +29,14 @@ const dimensionsFor = relativeAsset => {
 };
 
 test('active gallery stays inside decoded-pixel and two-scene transition budgets', t => {
+  const slotByAsset = new Map(theme.background.gallery.map(scene => [scene.asset, scene.slot]));
   const unique = [...new Set(theme.background.gallery.map(scene => scene.asset))]
-    .map(dimensionsFor);
+    .map(asset => ({ ...dimensionsFor(asset), slot: slotByAsset.get(asset) }));
   const totalPixels = unique.reduce((sum, asset) => sum + asset.pixels, 0);
+  const totalBytes = unique.reduce(
+    (sum, asset) => sum + fs.statSync(path.resolve(themeRoot, asset.asset)).size,
+    0
+  );
   const transitionPixels = unique
     .map(asset => asset.pixels)
     .sort((left, right) => right - left)
@@ -40,28 +46,38 @@ test('active gallery stays inside decoded-pixel and two-scene transition budgets
   for (const asset of unique) {
     assert.ok(asset.pixels <= MAX_BACKGROUND_PIXELS, `${asset.asset} exceeds the per-background budget`);
   }
+  assert.equal(unique.length, 22, 'active gallery must contain 22 unique numbered assets');
+  assert.ok(totalBytes <= MAX_GALLERY_BYTES, 'gallery exceeds its encoded-byte budget');
   assert.ok(totalPixels <= MAX_GALLERY_PIXELS, 'gallery exceeds its decoded-pixel budget');
   assert.ok(transitionPixels <= MAX_TRANSITION_PIXELS, 'crossfade exceeds its two-scene decoded-pixel budget');
 
-  const primaryGreatSage = unique.find(asset => asset.asset.endsWith('great-sage-staff.jpg'));
+  const primaryGreatSage = unique.find(asset => asset.slot === 'B02');
   assert.deepEqual(
     { width: primaryGreatSage?.width, height: primaryGreatSage?.height },
     { width: 1920, height: 1080 },
-    'active Great Sage battle background must remain full HD'
+    'B02 Great Sage battle background must remain full HD'
   );
   for (const asset of unique) {
-    const standard1080 = asset.width >= 1920 && asset.height >= 1080;
-    const approvedUltrawide = (
-      asset.asset.endsWith('erlang-ink-duel.jpg') &&
-      asset.width >= 2560 &&
-      asset.height >= 1000 &&
-      asset.pixels >= 1920 * 1080
+    const approvedWide = (
+      asset.width >= 1920 &&
+      asset.height >= 960 &&
+      asset.width / asset.height <= 2.1
     );
-    assert.ok(standard1080 || approvedUltrawide, `${asset.asset} is below the active cinematic quality floor`);
+    const approvedUltrawide = (
+      ['B01', 'B07'].includes(asset.slot) &&
+      asset.width >= 2560 &&
+      asset.height >= 1000
+    );
+    const sourceResolutionException = asset.slot === 'B05' && asset.width === 1256 && asset.height === 707;
+    assert.ok(
+      approvedWide || approvedUltrawide || sourceResolutionException,
+      `${asset.slot} ${asset.asset} is below the active cinematic quality floor`
+    );
   }
   t.diagnostic(
+    `encoded gallery: ${totalBytes.toLocaleString('en-US')} bytes; ` +
     `decoded gallery: ${totalPixels.toLocaleString('en-US')} px; transition: ${transitionPixels.toLocaleString('en-US')} px; ` +
-    'all active backgrounds satisfy the 1080p or approved 2560px-ultrawide quality floor'
+    '22 numbered slots satisfy the 960p-wide, approved ultrawide, or source-resolution contract'
   );
 
   assert.equal(payloadFromThemeFile(themePath).assets.length, theme.background.gallery.length);

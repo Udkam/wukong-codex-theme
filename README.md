@@ -1,193 +1,204 @@
 # Wukong Codex Forge
 
-> 当前开发线为 **0.13.0 / V50.1 lifecycle hotfix candidate**。V49 及更早实现继续原样保留为可审计历史；与现行行为冲突时，以 `docs/CURRENT_GOAL.md` 及本节的 V50.1 合同为准。
+为 Windows 官方 ChatGPT/Codex 桌面应用制作的《黑神话：悟空》风格主题。项目直接从本地 Git 仓库加载背景、纸面材质与样式，最终窗口仍由官方 `ChatGPT.exe` 承载；不会修改 `ChatGPT.exe`、`app.asar`、WindowsApps、应用签名或 Codex 配置，也不会创建一个独立的“Wukong Codex”应用。
 
-## V50.1 当前交付边界
+当前源码版本为 **0.14.7 / V51.9**。主题提供 22 张有序背景、原生坐标上的四角纸面输入器、侧栏选中纸带、环境信息纸面以及清晰的运行进度状态色。
 
-- **宠物整体延期**：本轮不修改、准备、打包、安装或验收小天命人和小八戒；`releasedPetIds` 保持为空，现有宠物目录、选择、payload 与元数据原样保留。宠物未通过不再阻塞本轮完成。
-- **葫芦已取消**：活动主题、注入器与最小包均不包含葫芦；历史素材只保留，不进入运行链。
-- **正式生命周期不再依赖常驻 PowerShell**：普通受管入口使用 Codex 自带 Node，经过 append-only `.mjs` bridge 启动 `runtime/host.mjs`，再启动官方 `ChatGPT.exe`。Windows Store 入口可能先产生一个很快退出的中转 PID，因此 host 不再把该 PID 当作浏览器寿命；它以受管 profile 的回环 DevTools 端口、浏览器身份和 Target/Page/Runtime 事件为真值，浏览器通道消失后只保留 4 秒有界重连，不做 1700ms target 轮询。
-- **移除即回原生**：保留式主题目录或 marker 不存在时，同一 bridge 在下一次受管启动中直接运行官方 `ChatGPT.exe`。不会修改 `ChatGPT.exe`、`app.asar`、WindowsApps 或官方配置；不会强制改写当前已打开的非受管窗口。
-- **适用入口有明确边界**：安装器管理的开始菜单 `ChatGPT` 与 `ChatGPT - Wukong Theme` 进入上述链路；直接运行 WindowsApps、AUMID、协议链接或第三方快捷方式可能绕过它。Store 包升级后需重新运行适配器验证，以刷新版本化的内置 Node 路径。
-- **正式安装与生命周期已落地**：V50.1 启动链热修复已安装为新的 append-only release `0.13.0-20260808-171808`；两个开始菜单入口均使用 Codex 内置 Node + 同一 bridge。该 release 可在中转 PID 先退出时继续等待正式 DevTools 通道，也可在旧 host 意外结束但 Codex 通道仍存活时安全重新接管；安装后已在当前真实 Codex renderer 到达 `watching-event-driven`，主题状态与四角纸面均验证为 active。
-- **环境卡实机整页门已通过**：V42 定向环境卡回归 1/1、最小包 1/1 通过；单个临时受管实例的完整页截图确认 `环境信息`、`子智能体`、`后台进程`、`来源` 四个标题直接显露同一外层纸面，没有独立深条，300px 卡片及原生分隔仍保留。截图后 root、launcher、项目 Node 与随机回环端口全部归零。
-- **真实非宠物联合门已完成**：V50 在一个临时受管实例中取得 `2050×1106 @ 125%` 完整页，原生顶部菜单、侧栏 selected 纸带、风景背景、真实 queue、活动 goal、`300px` 环境卡与长方形四角纸张输入器同屏。输入器在原生和主题状态下均为 `736×98px`，surface、editor shell、editor、footer 与 6 个原生底栏按钮的最大坐标差均为 `0`，布局属性完全一致，同时 `::before` 四角纸面仍存在。截图后原生恢复、watcher 确认、精确 root/host 与回环监听释放全部通过。原图因含本地工作区信息只保留在本机，不进入 Git；宠物与葫芦仍不在本轮门内。
+## 主要特性
 
-## V15–V50.1 实现与审计演进
+- 保留官方应用名称、图标、账号、项目、任务和原生交互。
+- 新建任务页使用 13 张战斗图，已有任务使用 9 张风景图；两组都按固定编号顺序切换，不随机抽取。
+- `Ctrl+Alt+B` 在当前模式内原位切换下一张背景，`Ctrl+Alt+Shift+B` 切换上一张；两者都在战斗或风景当前组内循环，不刷新页面、不重载或重建主题。
+- 普通任务切换、history/hash、流式回答、窗口缩放和 DOM 重挂载都不会换图。
+- 真正点击“新建任务”时，只有距上次自动推进至少 20 分钟才自动推进；没有后台定时轮播。
+- 下一张图由最终参与绘制的同一个 `<img>` 完成解码后才淡入；旧图在此之前持续可见。稳态只保留一张背景纹理，420 ms 过渡期最多两张，并且同时最多一个图片解码请求。
+- 图片本身不使用亮度、饱和度或对比度滤镜；战斗与风景遮罩均按每张图的色调降至正文仍满足至少 4.5:1 模型对比度的范围。
+- 运行链不使用 WMI/CIM、固定周期进程扫描、renderer 轮询、服务或计划任务。
+- 删除仓库后主题来源消失，监督器会注销自身，后续启动回到官方原生界面。
 
-- **活动范围是全窗背景 + 原生表面 paint 替换**：当前 landing 以原 56×56 图标位为锚点，在不改变其 DOMRect 与热区的前提下绘制三倍大小的官方“悟空”书法与朱印，并在原题字位显示“此去，欲破何局？”。原生“新建任务”和描述说明仅视觉透明，DOM、文本、布局与停用恢复保留；不新增卡片、栏位、按钮或 emoji。
-- **不完全覆盖已按官方 UI 源修复**：只读审计 `OpenAI.Codex 26.715.2305.0` 的 `app.asar`，确认中间黑块来自 `<main class="main-surface">` 的实体底色，顶部另有 `[data-app-shell-main-content-top-fade]`。V13.1 只清除二者的背景绘制，保留原生圆角、阴影、裁切、尺寸与命中区。
-- **双场景图库改为 renderer 内固定场景**：每个 renderer 在本次会话中分别选定一张战斗图和一张风景图并写入 session 状态；同一模式下切换项目、任务、history 或 hash 都不再换图、重解码或交叉淡变。只有 landing 与 thread 模式真正互换时才切到另一张已固定场景，并以 220 ms 低成本淡变完成。
-- **V50 继续执行低占用背景合同**：首屏不构造额外 `Image`，不预解码全部 9 张背景；解码 URL 可复用，切换最多保留一个可取消请求，稳态只保留一个背景纹理，220 ms 过渡期最多两个。旧层过渡后清空，`will-change` 只在过渡期存在；隐藏页面暂停刷新，流式回答的纯文本增长不触发整页主题重映射。
-- **新建任务首帧不再依赖缩放修复**：renderer 运行时识别官方 280 ms 淡入中的稳定标题节点，并监听标题/图案的延迟挂载；两次有界启动探测在 420 ms 内结束，不形成页面轮询。原项目名虚线装饰在主题激活期间透明化，避免题字下出现横线；正式 host 使用 Target/Page/Runtime 与 marker 文件事件，不以周期 target poll 维持主题。
-- **56×56 图案已转为三倍官方字标**：撤销所有卡通短棍和微缩器物方案；深/浅“悟空”书法按场景切换，以 336×336 双倍源绘制 168×168 视觉层，可见约 141×96 px；原生 56×56 图案占位、布局和热区均不变。
-- **输入框已进入 V50 原生坐标上的四角长方形纸面验收**：主 surface 的宽高、锚点、响应式结果、editor shell、editor、footer、按钮和全部内距完全由原生布局决定；主题只在同一矩形边界内用不命中鼠标的 `::before` 绘制纸纹，并裁出四个 8px 角，因此仍是用户要求的长方形悟空纸张，而不是回退原生圆角外观。排队区继续按 V22 的真实两层拓扑绘制：一个外层 queue panel 内含 N 个 internal queue item，再接一个目标 panel；每条内部消息保留独立纸纹与原生 `gap-px` 接缝，后续目标面板直边承接。独立 progress pill 才是全圆。
-- **队列上方黑带已按原生结构消除**：V38 依据当前 ASAR 的 `data-thread-scroll-footer`，只撤下其内层、无交互 `bg-gradient-to-t` 绘制，保留 sticky footer、滚动障碍、DOM、宿主、相对位置、尺寸与命中区。V50 又把该透明规则与生产 Motion wrapper 内 progress fade 改为首帧直达，修复后的完整页证据同时保留排队消息、进行中目标、原生几何内的四角长方形输入器与工作区背景，不把组件局部截图冒充整页验收。
-- **环境信息卡只做一体式 paint 替换**：V42 使用当前 ASAR 的 `data-pip-obstacle="thread-summary-panel"`、Section 与直属 header 结构映射官方 `300px` 卡片。最外层唯一纸面连续贯穿 `环境信息`、`子智能体`、`后台进程`、`来源` 与 7 行内容；主标题祖先链上的真实 `bg-token-dropdown-background` 承载层、四个标题本体及其伪元素都必须透明，不再另画深色底条、阴影或圆角。按钮、折叠、链接、滚动、ARIA 和全部几何保持原生。
-- **高频重挂载表面不再闪回原生**：composer、编辑器壳、发送键、300px 环境卡、环境行以及显式 selected/current 侧栏行由当前官方稳定属性和 class 组合直接获得主题 paint，React 切换任务后新 DOM 首次样式计算即可命中；运行时标记仅补充 queue/goal、动态标题和兼容分支。forced-colors 同时覆盖直接规则与标记规则，停用主题仍完整回到原生。
-- **背景过渡已有同页四阶段证据**：V24 连续记录新建页战斗稳态、进入对话交叉淡化、对话风景稳态和返回新建页战斗稳态；四层均逐边覆盖视口，纹理持有量为 `1 → 2 → 1 → 1`，不预取、不常驻 filter / `will-change`，返回新建页后字标与题字无需 resize 即出现。
-- **原生 ASAR 基线失效即停**：V28 锁定当前 Codex `26.715.2305.0` 的包目录、`app.asar` 字节数与 SHA-256；任一漂移都要求重新只读审计，避免应用升级后继续套用旧选择器或旧几何。
-- **真实整页证据等待原生 UI**：V29 修复一次性验收脚本过早截到 Codex 启动 Logo 的问题；截图前必须同时出现原生 app shell 与 landing/composer，并确认 V13 背景层 ready，截图后仍按精确 PID/端口证明释放。
-- **真实 landing 整页技术预验收**：V30 在 `1280×820 @ 125%` 的正式 Codex renderer 验证 275 px 原生侧栏、736×100 px 主纸面、全窗 `cover` 背景、60 个主题标记与原生 editor；截图含本地工作区名称，仅本地保留，仓库只归档去标识化摘要与哈希。该结果不冒充用户视觉通过，也不关闭 queue/goal、环境卡、宠物或最终生命周期门。
-- **失败捕获也必须自动归零**：V31 把临时窗口清理移到成功/失败共享路径。真实 renderer 故意打开不存在任务并触发 15 秒超时后，没有生成伪截图；脚本仍自动恢复原生 DOM、等待 watcher 确认并释放唯一 root、launcher 和端口。该门只证明开发取证资源安全，不冒充 queue/goal 视觉或最终生命周期通过。
-- **composer 不堆微缩道具**：夜叉套与兽棍·神锋由延期的 Hatch Pet 工作流承接，金箍棒由战斗背景完整表现；输入框只在原生矩形边界内的四角长方形纸面上承接游戏 UI 的纸面、云纹、回纹角饰与信息层级。不得加栏、改字、改命中区或用生成图补造装备细节。
-- **Hatch Pet 分开验收**：当前重新建立 `little-wukong-v5-yaksha-shenfeng-canonical-rebuild-20260725` 与 `little-bajie-v4-inart-game-motion` 两条 run；待审批 id 分别为 `little-wukong-v5-yaksha-shenfeng` 与 `little-bajie-v4-inart-game-motion`。基础候选已通过完整神锋/双足和成年猪妖/完整九齿钉耙的本地门，仍须先由用户分别审定母版，未通过前不扩展动作。
-- **宠物发布三态受单一策略保护**：`releasedPetIds` 当前为空；两个新候选只在 `pendingPetIds`，两个被否决旧包只在 `frozenPetIds`，三集合强制两两互斥。仓库旧文件、用户 discovery 目录与当前宠物选择均保留；准备、打包和安装不读取、不复制、不迁移或升级待审批/冻结包。
-- **最小包只携带现行定义**：`themes/active.json` 是页面 payload 的唯一活动清单，`themes/native-wukong.json` 只承担原生外观预览；含退役葫芦与旧宠物引用的 `themes/ink-mountain.json` 原位保留为历史文件，但不会进入正式运行包。
-- **最终随 Codex 启动集成（V50.1 已修复 Store 中转进程交接）**：受管入口、事件 host、原生恢复、真实联合完整页、输入器原生坐标证明和精确资源释放均已通过；现行正式候选链以本页顶部 V50.1 合同为准。
-- **本地素材只读**：`E:\GameRecord\Black Myth Wukong` 与 `D:\SteamLibrary\steamapps\common\BlackMythWukong` 可用于索引、比对和复制式抽帧；项目不得删除、移动或覆盖其中任何原文件。
+## 系统要求
 
-当前定向合同覆盖 `cover` 全窗、首帧解码门控、持久表面首帧、DOMRect 约束、稳态单纹理、单请求解码、9 图像素预算、当前定义与最小包排除门禁。真实 Codex 独立调试包只在一次性取证期间临时启动并已关闭；输入框/queue/goal/环境卡联合完整页已通过实机技术验收，延期宠物不再是本轮发布门槛。
+- Windows 10 或 Windows 11。
+- 已安装 Microsoft Store 提供的官方 ChatGPT/Codex 桌面应用（包名 `OpenAI.Codex`）。
+- Windows 自带的 .NET Framework v4 C# 编译器可用；安装器用它构建当前用户级激活器与监督器。
+- 当前用户可以运行 PowerShell 5.1 脚本。PowerShell 只用于一次性安装、维护与停用；日常正式启动使用预编译激活器和 Codex 自带 Node。
+- 仓库必须保留在固定路径。主题资源直接从该 checkout 读取，不会复制为一套可脱离仓库运行的主题。
+- 仓库路径及关键输入文件不得经过 junction、符号链接或其他 reparse point；安装器会对此 fail closed。
 
-当前新增归档的完整页面技术证据（均为无头原生结构 fixture，不等于真实 Codex 窗口或用户视觉验收）：
-
-- [V23 环境信息卡与完整 guided 页面](artifacts/test-runs/v23-environment-panel-2026-07-31T23-14-14-461Z/01-full-multi-guided.png)及其[几何/绘制记录](artifacts/test-runs/v23-environment-panel-2026-07-31T23-14-14-461Z/capture.json)
-- [V24 新建页战斗稳态](artifacts/test-runs/v24-background-transition-2026-07-31T23-55-59-699Z/01-full-landing-stable.png)、[进入对话过渡](artifacts/test-runs/v24-background-transition-2026-07-31T23-55-59-699Z/02-full-transition-to-thread.png)、[对话风景稳态](artifacts/test-runs/v24-background-transition-2026-07-31T23-55-59-699Z/03-full-thread-stable.png)、[返回新建页](artifacts/test-runs/v24-background-transition-2026-07-31T23-55-59-699Z/04-full-landing-returned.png)及其[状态机记录](artifacts/test-runs/v24-background-transition-2026-07-31T23-55-59-699Z/capture.json)
-- [V38 环境卡一体纸面、queue/goal 与完整页面](artifacts/test-runs/v38-environment-unified-20260803-141204/01-full-multi-guided.png)及其[7 行/3 分区/透明标题绘制记录](artifacts/test-runs/v38-environment-unified-20260803-141204/capture.json)仅保留为历史 fixture 证据；它没有模拟真实标题外层与伪元素的独立深色 paint，不能证明 V42 实机效果。
-
-> 以下是 **0.10.0 / V11 历史记录**，不代表当前运行包；其中宠物与葫芦方案已被顶部 V38 合同取代。
-
-## 0.10.0 / V11 历史实现（保留）
-
-- **仍是原生 Codex 页面**：顶部栏、侧栏、工作区、输入器、环境信息卡、原有图标、文案和事件全部保留；不增加主题侧栏、底栏、开关、状态卡或 emoji。
-- **替换样式而非只换颜色**：侧栏操作项采用窄边经匣切角与朱砂签，输入器采用同宽同高的短轨经匣轮廓，发送键采用同尺寸八角朱砂印，环境卡采用同尺寸典籍匣角与行分隔。改变的是轮廓、材质和局部构造，不改变原生槽位坐标、宽高、内边距或文字。
-- **背景完全覆盖且逐图适配**：唯一的 `body::before` 固定背景使用 `cover` 覆盖全窗；11 张画面分别定义色板、遮罩与亮度，战斗/风景模式遮罩与场景遮罩独立叠加。白场杨戬、大圣、夜叉王和五张风景图不再被统一压成同一种暗色。
-- **角色改用原生 Hatch Pet**：页面样式层不再绘制静态小悟空或小八戒。小悟空固定为游科官方天命人厌火夜叉套 1/12 造型并持兽棍·神锋；小八戒固定参考 INART 1/12，使用旧青衣、念珠和恰好九齿的钉耙。两者按 Codex v2 8×11 动画图集制作、验证和安装。
-- **页面 motif 只保留湘妃葫芦**：它是无交互、无障碍隐藏的单一装饰，不进入输入器、侧栏或环境卡布局，也不改变任何 DOMRect。
-- **回答继续无框**：助手回答及其祖先链保持透明、无阴影、无圆角；用户提示词、回答和输入提示均不改写。
-
-当前 V11 fixture 证据：
-
-- [新建任务·杨戬战斗境](docs/screenshots/runtime-v11-fixture-v2-landing.png)
-- [进入对话·佛窟风景境](docs/screenshots/runtime-v11-fixture-v2-thread.png)
-- [几何、状态与控制台记录](docs/screenshots/runtime-v11-fixture-v2.json)
-
-fixture 只用于稳定复核 landing/thread 两类 DOM。真实 Codex renderer 已在同一受管实例完成补充审计：
-
-- [真实 V11 新建任务窗口](docs/screenshots/live-codex-v11-native-pets-initial-20260722.png)及其[状态 JSON](docs/screenshots/live-codex-v11-native-pets-initial-20260722.png.json)
-- [官方“宠物”页识别两个自定义包](docs/screenshots/live-codex-v11-native-pets-linked-payload-main-20260722.png)及其[状态 JSON](docs/screenshots/live-codex-v11-native-pets-linked-payload-main-20260722.png.json)
-- [小八戒原生宠物层](docs/screenshots/live-codex-v11-bajie-pet-linked-payload-20260722.png)与[小悟空原生宠物层](docs/screenshots/live-codex-v11-wukong-pet-linked-payload-20260722.png)
-- [小八戒 11 行动作表](docs/pets/little-bajie-v3-inart/contact-sheet.png)、[小悟空 11 行动作表](docs/pets/little-wukong-yaksha-shenfeng/contact-sheet.png)
-
-`start-theme.cmd` 会调用 `scripts/install-native-pets.ps1`，但宠物发布集合只由包内 `pets/release-policy.json` 决定。当前两个重建母版都尚待用户审计，因此批准集合为空：安装器在创建 CodexHome、宠物目录或事件日志前直接无操作返回，既有宠物、选择与 discovery 目录完全不变。未来只有在用户明确通过新母版并单独更新发布策略后，安装器才会为获准包建立真实发现目录，并在其内部使用 hash 版本化 `payload-*` junction；旧 payload 和 metadata 仍按 append-only 合同保留。
-
-## 0.9.0 / V10 历史交付（保留）
-
-- **普通入口自动生效**：首次双击 `start-theme.cmd` 会把用户开始菜单中的普通 `ChatGPT.lnk` 改为 178 字符的短入口，并立即启动主题窗口。以后从同一个普通 ChatGPT 快捷方式启动即可；主题根目录不存在时，版本化桥接脚本动态定位当前官方 Store 包并按原生方式启动。
-- **关闭同生命周期**：主题 watcher 只跟随隔离 profile 的 Codex renderer；连续 8 次、约 13.6 秒没有 renderer 即自动结束。Windows 官方主进程可按托盘策略隐藏窗口并保留 renderer，此时 watcher 继续绑定同一实例而不新增副本；再点同一 ChatGPT 快捷方式会以相同 profile 进入官方 `second-instance` / `codex://launch` 通道并复显该窗口。若 renderer 或进程真正退出，watcher 自动结束，下一次启动再创建。不会结束或改写用户已经打开的普通 Codex。
-- **原生外形、场景换肤**：仍是 36 px 菜单栏、275 px 侧栏、原生工作区、736 × 98 px 输入器和 300 px 环境卡；没有主题侧栏、底栏、按钮或开关。新任务自动为战斗境，进入对话自动为风景境。
-- **11 组场景自适应矿色**：每张背景同时携带独立的文字、侧栏、顶栏、输入器、用户气泡、代码块、菜单、环境卡与 veil 色板，换图不再只换背景。
-- **独立同行者层**：新绘小悟空、小八戒与湘妃葫芦位于一个 `aria-hidden`、`inert`、`pointer-events:none` 的固定覆盖层；不再依附输入框伪元素。小悟空和小八戒站在工作区底部两侧，葫芦按页面在新任务主视觉、环境卡脚部或工作区上缘之间选择安全位置。
-- **只增不删**：官方 `ChatGPT.exe`、WindowsApps、`app.asar` 与 `config.toml` 零写入；官方快捷方式原件、失败的 1023 字符入口和后续入口版本均保存在 append-only 历史目录。脚本不删除、不移动文件。
-
-当前本机真实窗口证据：
-
-- [最终便携包 fresh-profile 启动](docs/screenshots/live-codex-v10-release-fresh-profile-landing.png)及其[状态与几何 JSON](docs/screenshots/live-codex-v10-release-fresh-profile-landing.json)
-- [普通快捷方式启动·新任务战斗境](docs/screenshots/live-codex-v10-autostart-landing.png)及其[状态与几何 JSON](docs/screenshots/live-codex-v10-autostart-landing.json)
-- [同一窗口·对话风景境](docs/screenshots/live-codex-v10-autostart-thread.png)及其[状态与几何 JSON](docs/screenshots/live-codex-v10-autostart-thread.json)
-
-本次实测为 PID 26812、随机回环端口 38625、watcher PID 18296；V10 active、背景 `cover`、输入器 736 × 98、环境卡 300 × 473、助手回答透明无框，三件伴随元素均不接收鼠标。定向回归 24/24 通过。
-
-最终推荐 ZIP 另以全新目录和全新 profile 验收：PID 45072、端口 34661、watcher PID 46940；`starting → watching`，受管标记 128、三项安全位 true、启动 stderr 0 bytes。该窗口保留供现场审计。
-
-安全边界：开始菜单快捷方式、安装目录内 `start-theme.cmd` 与由它安装的入口可自动带主题启动。直接运行 WindowsApps 内 `ChatGPT.exe`、Store AUMID、协议或第三方自建入口会绕过适配器；若要无条件拦截这些入口，需要修改官方包、IFEO、注入 DLL 或系统服务，本项目为避免崩溃与破坏签名明确不采用。
-
-只读核对官方 26.715.2305.0 主进程代码后确认：Windows 的 `window-all-closed` 不调用 `app.quit()`，所以“关闭窗口”与“结束 `ChatGPT.exe`”不是同一事件；驻留实例的恢复由官方 `second-instance` 队列、同一 `CODEX_ELECTRON_USER_DATA_PATH`、同一 `--user-data-dir` 和 `codex://launch` 共同完成。Chromium 在原生窗口已隐藏时仍可能报告 DOM `visible`，因此本项目只按受管根 PID 的 `MainWindowHandle` 验收复显，失败即明确返回非零，不伪造可见或退出状态，也不调用 Win32 窗口操控 API。
-
-## 0.8.0 / V9 历史记录（保留）
-
-“大圣归来 · 潇湘双境”是 Windows Codex 桌面端的《黑神话：悟空》样式层。它复用真实 Codex DOM，保留顶部栏、275 px 侧栏、工作区、736 × 98 px 输入器与 300 px 环境卡，不增加主题控制栏、侧栏或底栏。用户提示词和回答不改写，助手回答保持无框；小悟空、小八戒与湘妃葫芦只作为无交互伪元素出现，不改变任何原生槽位。
-
-## 潇湘双境
-
-- **新建任务页＝战斗境**：首幕是用户指定的水墨杨戬对决图；大圣归来和金箍棒同属主组，夜叉王、雷法与蓝色对峙只低频出现。
-- **进入对话＝风景境**：根据任务路径和标题稳定选择岭谷、林寺、山径、佛窟或晚霞，同一任务不随时间跳图。
-- **组件采用“潇湘矿色”**：侧栏和环境卡只换墨铁、石青、旧金、漆褐材质，不再粘贴夜叉套、神锋或武器条。
-- **三件伴随元素**：以实机画面为造型依据的小悟空与小八戒站在输入器左右空白沟槽，湘妃葫芦位于左侧余量；三者都不进入输入框，碰撞正文、窗口过窄或强制高对比时自动隐藏。
-- **原生形状优先**：46 px 任务栏、275 px 侧栏、768/736 px 内容与输入器、300 px 浮动环境卡及其原生圆角均不变；只换背景、透明度、边线和材质。
-
-## 安装与使用
-
-下载并解压发布包后，直接双击 `start-theme.cmd`。它会同时启动官方 Codex 与主题 watcher；无需 npm、全局 Node、浏览器扩展或管理员安装。
-
-仓库用户也可直接运行：
+## 安装与首次启动
 
 ```powershell
+git clone https://github.com/Udkam/wukong-codex-forge.git
+cd wukong-codex-forge
+.\install-theme.cmd
 .\start-theme.cmd
 ```
 
-如需把一个只增不删的版本副本放入 Codex 用户目录，再双击 [install-theme.cmd](install-theme.cmd)，或执行：
+首次安装前，建议先完全退出 ChatGPT，包括托盘或后台实例。安装器会验证官方包、建立仓库 bridge、编译当前用户级原生入口监督器，并维护一个仍叫作 `ChatGPT`、仍使用官方图标的开始菜单入口。
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\install-preserving.ps1
+如果 `start-theme.cmd` 提示当前窗口来自未受管入口，请完全退出 ChatGPT 后再运行一次。Chromium 的受管启动参数不能在进程创建后补加，因此只有这种首次修复场景需要完整退出；安装完成后的日常任务切换不需要重启。
+
+## 日常使用
+
+安装成功后，从开始菜单或已固定的官方名称 `ChatGPT` 入口启动即可，不需要运行 `npm`，也不需要保持 PowerShell 窗口。
+
+- 手动下一张背景：`Ctrl+Alt+B`（当前模式内循环）
+- 手动上一张背景：`Ctrl+Alt+Shift+B`（当前模式内循环）
+- 两个切图快捷键都原位解码与淡入，不刷新页面，也不重载或重建主题。
+- 临时恢复当前窗口为原生界面：运行 `stop-theme.cmd`
+- 在同一个可复用官方窗口重新应用主题：运行 `start-theme.cmd`
+- Store 更新覆盖入口后：重新运行 `install-theme.cmd`
+
+## 背景编号与切换顺序
+
+手动切换永远在当前模式的编号序列内推进或后退并循环，因此不会随机抽图，也不会切换战斗/风景模式。
+
+| 战斗顺序 | 场景 ID | 风景顺序 | 场景 ID |
+| --- | --- | --- | --- |
+| B01 | `erlang-ink-duel` | S01 | `ridge-gate` |
+| B02 | `great-sage-staff` | S02 | `forest-shrine` |
+| B03 | `storm-bearer` | S03 | `mountain-path` |
+| B04 | `shadow-confrontation` | S04 | `sunlit-mountain-vista` |
+| B05 | `training-sunset` | S05 | `sunset-ravine` |
+| B06 | `thunder-dragon-ascent` | S06 | `mist-temple` |
+| B07 | `ink-wanderer` | S07 | `cavern-temple` |
+| B08 | `white-tiger` | S08 | `snow-lake` |
+| B09 | `red-lightning` | S09 | `autumn-grove` |
+| B10 | `violet-dharma-ring` | — | — |
+| B11 | `white-dragon-frost` | — | — |
+| B12 | `bear-crush` | — | — |
+| B13 | `spider-blade` | — | — |
+
+完整循环分别为：
+
+```text
+B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13 -> B01
+S01 -> S02 -> S03 -> S04 -> S05 -> S06 -> S07 -> S08 -> S09 -> S01
 ```
 
-版本化安装器会：
+当前 22 张 JPEG 合计 8,355,513 bytes（约 8.36 MB）、45,201,592 解码像素。图片不会在启动时全部解码，也不会进行相邻场景预取。
 
-1. 把最小运行包写入 `%USERPROFILE%\.codex\themes\wukong-codex-forge\releases\<版本-时间>`。
-2. 保留旧 app、旧 state、旧素材和历史配置副本；只记录早期颜色主题证据，不改写当前 `config.toml`。
-3. 先把现有普通入口复制到 append-only 备份，再创建或更新 `ChatGPT.lnk` 与名称明确的 `ChatGPT - Wukong Theme.lnk`；两者都只引用当前 retained release 的短 bridge。
-4. 运行 `scripts/verify-launch-adapter.ps1`，核对两个快捷方式、bridge、release marker、事件记录和 SHA-256；任一项不一致即安装失败。
+## 自行调整背景
 
-便携入口使用包内 `.wukong-runtime`；稳定入口使用 Codex 当前正式 profile。安装器不强关现有窗口，也不修改 `ChatGPT.exe`、WindowsApps、`app.asar`、签名文件或 Codex 配置。已经运行且没有调试端口的普通 Codex 窗口无法通过“只复制文件”即时换肤；这是 Chromium renderer 的运行边界。安装完成后，从经过 verifier 的受管入口进行下一次启动即可。
+### 替换现有图片
 
-## 停用与保留
+`scripts/prepare-background.ps1` 可以把 JPG、PNG 等 System.Drawing 可读取的图片转换为对应编号槽位。脚本不会修改源图，默认不放大小图，最大输出 1920×1080、JPEG 质量 90；带透明通道的区域会铺为黑色。需要去掉源图黑边时，可选传入 `-CropTop`、`-CropRight`、`-CropBottom`、`-CropLeft`，单位均为源图像素。
 
-双击 `stop-theme.cmd`（`remove-theme.cmd` 是同义入口）可把当前主题窗口热恢复为原生 DOM：
+例如，用自己的图片替换 B05：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\disable.ps1 -Root . -Portable
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
+  -Slot B05 `
+  -InputPath "D:\Pictures\my-battle.png" `
+  -Force
 ```
 
-停用脚本必须先验证 renderer 已无 style、class、标记和运行时对象，才报告成功；它不删除任何文件。关闭主题 Codex 后，用户自行删除解压目录即可完全回到普通 Codex。0.8.0 的运行状态、profile、请求与日志全部位于该目录的 `.wukong-runtime`，目录外不创建快捷方式或持久主题配置。
-
-## 成本与稳定性
-
-- 11 张压缩 JPEG 和 3 张透明 WebP 共 2,737,884 bytes（约 2.61 MiB）；启动后无素材网络请求。
-- 无视频解码、定时轮播、持续截图或布局轮询。
-- 每张背景只编码一次，语义别名引用同一 CSS 变量；注入变量约 3.65M 字符、完整样式约 3.67M 字符，本机热应用约 1.2 秒。
-- 随机回环端口就绪后，启动器以最多 20 秒、每 350 ms 一次的有界重试等待首个 Codex renderer；只有 V9 完整样式已应用并回读验证，才进入 watcher 状态。
-- V9 只保留一个 `childList` 结构观察器：忽略属性、文字、滚动、逐字输入和焦点变化，仅当新增/移除节点命中对话、输入器或浮层结构时触发；所有刷新以 650 ms 合并节流，侧栏与提交动作只安排有限次复核。
-- 同一真实 renderer 稳态 6 秒采样：原生 landing 约 3.90% 单核，V9 主题 landing 约 1.82% 单核；差异处于调度噪声内，未测得主题常驻增量。
-- 页面内停用只撤销受管 style 和 `forge-*` 标记；磁盘文件与历史版本全部保留。
-
-## 针对性验证
+替换 S03 并自定义编码质量：
 
 ```powershell
-npm run test:theme
-npm run test:managed-package
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
+  -Slot S03 `
+  -InputPath "D:\Pictures\my-scenery.jpg" `
+  -Quality 92 `
+  -Force
+```
+
+使用规则：
+
+1. 当前活动战斗槽位为 `B01`–`B13`，风景槽位为 `S01`–`S09`；准备脚本为后续扩展接受 `B01`–`B99` / `S01`–`S99`。
+2. 已存在的槽位必须显式传入 `-Force`，防止误覆盖。
+3. 活动清单只有 `themes/active.json`；`themes/ink-mountain.json` 是历史文件，不要编辑它来配置当前主题。
+4. 如需改变裁切焦点，可编辑对应条目的 `position`；`tone` 控制界面配色，`veil` 控制阅读遮罩强度，`mark` 可在浅/深“悟空”字标之间选择。
+5. 替换后依次运行 `stop-theme.cmd`、`start-theme.cmd`，即可让同一官方窗口重新载入资源，不需要重启 ChatGPT；只有受管调试通道本身已不存在时才需要退出并重开一次。
+6. 准备公开提交前请运行 `npm ci` 与 `npm run check`，确保总字节、解码像素和双图过渡预算没有超限。
+
+### 调整播放顺序
+
+播放顺序由 `themes/active.json` 中每个场景的 `slot` 与 `order` 决定，JSON 条目本身排在哪一行不影响播放。战斗组与风景组分别从 1 连续编号，且 `slot` 必须和 `order` 一致：例如 `B03` 对应 `order: 3`，`S06` 对应 `order: 6`。
+
+要交换两张图的顺序，同时交换它们的 `slot` 和 `order` 即可；场景的 `id`、`asset`、`position`、`tone`、`veil` 和 `mark` 留在原条目中。修改后运行 `stop-theme.cmd`、`start-theme.cmd`。由于图片文件名和逻辑顺序可以不同，后续替换图片时应以该条目的 `asset` 文件名为准。
+
+### 增加一张背景
+
+例如增加第 14 张战斗图：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
+  -Slot B14 `
+  -InputPath "D:\Pictures\my-new-battle.jpg"
+```
+
+然后在 `themes/active.json` 的 `background.gallery` 中增加：
+
+```json
+{ "id": "my-new-battle", "slot": "B14", "order": 14, "asset": "backgrounds/battle-14.jpg", "position": "center center", "mode": "battle-secondary", "tone": "celestial-ink", "veil": 0.8 }
+```
+
+风景图同理使用下一个连续编号（当前为 `S10`）并把 `mode` 设为 `scenery`。`id` 必须唯一；同一组的 `slot`/`order` 必须从 1 连续到末项，图库最多 24 项。当前图库已使用 45,201,592 / 48,000,000 解码像素，因此通常只能再加入一张不超过 1920×1080 的图片；如需更多图片，请降低尺寸或替换现有图片。仅本地自用时只需修改 `themes/active.json`；若要把新默认顺序公开提交，还应同步 `shared/theme-model.mjs`、固定数量测试、README 表格与 `docs/ASSET_SOURCES.md`。
+
+## 停用与恢复原生
+
+运行以下任一命令可以恢复当前窗口的原生 DOM 与绘制，且不会结束 ChatGPT 进程：
+
+```powershell
+.\stop-theme.cmd
+# 或
+.\remove-theme.cmd
+```
+
+如果不再使用本项目，先运行上述命令，再删除本地仓库。监督器检测到仓库或 `package.json` 标记消失后会撤销自己的当前用户启动项；残留 bridge 也只会回退启动官方应用，不再加载主题资源。
+
+## 故障排查
+
+### 启动后仍是原生主题
+
+1. 完全退出 ChatGPT，包括托盘/后台实例。
+2. 在仓库根目录重新运行 `install-theme.cmd`。
+3. 再运行 `start-theme.cmd`。
+4. 若 Store 刚完成更新，必须重跑安装器以刷新官方包路径与 AUMID 验证。
+
+### 切换任务时短暂错位
+
+主题只替换原生 DOM 上的 paint，不创建第二套输入器。若应用升级改变了原生结构，运行 `npm run check`；原生结构合同失败时应先更新适配器，不要用额外定位规则掩盖漂移。
+
+### 资源占用异常
+
+背景运行时没有定时轮播，稳态只保留一张纹理。若占用持续异常，先运行 `stop-theme.cmd` 比较原生状态，并检查是否存在开发服务器、测试浏览器或其他非日常进程；不要按进程名批量结束 ChatGPT 子进程。
+
+## 开发与验证
+
+```powershell
+npm ci
+npm run check
+```
+
+常用聚焦测试：
+
+```powershell
 npm run test:runtime-states
+npm run test:managed-package
+npm run test:native
 ```
 
-当前证据分两类：
+项目结构：
 
-- 生产 DOM 形态 fixture：验证双境切换、原生几何不变、回答无框、文字零改写、三件装饰实际载入、碰撞避让与完全清理。
-- 本机生产窗口：只有从受管入口启动、并同时记录注入状态与端口的截图才算真实 Codex 证据。
+- `themes/active.json`：唯一活动主题清单。
+- `themes/backgrounds/`：B/S 编号背景槽位。
+- `runtime/`：renderer 注入、背景状态机、宿主与原生入口组件。
+- `scripts/`：安装、启动、停用、打包与背景准备工具。
+- `tests/`：资源预算、原生几何、生命周期和最小包合同。
+- `docs/`：需求、设计、素材来源、历史决策和验收记录。
 
-与最终 release 使用同一视觉载荷的真实 Codex 截图（同名 JSON 保留状态、几何与 computed style）：
+进一步阅读：[当前目标](docs/CURRENT_GOAL.md)、[设计说明](docs/DESIGN.md)、[需求与验收](docs/REQUIREMENTS.md)、[素材来源](docs/ASSET_SOURCES.md)。
 
-- [新建任务·战斗境](docs/screenshots/live-codex-v9-final-landing.png)
-- [进入任务·风景境与无框正文](docs/screenshots/live-codex-v9-final-thread.png)
+## 素材、商标与侵权联系
 
-自动实渲染截图：
+本项目是独立、非官方的本地主题项目，与 OpenAI、Game Science 或《黑神话：悟空》的权利人不存在隶属、授权或背书关系。ChatGPT、Codex、《黑神话：悟空》及相关角色、商标、书法、截图和美术权利归各自权利人所有。
 
-- [原生 UI 基线](docs/screenshots/native-ui-baseline.png)
-- [战斗境·杨戬首幕](docs/screenshots/runtime-style-battle-erlang.png)
-- [战斗境·大圣归来](docs/screenshots/runtime-style-battle-great-sage.png)
-- [战斗境·夜叉王](docs/screenshots/runtime-style-battle-yaksha.png)
-- [战斗境·金箍棒](docs/screenshots/runtime-style-battle-jingu.png)
-- [风景境·对话中](docs/screenshots/runtime-style-thread.png)
-- 旧 0.7.0 的金箍棒、神锋和夜叉套 UI 近景素材保留为历史证据，但不进入 0.8.0 运行包；当前金箍棒只作为战斗境背景画面使用。
+部分背景图片由网络搜集或由用户提供，仅用于非商业主题展示；仓库不主张这些原始图片的所有权。若您是相关权利人并认为仓库内容侵犯了您的权利，请发送邮件至 **`chenlj89@mail2.sysu.edu.cn`**，维护者会核验并及时移除或更正。
 
-## 文档
+详细来源和发布边界见 [docs/ASSET_SOURCES.md](docs/ASSET_SOURCES.md)。
 
-- [需求与验收](docs/REQUIREMENTS.md)
-- [设计与实现](docs/DESIGN.md)
-- [多对话分工与交付边界](docs/WORKBREAKDOWN.md)
-- [运行时调查](docs/RUNTIME_FINDINGS.md)
-- [Codex 26.715.2305.0 原生 UI 基线](docs/UI_BASELINE.md)
-- [素材来源与发布边界](docs/ASSET_SOURCES.md)
-- [V10 同行者生成谱系](docs/PET_GENERATION.md)
-- [0.9.0 发布记录](docs/RELEASE_0.9.0.md)
+## 许可证
 
-过程日志位于本地 `docs/logs/CHANGELOG.md`，按仓库约定不提交。代码以 [MIT](LICENSE) 发布；游戏名称、截图、装备参考与官方艺术作品的权利属于其各自权利人。
+代码按 [MIT License](LICENSE) 发布。第三方图片、商标、角色和其他素材不因代码许可证而获得再许可。

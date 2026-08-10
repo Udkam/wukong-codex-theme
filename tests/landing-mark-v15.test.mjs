@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { validateTheme } from '../shared/theme-model.mjs';
+import { cssFor, validateTheme } from '../shared/theme-model.mjs';
 
 const css = fs.readFileSync(
   new URL('../runtime/forge-background-v13.css', import.meta.url),
@@ -17,7 +17,7 @@ test('V16 landing mark paints the official Wukong wordmark at threefold scale wi
   const rule = ruleMatch[1];
   assert.match(
     rule,
-    /background-image:\s*var\(--forge-ui-landing-mark\)/
+    /background-image:\s*var\(\s*--forge-landing-mark-active,[\s\S]*--forge-ui-landing-mark/
   );
   assert.doesNotMatch(rule, /animation|filter|will-change/i);
   assert.match(rule, /top:\s*50%/);
@@ -59,15 +59,26 @@ test('V16 landing mark paints the official Wukong wordmark at threefold scale wi
     assert.ok(asset.byteLength < 40960, `${relativePath} should stay under 40 KiB`);
   }
 
-  const darkRule = css.match(
-    /:root\.forge-ink-mountain:is\(([\s\S]*?)\)\s+\[data-testid="home-icon"\]\[data-forge-mark="1"\]::before\s*\{([\s\S]*?)\n\}/
+  assert.doesNotMatch(css, /data-forge-scene="(?:4|8)"[\s\S]*landing-mark-dark/);
+  const sceneVariables = cssFor(
+    activeTheme,
+    activeTheme.background.gallery.map((scene, index) => ({
+      ...scene,
+      url: `data:image/jpeg;base64,${Buffer.from(String(index)).toString('base64')}`
+    })),
+    {},
+    {}
   );
-  assert.ok(darkRule, 'scene-adaptive dark wordmark rule must exist');
-  for (const scene of ['0', '4', '8']) {
-    assert.match(darkRule[1], new RegExp(`data-forge-scene="${scene}"`));
+  for (const slot of ['B07', 'B08']) {
+    const index = activeTheme.background.gallery.findIndex(scene => scene.slot === slot);
+    assert.match(
+      sceneVariables,
+      new RegExp(`data-forge-scene="${index}"[^}]*--forge-landing-mark-active:var\\(--forge-ui-landing-mark-dark\\)`)
+    );
   }
-  assert.match(darkRule[2], /--forge-ui-landing-mark-dark/);
-  assert.match(darkRule[2], /--forge-ui-landing-mark/);
+  const firstSceneRule = sceneVariables.match(/data-forge-scene="0"\]\{([^}]*)\}/)?.[1] || '';
+  assert.match(firstSceneRule, /--forge-landing-mark-active:var\(--forge-ui-landing-mark\)/);
+  assert.doesNotMatch(firstSceneRule, /landing-mark-dark/);
 
   const legacyTheme = structuredClone(activeTheme);
   delete legacyTheme.uiAssets.landingMarkDark;

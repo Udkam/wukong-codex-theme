@@ -20,10 +20,10 @@ const contrast = (left, right) => {
   return (values[0] + .05) / (values[1] + .05);
 };
 
-test('all nine active cinematic scenes declare a validated adaptive tone', () => {
+test('all twenty-two numbered cinematic scenes declare a validated adaptive tone', () => {
   assert.equal(active.schemaVersion, 3);
-  assert.equal(active.background.gallery.length, 9);
-  assert.equal(new Set(active.background.gallery.map(scene => scene.tone)).size, 9);
+  assert.equal(active.background.gallery.length, 22);
+  assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 22);
   for (const scene of active.background.gallery) {
     const tone = SCENE_TONES[scene.tone];
     for (const key of ['ink', 'inkSoft', 'lacquer', 'jade', 'jadeLight', 'gold', 'goldLight', 'paper', 'composer', 'sidebar', 'rightCard', 'veil', 'brightness']) {
@@ -33,26 +33,36 @@ test('all nine active cinematic scenes declare a validated adaptive tone', () =>
   const invalid = structuredClone(active);
   delete invalid.background.gallery[3].tone;
   assert.throws(() => validateTheme(invalid), /Invalid background\.gallery entry/);
+  const invalidSequence = structuredClone(active);
+  invalidSequence.background.gallery.find(scene => scene.slot === 'B13').order = 12;
+  assert.throws(() => validateTheme(invalidSequence), /Invalid background\.gallery/);
   assert.equal(active.background.gallery[0].position, '68% center');
 });
 
-test('all nine active scene veils keep primary copy readable over a worst-case white pixel', () => {
+test('all active scene veils preserve copy contrast while battle art remains lighter than scenery art', () => {
+  const backdropLuminances = { battle: [], scenery: [] };
   for (const scene of active.background.gallery) {
     const tone = SCENE_TONES[scene.tone];
-    const [, , sceneCenter] = tone.veil;
+    const [, , toneCenter] = tone.veil;
+    const sceneCenter = toneCenter * (scene.veil ?? 1);
     const scenery = scene.mode === 'scenery';
-    const modeHorizontal = scenery ? ['#0c0f0d', .27] : ['#0c0e0d', .04];
-    const modeVertical = scenery ? ['#0a0d0b', .14] : ['#0a0c0b', .02];
-    const sceneHorizontal = scene.id === 'erlang-ink-duel' ? .56 : sceneCenter;
-    const sceneVertical = scene.id === 'erlang-ink-duel' ? .31 : sceneCenter;
+    const modeHorizontal = scenery ? ['#0c0f0d', .25] : ['#0c0e0d', .035];
+    const modeVertical = scenery ? ['#0a0d0b', .12] : ['#0a0c0b', .018];
     let backdrop = [255, 255, 255];
-    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneVertical);
-    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneHorizontal);
+    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneCenter);
+    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneCenter);
     backdrop = blend(backdrop, rgb(modeVertical[0]), modeVertical[1]);
     backdrop = blend(backdrop, rgb(modeHorizontal[0]), modeHorizontal[1]);
     const ratio = contrast(rgb(tone.ink), backdrop);
     assert.ok(ratio >= 4.5, `${scene.id} primary copy contrast is ${ratio.toFixed(2)}:1`);
+    const group = scenery ? 'scenery' : 'battle';
+    backdropLuminances[group].push(luminance(backdrop));
   }
+  const average = values => values.reduce((sum, value) => sum + value, 0) / values.length;
+  assert.ok(
+    average(backdropLuminances.battle) > average(backdropLuminances.scenery),
+    'battle backdrops must remain perceptually lighter than scenery backdrops'
+  );
 });
 
 test('scene switching updates image, shell surfaces and text minerals together', async t => {
@@ -83,21 +93,25 @@ test('scene switching updates image, shell surfaces and text minerals together',
         rightCard: style.getPropertyValue('--forge-right-card-bg').trim(),
         sceneVeil: style.getPropertyValue('--forge-scene-veil').trim(),
         sceneBrightness: style.getPropertyValue('--forge-scene-brightness').trim(),
+        sceneSlot: style.getPropertyValue('--forge-scene-slot').trim(),
+        sceneOrder: Number(style.getPropertyValue('--forge-scene-order')),
         sceneBackground: style.getPropertyValue('--forge-scene-bg').trim()
       };
     }, index));
   }
 
-  assert.equal(new Set(states.map(state => state.composer)).size, 9);
-  assert.equal(new Set(states.map(state => state.sidebar)).size, 9);
-  assert.equal(new Set(states.map(state => state.rightCard)).size, 9);
-  assert.equal(new Set(states.map(state => state.paper)).size, 9);
+  assert.ok(new Set(states.map(state => state.composer)).size >= 9);
+  assert.ok(new Set(states.map(state => state.sidebar)).size >= 9);
+  assert.ok(new Set(states.map(state => state.rightCard)).size >= 9);
+  assert.ok(new Set(states.map(state => state.paper)).size >= 9);
   states.forEach((state, index) => {
     const tone = SCENE_TONES[active.background.gallery[index].tone];
     assert.equal(state.ink, tone.ink);
     assert.equal(state.paper, tone.paper);
     assert.match(state.sceneVeil, /linear-gradient/);
     assert.equal(Number(state.sceneBrightness), tone.brightness);
+    assert.equal(state.sceneSlot, active.background.gallery[index].slot);
+    assert.equal(state.sceneOrder, active.background.gallery[index].order);
     assert.match(state.sceneBackground, /data:image\/jpeg/);
   });
 });

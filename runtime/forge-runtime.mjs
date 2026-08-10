@@ -11,7 +11,7 @@ export const MAX_GALLERY_BYTES = 24 * 1024 * 1024;
 export const MAX_MOTIF_BYTES = 4 * 1024 * 1024;
 export const MAX_UI_ASSET_BYTES = 1024 * 1024;
 export const MAX_BACKGROUND_PIXELS = 12_000_000;
-export const MAX_GALLERY_PIXELS = 32_000_000;
+export const MAX_GALLERY_PIXELS = 48_000_000;
 export const MAX_TRANSITION_PIXELS = 16_000_000;
 export const MAX_DECORATION_PIXELS = 4_194_304;
 
@@ -173,7 +173,17 @@ export function resolveThemeAssets(themePath, theme) {
       if (totalBytes > MAX_GALLERY_BYTES) throw Error('Theme gallery exceeds size limit');
       if (totalPixels > MAX_GALLERY_PIXELS) throw Error('Theme gallery exceeds decoded pixel limit');
     }
-    return { id: entry.id, url: encoded.url, position: entry.position, mode: entry.mode, tone: entry.tone };
+    return {
+      id: entry.id,
+      slot: entry.slot,
+      order: entry.order,
+      url: encoded.url,
+      position: entry.position,
+      mode: entry.mode,
+      tone: entry.tone,
+      veil: entry.veil,
+      mark: entry.mark
+    };
   });
   const transitionPixels = uniquePixels.sort((left, right) => right - left).slice(0, 2)
     .reduce((sum, pixels) => sum + pixels, 0);

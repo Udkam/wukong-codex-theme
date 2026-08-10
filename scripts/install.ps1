@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($AllowLegacyMutation) { Write-Warning 'Legacy mutation was requested, but destructive legacy behavior remains archived and cannot run.' }
-& (Join-Path $PSScriptRoot 'install-preserving.ps1') -Destination $Destination -NoShortcut:$NoShortcut
+& (Join-Path $PSScriptRoot 'install-repository.ps1') -Root (Split-Path $PSScriptRoot -Parent) -NoShortcut:$NoShortcut
 return
 
 <# Archived legacy implementation retained below as non-executable history.

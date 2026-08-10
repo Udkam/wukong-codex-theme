@@ -4,12 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  activatePackagedChatGpt,
+  appxArgumentLine,
   browserIdentity,
   controlPipeName,
   createHostSignals,
   deriveOfficialPaths,
   findReusableDevToolsPort,
   parseHostArgs,
+  repositoryStateRoot,
   resolveHostPaths,
   runEventWatcher,
   waitForDevToolsPort
@@ -62,7 +65,7 @@ const nativeState = {
   runtimeV13: false
 };
 
-test('formal lifecycle bridge is Node-hosted, event-driven and non-PowerShell', () => {
+test('formal lifecycle bridge is Node-hosted and uses a compiled native AppX helper', () => {
   const host = read('runtime/host.mjs');
   const hook = read('scripts/install-chatgpt-hook.ps1');
   const bridge = hook.match(/\$bridgeScript = @"([\s\S]*?)"@/)?.[1] || '';
@@ -72,29 +75,98 @@ test('formal lifecycle bridge is Node-hosted, event-driven and non-PowerShell', 
   assert.match(host, /Page\.frameNavigated/);
   assert.match(host, /Runtime\.executionContextCreated/);
   assert.doesNotMatch(host, /setInterval\s*\(/);
-  assert.doesNotMatch(host, /powershell(?:\.exe)?|runtime[\\/]watch\.mjs|Start-Sleep/i);
+  assert.doesNotMatch(host, /runtime[\\/]watch\.mjs|Start-Sleep|Get-CimInstance|Get-WmiObject/i);
+  assert.match(host, /helperPath: paths\.appxActivatorPath/);
+  assert.match(host, /activationMode: 'native-appx-aumid'/);
+  assert.match(host, /launchMode = 'activated-official-appx'/);
+  assert.match(host, /if \(portable\) \{[\s\S]*?spawn\(official\.chatGpt, args/);
+  assert.match(host, /runtime', 'activate-appx\.cs'/);
+  assert.doesNotMatch(host, /WindowsPowerShell|powershell\.exe|activate-appx\.ps1/i);
 
   assert.match(bridge, /import fs from 'node:fs'/);
   assert.match(bridge, /spawn\(target, args/);
+  assert.match(bridge, /spawnSync\(tasklist/);
+  assert.match(bridge, /hasReusableCodexChannel/);
+  assert.match(bridge, /AbortSignal\.timeout\(5_000\)/);
+  assert.match(bridge, /initialRoute[\s\S]*?avatar-overlay/);
+  assert.match(bridge, /showBlockedLaunch/);
   assert.match(bridge, /runtime', 'host\.mjs/);
-  assert.doesNotMatch(bridge, /powershell(?:\.exe)?|launch\.ps1|watch\.mjs|Get-CimInstance|Start-Process/i);
+  assert.match(bridge, /const activator = \$nativeActivatorLiteral/);
+  assert.match(bridge, /--appx-activator[\s\S]*--appx-aumid[\s\S]*--appx-package/);
+  assert.doesNotMatch(bridge, /powershell(?:\.exe)?|launch\.ps1|watch\.mjs|Get-CimInstance|Get-WmiObject|Start-Process/i);
   assert.match(hook, /\$expectedTarget = \$node/);
   assert.match(hook, /chatgpt-entry-\$bridgeId\.mjs/);
   assert.match(hook, /& \$node --check \$bridgePath/);
   assert.match(hook, /\$expectedArguments = "`"\$bridgePath`""/);
 });
 
+test('AppX activation uses an encoded argument line and validates helper evidence', () => {
+  assert.equal(
+    appxArgumentLine(['--remote-debugging-port=0', '--user-data-dir=C:\\A B', 'a"b']),
+    '--remote-debugging-port=0 "--user-data-dir=C:\\A B" "a\\"b"'
+  );
+
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), `wukong-appx-helper-${process.pid}-`));
+  const helperPath = path.join(temp, 'activate-appx.exe');
+  const expectedExecutable = path.join(temp, 'ChatGPT.exe');
+  fs.writeFileSync(helperPath, '', 'utf8');
+  fs.writeFileSync(expectedExecutable, '', 'utf8');
+  let invocation;
+  const aumid = 'OpenAI.Codex_test!App';
+  const packageName = 'OpenAI.Codex_test_1.2.3.4_x64__test';
+  const version = '1.2.3.4';
+  const evidence = activatePackagedChatGpt({
+    helperPath,
+    args: ['--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0'],
+    aumid,
+    packageName,
+    version,
+    expectedExecutable,
+    dependencies: {
+      spawnSync: (executable, args, options) => {
+        invocation = { executable, args, options };
+        return {
+          status: 0,
+          stdout: `${JSON.stringify({ pid: 1234, aumid, package: packageName, version, executable: expectedExecutable })}\n`,
+          stderr: ''
+        };
+      }
+    }
+  });
+  assert.equal(evidence.pid, 1234);
+  assert.equal(invocation.executable, helperPath);
+  assert.deepEqual(invocation.args.slice(0, 8), [
+    '--aumid', aumid,
+    '--expected-executable', expectedExecutable,
+    '--package', packageName,
+    '--version', version
+  ]);
+  const encoded = invocation.args[invocation.args.indexOf('--arguments-base64') + 1];
+  assert.equal(
+    Buffer.from(encoded, 'base64').toString('utf8'),
+    '--remote-debugging-address=127.0.0.1 --remote-debugging-port=0'
+  );
+  assert.equal(invocation.options.windowsHide, true);
+  assert.doesNotMatch(invocation.executable, /powershell|pwsh/i);
+});
+
 test('event host arguments, official path derivation and pipe ownership are deterministic', () => {
   assert.deepEqual(parseHostArgs(['--root', 'C:\\theme']), {
     portable: false,
+    repository: false,
     signalDisable: false,
     root: 'C:\\theme'
   });
-  assert.deepEqual(parseHostArgs(['--root', 'C:\\theme', '--portable', '--signal-disable']), {
-    portable: true,
+  assert.deepEqual(parseHostArgs(['--root', 'C:\\theme', '--repository', '--signal-disable']), {
+    portable: false,
+    repository: true,
     signalDisable: true,
     root: 'C:\\theme'
   });
+  assert.throws(
+    () => parseHostArgs(['--root', 'C:\\theme', '--portable', '--repository']),
+    /mutually exclusive/
+  );
   assert.throws(() => parseHostArgs(['--portable']), /--root DIR/);
   assert.throws(() => parseHostArgs(['--root', 'C:\\theme', '--unknown']), /Unknown or incomplete/);
 
@@ -105,6 +177,25 @@ test('event host arguments, official path derivation and pipe ownership are dete
     env: { USERPROFILE: 'C:\\Users\\Test', APPDATA: 'C:\\Users\\Test\\AppData\\Roaming' }
   });
   assert.equal(resolved.profilePath, path.resolve('C:\\Users\\Test\\AppData\\Roaming\\Codex\\web\\Codex'));
+  const repositoryResolved = resolveHostPaths({
+    root: 'C:\\checkout\\wukong-codex-forge',
+    repository: true,
+    env: {
+      USERPROFILE: 'C:\\Users\\Test',
+      APPDATA: 'C:\\Users\\Test\\AppData\\Roaming',
+      LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local'
+    }
+  });
+  assert.equal(repositoryResolved.profilePath, resolved.profilePath);
+  assert.equal(
+    repositoryResolved.stateRoot,
+    repositoryStateRoot({
+      root: 'C:\\checkout\\wukong-codex-forge',
+      env: { USERPROFILE: 'C:\\Users\\Test', LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' }
+    })
+  );
+  assert.match(repositoryResolved.stateRoot, /WukongCodexForge[\\/]repository-state[\\/][0-9a-f]{24}$/);
+  assert.equal(repositoryResolved.stateRoot.startsWith(path.resolve('C:\\checkout')), false);
   assert.equal(controlPipeName(resolved.stateRoot), controlPipeName(resolved.stateRoot.toUpperCase()));
   assert.match(controlPipeName(resolved.stateRoot), /^\\\\\.\\pipe\\WukongCodexForge-[0-9a-f]{24}$/);
   assert.match(browserIdentity({
@@ -133,6 +224,26 @@ test('startup follows the managed DevTools channel after the short-lived Store r
   });
 
   assert.equal(port, 17776);
+});
+
+test('startup channel wait stops immediately when the lifecycle is terminated', async () => {
+  const profilePath = path.join(os.tmpdir(), `wukong-event-host-cancel-${process.pid}-${Date.now()}`);
+  fs.mkdirSync(profilePath, { recursive: false });
+  const signals = createHostSignals();
+  const waiting = waitForDevToolsPort({ profilePath, timeoutMs: 30_000, signals });
+  signals.requestTerminate();
+  assert.equal(await waiting, null);
+});
+
+test('host refresh signal requests reconciliation without changing stop state', () => {
+  const signals = createHostSignals();
+  let changes = 0;
+  const unsubscribe = signals.subscribe(() => { changes += 1; });
+  signals.requestRefresh();
+  unsubscribe();
+  assert.equal(changes, 1);
+  assert.equal(signals.disableRequested, false);
+  assert.equal(signals.terminateRequested, false);
 });
 
 test('an orphaned event host can safely reattach to the live Codex profile channel', async () => {
@@ -282,6 +393,56 @@ test('event watcher applies once, verifies active state, and restores before dis
     'Target.setDiscoverTargets',
     'Target.setAutoAttach'
   ]);
+});
+
+test('removing the repository marker restores the live ChatGPT renderer before the host exits', async () => {
+  const runRoot = path.join(os.tmpdir(), `wukong-repository-removal-${process.pid}-${Date.now()}`);
+  fs.mkdirSync(runRoot, { recursive: false });
+  const markerPath = path.join(runRoot, 'package.json');
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  let markerPresent = true;
+  let themed = false;
+  const never = new Promise(() => {});
+
+  const result = await runEventWatcher({
+    port: 17773,
+    expression: 'APPLY',
+    disableRequest: '',
+    rootPid: null,
+    markerPath,
+    signals: createHostSignals(),
+    onReady: () => {
+      markerPresent = false;
+      fs.writeFileSync(path.join(runRoot, 'repository-removed.signal'), 'removed\n', { encoding: 'utf8', flag: 'wx' });
+    },
+    dependencies: {
+      existsSync: candidate => candidate === markerPath ? markerPresent : fs.existsSync(candidate),
+      getBrowserVersion: async () => ({
+        Browser: 'Codex/test',
+        webSocketDebuggerUrl: 'ws://127.0.0.1:17773/devtools/browser/stable'
+      }),
+      getTargets: async () => [{ id: 'page-1', type: 'page', url: 'app://codex/index.html' }],
+      isCodexTarget: () => true,
+      connectBrowserEvents: async () => ({
+        closed: never,
+        command: async () => ({}),
+        close: () => {}
+      }),
+      evaluateTarget: async (_target, expression) => {
+        if (expression === 'APPLY') { themed = true; return true; }
+        if (expression === ACTIVE_PROBE_EXPRESSION) return themed;
+        if (expression === THEME_STATE_EXPRESSION) return themed ? activeState : nativeState;
+        if (expression === RESTORE_EXPRESSION) { themed = false; return true; }
+        throw Error(`Unexpected expression: ${expression.slice(0, 24)}`);
+      },
+      targetSettleMs: 0,
+      log: () => {}
+    }
+  });
+
+  assert.equal(result.reason, 'theme-removed-verified');
+  assert.equal(result.targets, 1);
+  assert.equal(themed, false);
 });
 
 test('disable fails closed when native restoration cannot be verified', async () => {
@@ -451,6 +612,56 @@ test('event watcher remains dormant until a delayed renderer appears', async () 
   browserEvent({ method: 'Target.targetCreated', params: { targetInfo: target } }, { command: async () => ({}) });
   const result = await resultPromise;
 
+  assert.equal(result.reason, 'terminated-verified');
+  assert.equal(themed, false);
+});
+
+test('bounded startup probes recover a delayed renderer when the browser emits no target event', async () => {
+  const runRoot = path.join(os.tmpdir(), `wukong-event-host-probe-${process.pid}-${Date.now()}`);
+  fs.mkdirSync(runRoot, { recursive: false });
+  const markerPath = path.join(runRoot, 'package.json');
+  fs.writeFileSync(markerPath, '{"name":"wukong-codex-forge"}\n', { encoding: 'utf8', flag: 'wx' });
+  const signals = createHostSignals();
+  const never = new Promise(() => {});
+  const target = { id: 'page-probed', type: 'page', url: 'app://codex/index.html' };
+  let targetReads = 0;
+  let themed = false;
+
+  const result = await runEventWatcher({
+    port: 17781,
+    expression: 'APPLY',
+    disableRequest: '',
+    rootPid: process.pid,
+    markerPath,
+    signals,
+    onReady: () => { signals.requestTerminate(); },
+    dependencies: {
+      getBrowserVersion: async () => ({
+        Browser: 'Codex/test',
+        webSocketDebuggerUrl: 'ws://127.0.0.1:17781/devtools/browser/stable'
+      }),
+      getTargets: async () => (++targetReads >= 2 ? [target] : []),
+      isCodexTarget: () => true,
+      connectBrowserEvents: async () => ({
+        closed: never,
+        command: async () => ({}),
+        close: () => {}
+      }),
+      evaluateTarget: async (_target, expression) => {
+        if (expression === 'APPLY') { themed = true; return true; }
+        if (expression === ACTIVE_PROBE_EXPRESSION) return themed;
+        if (expression === THEME_STATE_EXPRESSION) return themed ? activeState : nativeState;
+        if (expression === RESTORE_EXPRESSION) { themed = false; return true; }
+        throw Error(`Unexpected expression: ${expression.slice(0, 24)}`);
+      },
+      startupTargetProbeDelays: [1],
+      targetSettleMs: 0,
+      log: () => {}
+    }
+  });
+
+  assert.ok(targetReads >= 2);
+  assert.ok(targetReads <= 3);
   assert.equal(result.reason, 'terminated-verified');
   assert.equal(themed, false);
 });

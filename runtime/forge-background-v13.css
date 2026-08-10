@@ -9,7 +9,7 @@
 :root.forge-ink-mountain {
   --forge-paper: #101210;
   --forge-scene-brightness: 1;
-  --forge-background-transition: 220ms;
+  --forge-background-transition: 420ms;
   --forge-mode-veil:
     linear-gradient(90deg, rgba(8, 10, 9, .34), rgba(12, 14, 13, .18) 30%, rgba(12, 14, 13, .18) 70%, rgba(8, 10, 9, .32)),
     linear-gradient(180deg, rgba(8, 10, 9, .22), rgba(8, 10, 9, .09) 22%, rgba(8, 10, 9, .12) 78%, rgba(8, 10, 9, .28));
@@ -28,16 +28,6 @@
   --forge-mode-veil:
     linear-gradient(90deg, rgba(8, 11, 9, .4), rgba(12, 15, 13, .25) 25%, rgba(12, 15, 13, .25) 75%, rgba(8, 11, 9, .38)),
     linear-gradient(180deg, rgba(9, 12, 10, .21), rgba(10, 13, 11, .12) 18%, rgba(10, 13, 11, .14) 82%, rgba(9, 12, 10, .26));
-}
-
-/*
- * Scene 0 is the white Erlang ink duel. The additional `html` specificity is
- * intentional: generated scene variables are appended after this stylesheet.
- */
-html:root.forge-ink-mountain[data-forge-scene="0"] {
-  --forge-scene-veil:
-    linear-gradient(90deg, rgba(13, 15, 14, .79) 0%, rgba(17, 20, 18, .58) 27%, rgba(17, 20, 18, .54) 73%, rgba(13, 15, 14, .76) 100%),
-    linear-gradient(180deg, rgba(18, 21, 19, .44), rgba(18, 21, 19, .32) 22%, rgba(18, 21, 19, .35) 80%, rgba(18, 21, 19, .49));
 }
 
 :root.forge-ink-mountain[data-forge-background-ready="true"],
@@ -65,10 +55,10 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transition: opacity var(--forge-background-transition) cubic-bezier(.22, .61, .36, 1);
+  transition: opacity var(--forge-background-transition) cubic-bezier(.4, 0, .6, 1);
 }
 
-:root.forge-ink-mountain #wukong-forge-background[data-forge-transitioning="true"] > [data-forge-background-layer] {
+:root.forge-ink-mountain #wukong-forge-background[data-forge-transitioning="true"] > [data-forge-background-layer][data-forge-active="true"] {
   will-change: opacity;
 }
 
@@ -83,10 +73,15 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
 }
 
 :root.forge-ink-mountain [data-forge-background-image] {
-  background-color: var(--forge-paper);
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: center center;
+  background: transparent;
+  border: 0;
+  user-select: none;
 }
 
 :root.forge-ink-mountain [data-forge-background-veil] {
@@ -138,9 +133,10 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
  * New-task hero: preserve the official 56×56 icon and title footprints while
  * replacing only their paint. The motif is the official 悟空 brush wordmark
  * and seal, painted at three times the native icon size from a 2× raster.
- * Light and dark variants follow the scene without filters or extra surfaces. The
- * native kicker and descriptive subtitle keep their layout boxes but become
- * visually transparent so the hero contains only the mark and themed title.
+ * Light and dark variants follow each manifest slot without filters or extra
+ * surfaces. The native kicker and descriptive subtitle keep their layout boxes
+ * but become visually transparent so the hero contains only the mark and themed
+ * title.
  */
 :root.forge-ink-mountain [data-forge-title-copy] {
   position: relative !important;
@@ -205,22 +201,14 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
   width: 168px;
   height: 168px;
   transform: translate(-50%, -50%);
-  background-image: var(--forge-ui-landing-mark);
+  background-image: var(
+    --forge-landing-mark-active,
+    var(--forge-ui-landing-mark)
+  );
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
   pointer-events: none;
-}
-
-:root.forge-ink-mountain:is(
-  [data-forge-scene="0"],
-  [data-forge-scene="4"],
-  [data-forge-scene="8"]
-) [data-testid="home-icon"][data-forge-mark="1"]::before {
-  background-image: var(
-    --forge-ui-landing-mark-dark,
-    var(--forge-ui-landing-mark)
-  );
 }
 
 /*
@@ -746,6 +734,31 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
     0 4px 11px rgba(5, 4, 3, .24) !important;
 }
 
+:root.forge-ink-mountain .forge-progress-status-icon {
+  color: #063f61 !important;
+  opacity: 1 !important;
+}
+
+:root.forge-ink-mountain .forge-progress-status-icon :is(circle, path) {
+  stroke: currentColor !important;
+  stroke-opacity: 1 !important;
+  stroke-width: 1.65px !important;
+}
+
+:root.forge-ink-mountain .forge-diff-added,
+:root.forge-ink-mountain .forge-diff-removed {
+  -webkit-text-stroke: .18px rgba(17, 11, 6, .62);
+  text-shadow: 0 .35px .35px rgba(17, 11, 6, .34);
+}
+
+:root.forge-ink-mountain .forge-diff-added {
+  color: #064521 !important;
+}
+
+:root.forge-ink-mountain .forge-diff-removed {
+  color: #781718 !important;
+}
+
 :root.forge-ink-mountain :is(
   .forge-composer-submit,
   :is([data-codex-composer-root], [data-thread-find-composer="true"])
@@ -1266,6 +1279,9 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
   :root.forge-ink-mountain #root .forge-composer-queue-item,
   :root.forge-ink-mountain #root .forge-composer-thread-fade,
   :root.forge-ink-mountain #root .forge-composer-progress-pill,
+  :root.forge-ink-mountain #root .forge-progress-status-icon,
+  :root.forge-ink-mountain #root .forge-diff-added,
+  :root.forge-ink-mountain #root .forge-diff-removed,
   :root.forge-ink-mountain #root .forge-plan-pill,
   :root.forge-ink-mountain #root .forge-diff-summary,
   :root.forge-ink-mountain #root .forge-composer-submit,
@@ -1342,6 +1358,14 @@ html:root.forge-ink-mountain[data-forge-scene="0"] {
     clip-path: none !important;
     forced-color-adjust: auto;
     outline: revert !important;
+  }
+
+  :root.forge-ink-mountain #root .forge-progress-status-icon,
+  :root.forge-ink-mountain #root .forge-diff-added,
+  :root.forge-ink-mountain #root .forge-diff-removed {
+    color: CanvasText !important;
+    -webkit-text-stroke: 0 !important;
+    text-shadow: none !important;
   }
 
   :root.forge-ink-mountain #root .forge-composer-progress-fade,

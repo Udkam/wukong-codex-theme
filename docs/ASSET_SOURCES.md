@@ -1,15 +1,43 @@
 # 素材来源与发布边界
 
-## V15 当前活动背景边界
+## V51.9 当前活动背景边界
 
-- 活动 runtime 只发布 9 张画面：`erlang-ink-duel`、`great-sage-staff`、`storm-bearer`、`shadow-confrontation` 与 5 张风景图。
-- 用户否决的 `themes/assets/destined-afterimage.jpg` 与 `themes/assets/yaksha-king-rift.jpg` 不再被 active/default/native preview 引用，也不会进入最小运行包；本地文件原位保留，不删除、不移动、不覆盖。
-- 旧 `great-sage-return.jpg` 同样退出活动图库，避免 1256×707 画质缺口；默认预览使用 1920×1080 `great-sage-staff.jpg`。
-- 9 张活动图解码总量为 19,258,880 px，最大两张合计 4,743,680 px。用户指定的白场杨戬图为 2560×1043 超宽构图，其余活动图均至少 1920×1080。
+活动 runtime 只从 `themes/active.json` 组装以下 22 个稳定编号槽位。B/S 两组分别按编号循环，不使用随机牌堆；文件合计 `8,355,513 bytes`，解码总量 `45,201,592 px`，最大双图过渡 `5,337,600 px`。
+
+| 槽位 | 场景 ID | 像素 | 字节 | 活动文件 | 来源类别 |
+| --- | --- | ---: | ---: | --- | --- |
+| B01 | `erlang-ink-duel` | 2560×1043 | 309,953 | `themes/backgrounds/battle-01.jpg` | 用户提供的既有活动图 |
+| B02 | `great-sage-staff` | 1920×1080 | 341,165 | `themes/backgrounds/battle-02.jpg` | 用户本地既有活动图 |
+| B03 | `storm-bearer` | 1920×1080 | 293,694 | `themes/backgrounds/battle-03.jpg` | 用户提供的既有活动图 |
+| B04 | `shadow-confrontation` | 1920×1080 | 98,466 | `themes/backgrounds/battle-04.jpg` | 用户提供的既有活动图 |
+| B05 | `training-sunset` | 1256×707 | 62,396 | `themes/backgrounds/battle-05.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B06 | `thunder-dragon-ascent` | 1920×980 | 357,973 | `themes/backgrounds/battle-06.jpg` | 2026-08-11 用户提供；可能来自网络搜集；仅裁去源图上下黑边 |
+| B07 | `ink-wanderer` | 2560×1042 | 400,195 | `themes/backgrounds/battle-07.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B08 | `white-tiger` | 1920×1080 | 332,994 | `themes/backgrounds/battle-08.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B09 | `red-lightning` | 1920×1080 | 659,828 | `themes/backgrounds/battle-09.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B10 | `violet-dharma-ring` | 1920×1080 | 529,667 | `themes/backgrounds/battle-10.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B11 | `white-dragon-frost` | 1920×1080 | 416,627 | `themes/backgrounds/battle-11.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B12 | `bear-crush` | 1920×1080 | 551,165 | `themes/backgrounds/battle-12.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B13 | `spider-blade` | 1920×960 | 676,304 | `themes/backgrounds/battle-13.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S01 | `ridge-gate` | 1920×1080 | 127,753 | `themes/backgrounds/scenery-01.jpg` | 用户提供的既有活动图 |
+| S02 | `forest-shrine` | 1920×1080 | 256,950 | `themes/backgrounds/scenery-02.jpg` | 用户提供的既有活动图 |
+| S03 | `mountain-path` | 1920×1080 | 391,525 | `themes/backgrounds/scenery-03.jpg` | 用户提供的既有活动图 |
+| S04 | `sunlit-mountain-vista` | 1920×1080 | 395,960 | `themes/backgrounds/scenery-04.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S05 | `sunset-ravine` | 1920×1080 | 167,847 | `themes/backgrounds/scenery-05.jpg` | 用户提供的既有活动图 |
+| S06 | `mist-temple` | 1920×1080 | 368,582 | `themes/backgrounds/scenery-06.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S07 | `cavern-temple` | 1920×1080 | 305,333 | `themes/backgrounds/scenery-07.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S08 | `snow-lake` | 1920×1080 | 518,319 | `themes/backgrounds/scenery-08.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S09 | `autumn-grove` | 1920×1080 | 792,817 | `themes/backgrounds/scenery-09.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+
+本轮只进行等比例缩小和 JPEG 重编码；B06 额外裁掉实测上下黑边，其他新图不裁切，不进行生成式改画或调色，源图保持原位不变。用户可通过 `scripts/prepare-background.ps1` 替换当前 B01–B13/S01–S09，脚本也接受 B01–B99/S01–S99 供后续清单扩展；新的图片仍必须通过压缩字节、单图像素、图库总像素和双图过渡预算。
+
+部分图片由网络搜集或由用户提供，仅用于非商业主题展示；其著作权、商标权和其他权利归原权利人所有。若权利人认为相关素材构成侵权，请发送邮件至 `chenlj89@mail2.sysu.edu.cn`；维护者核验后会及时处理或移除。
+
+用户否决的 `themes/assets/destined-afterimage.jpg`、`themes/assets/yaksha-king-rift.jpg` 和其他历史素材不被 active/default 引用，也不会进入最小运行包；历史文件原位保留。
 
 ## 0.12.3 / V13.3 背景、新建页、输入框与动作证据
 
-- 当前 runtime 只发布 `themes/assets/` 中 4 张战斗图与 5 张风景图；9 个活动源文件 SHA-256 均不同。runtime 不读取本机素材目录，不进行网络请求或视频解码。含退役葫芦/旧宠物引用的 `themes/ink-mountain.json` 保留为历史文件，但不进入最小运行包。
+- V13.3 当时的 runtime 只发布 `themes/assets/` 中 4 张战斗图与 5 张风景图；当时 9 个活动源文件 SHA-256 均不同。现行 V51.9 清单以本文顶部 22 个编号槽位为准。runtime 不读取本机素材目录，不进行网络请求或视频解码。含退役葫芦/旧宠物引用的 `themes/ink-mountain.json` 保留为历史文件，但不进入最小运行包。
 - V8 composer 三案及上下文证据位于 `docs/design/composer-options/v8-black-myth-silhouette-study-20260723/`。这些是纯 UI 形状预览，不包含夜叉套、神锋或金箍棒的生成替身，不进入 0.12.3 最小运行包。
 - 新建页旧 56×56 内联 SVG 短棍、墨尾与 V15 微缩金箍棒均已因卡通贴纸感或器物失真被用户否决；文件继续原位保留但 active theme 和最小包不再引用。
 - V16 字标源为 Steam 官方 CDN 的 `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2358720/logo_2x.png`，项目内只读副本是 `themes/ui/v16/sources/steam-black-myth-wukong-logo-2x.png`，310,824 bytes，SHA-256 `9B627BEE5BE0DB718A837A5DDFE1D367E02577AA5DF6168A5774382AF2BC0FA0`。
