@@ -21,6 +21,7 @@ import {
 
 const styleSheet = fs.readFileSync(new URL('../runtime/forge-background-v12.css', import.meta.url), 'utf8');
 const payload = payloadFromThemeFile(fileURLToPath(new URL('../themes/active.json', import.meta.url)));
+const activeTheme = JSON.parse(fs.readFileSync(new URL('../themes/active.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''));
 const expression = makeApplyExpression({ styleSheet, variables: payload.variables });
 const payloadSceneIds = name => {
   const value = payload.variables.match(new RegExp(`${name}:([^;]+)`))?.[1] || '';
@@ -28,6 +29,11 @@ const payloadSceneIds = name => {
 };
 const battleSceneIds = payloadSceneIds('--forge-battle-scenes');
 const scenerySceneIds = payloadSceneIds('--forge-scenery-scenes');
+const firstBattleScene = activeTheme.background.gallery[Number(battleSceneIds[0])];
+const computedPosition = value => String(value)
+  .split(/\s+/)
+  .map(token => ({ left: '0%', center: '50%', right: '100%', top: '0%', bottom: '100%' })[token] || token)
+  .join(' ');
 
 const nativeSurfaceStyle = page => page.evaluate(() => {
   const read = selector => {
@@ -83,7 +89,7 @@ test('V12 changes only the full-window background carriers and preserves native 
   const activeState = await page.evaluate(THEME_STATE_EXPRESSION);
   assert.equal(isActiveThemeState(activeState), true);
   assert.equal(activeState.mode, 'battle');
-  assert.equal(activeState.scene, '0');
+  assert.equal(activeState.scene, battleSceneIds[0]);
   assert.equal(activeState.backgroundLayerPresent, true);
   assert.equal(activeState.backgroundLayerCount, 2);
   assert.equal(activeState.motifLayerPresent, false);
@@ -121,7 +127,7 @@ test('V12 changes only the full-window background carriers and preserves native 
   assert.equal(background.transitionDuration, '0.82s');
   assert.match(background.backgroundImage, /data:image\/jpeg/);
   assert.equal(background.backgroundSize, 'cover');
-  assert.equal(background.backgroundPosition, '68% 50%');
+  assert.equal(background.backgroundPosition, computedPosition(firstBattleScene.position));
 
   const authored = await enterThreadState(page);
   await page.waitForTimeout(760);

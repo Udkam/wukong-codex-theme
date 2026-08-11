@@ -58,6 +58,10 @@
   transition: opacity var(--forge-background-transition) cubic-bezier(.4, 0, .6, 1);
 }
 
+:root.forge-ink-mountain #wukong-forge-background:not([data-forge-transitioning="true"]) > [data-forge-background-layer][data-forge-active="false"] {
+  transition: none;
+}
+
 :root.forge-ink-mountain #wukong-forge-background[data-forge-transitioning="true"] > [data-forge-background-layer][data-forge-active="true"] {
   will-change: opacity;
 }

@@ -43,6 +43,8 @@ test('all public and retained legacy lifecycle scripts parse', () => {
     'scripts/launch.ps1',
     'scripts/start.ps1',
     'scripts/install-native-pets.ps1',
+    'scripts/manage-backgrounds.ps1',
+    'scripts/prepare-background.ps1',
     'runtime/activate-appx.ps1',
     'scripts/install-chatgpt-hook.ps1',
     'scripts/verify-launch-adapter.ps1',
@@ -216,7 +218,7 @@ test('public entries route to repository-backed injection and verified disable',
   assert.match(publicScripts.disable, /\$PSBoundParameters\.ContainsKey\('Repository'\)/);
   assert.match(publicScripts.disable, /\$releaseMarker/);
 
-  for (const [name, script] of Object.entries({ launch: publicScripts.launch, disable: publicScripts.disable })) {
+  for (const [name, script] of Object.entries({ disable: publicScripts.disable })) {
     assert.match(script, /Get-AppxPackage -Name 'OpenAI\.Codex'/, `${name} does not resolve the official Codex package`);
     assert.match(script, /app\\resources\\cua_node\\bin\\node\.exe/, `${name} does not use Codex's embedded Node runtime`);
     assert.doesNotMatch(script, /Get-Command\s+node(?:\.exe)?\b/i, `${name} depends on an external Node installation`);
@@ -244,39 +246,17 @@ test('public entries route to repository-backed injection and verified disable',
   assert.match(publicScripts.install, /verify-launch-adapter\.ps1/);
   assert.match(publicScripts.install, /-Repository/);
   assert.doesNotMatch(publicScripts.install, /releases|release\.json|package-runtime|appTarget/);
-  assert.match(publicScripts.launch, /--remote-debugging-address=127\.0\.0\.1/);
-  assert.match(publicScripts.launch, /--remote-debugging-port=0/);
-  assert.match(publicScripts.launch, /CODEX_ELECTRON_USER_DATA_PATH/);
-  assert.match(publicScripts.launch, /\.wukong-runtime/);
-  assert.match(publicScripts.launch, /profileMode = 'native-default'/);
-  assert.match(publicScripts.launch, /GetFolderPath\('ApplicationData'\)[\s\S]*Codex\\web\\Codex/);
-  assert.match(publicScripts.launch, /if \(\$Portable\)[\s\S]*--user-data-dir=[\s\S]*else \{[\s\S]*--remote-debugging-port=0/);
-  assert.match(publicScripts.launch, /already running without the managed loopback theme channel/);
-  assert.match(
+  assert.match(publicScripts.launch, /\[string\]\$Root/);
+  assert.match(publicScripts.launch, /\[switch\]\$Portable/);
+  assert.match(publicScripts.launch, /Theme package marker package\.json is missing/);
+  assert.match(publicScripts.launch, /Theme package marker is invalid/);
+  assert.match(publicScripts.launch, /\$startScript = Join-Path \$rootPath 'scripts\\start\.ps1'/);
+  assert.match(publicScripts.launch, /\$null = \$Portable/);
+  assert.match(publicScripts.launch, /& \$startScript -Root \$rootPath/);
+  assert.doesNotMatch(
     publicScripts.launch,
-    /foreach \(\$managedPath in @\(\$rootPath, \$stateRoot,/,
-    'launch does not reject a reparse-point package root'
-  );
-  assert.match(publicScripts.launch, /System\.Threading\.Mutex|Threading\.Mutex/);
-  assert.match(publicScripts.launch, /WaitOne\(0\)/);
-  assert.match(publicScripts.launch, /AddSeconds\(20\)/);
-  assert.match(publicScripts.launch, /\$verifyDeadline = \[DateTime\]::UtcNow\.AddSeconds\(20\)/);
-  assert.match(publicScripts.launch, /Timed out verifying the Codex loopback theme channel/);
-  assert.match(publicScripts.launch, /\$ErrorActionPreference = 'Continue'/);
-  assert.match(publicScripts.launch, /\$verifyExitCode = \$LASTEXITCODE/);
-  assert.match(publicScripts.launch, /\$applyExitCode = \$LASTEXITCODE/);
-  assert.match(publicScripts.launch, /\$ErrorActionPreference = \$priorErrorActionPreference/);
-  assert.match(publicScripts.launch, /\$injectorPath = Join-Path \$rootPath 'runtime\\injector\.mjs'/);
-  assert.match(publicScripts.launch, /\$watcherPath = Join-Path \$rootPath 'runtime\\watch\.mjs'/);
-  assert.match(publicScripts.launch, /\$themePath = Join-Path \$rootPath 'themes\\active\.json'/);
-  assert.match(publicScripts.launch, /& \$node \$injectorPath --apply \$port \$themePath/);
-  assert.match(publicScripts.launch, /& \$node \$watcherPath \$port \$themePath \$disableRequest \$codexProcess\.Id/);
-  assert.match(publicScripts.launch, /Wait-ForManagedMainWindow -ManagedProcessId \$codexProcess\.Id/);
-  assert.match(publicScripts.launch, /if \(\$reuseManagedProcess\)[\s\S]*CODEX_ELECTRON_USER_DATA_PATH = \$profilePath[\s\S]*Start-Process -FilePath \$chatGpt/);
-  assert.ok(
-    publicScripts.launch.indexOf('& $node $injectorPath --apply $port $themePath') <
-      publicScripts.launch.indexOf("Write-RuntimeEvent 'watching'"),
-    'launch records watching before the first renderer has verified the active theme'
+    /Get-AppxPackage|Get-CimInstance|Get-WmiObject|Win32_Process|Start-Process|--remote-debugging|CODEX_ELECTRON_USER_DATA_PATH/,
+    'legacy launch compatibility wrapper owns runtime or process discovery instead of delegating'
   );
   assert.match(publicScripts.disable, /repositoryMode/);
   assert.doesNotMatch(publicScripts.install, /install-native-pets\.ps1/);
@@ -447,7 +427,16 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.match(runtime, /addEventListener\('visibilitychange', handleVisibilityChange/);
   assert.match(runtime, /scheduleRefresh\(composerSignalChanged \? 140 : undefined\)/);
   assert.doesNotMatch(runtime, /taskIdentity|landingEpoch/);
-  assert.doesNotMatch(runtime, /requestAnimationFrame|setInterval/);
+  assert.doesNotMatch(runtime, /setInterval/);
+  assert.equal(
+    runtime.match(/window\.requestAnimationFrame\(/g)?.length,
+    2,
+    'background transitions may use exactly two one-shot paint frames, never a renderer refresh loop'
+  );
+  assert.match(runtime, /state\.transitionFrameA = window\.requestAnimationFrame\(\(\) =>/);
+  assert.match(runtime, /state\.transitionFrameB = window\.requestAnimationFrame\(beginTransition\)/);
+  assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameA\)/);
+  assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameB\)/);
 
   const style = read('runtime/forge-background-v13.css');
   assert.match(style, /\[data-codex-composer-root\] \.composer-surface-chrome/);

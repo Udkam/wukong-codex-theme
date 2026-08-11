@@ -1,6 +1,6 @@
 Wukong Codex Theme 0.14.7
 
-CURRENT V51.9 ORDERED 22-BACKGROUND GALLERY
+CURRENT V52.1 ORDERED 22-BACKGROUND GALLERY
 
 This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
 
@@ -14,18 +14,18 @@ INSTALL AND START
 
 BACKGROUND CONTRACT
 
-The runtime keeps a 22-image gallery (13 battle + 9 scenery) in persistent numbered sequences. Manual switching never shuffles or repeats randomly:
+The runtime keeps a 22-image gallery (13 battle + 9 scenery) in two explicit playback sequences. A slot is the stable physical identity; order is the independent position inside its group:
 
-B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13
-S01 -> S02 -> S03 -> S04 -> S05 -> S06 -> S07 -> S08 -> S09
+B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13
+S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09
 
-Ctrl+Alt+B advances the visible mode by one slot, while Ctrl+Alt+Shift+B moves back by one slot. Both shortcuts wrap only within the current battle or scenery sequence. They do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. A real New Task action may auto-advance only after the 20-minute cooldown. Ordinary task/history/hash/stream/resize/mutation activity does not rotate backgrounds. There is no timer rotation, steady poll, WMI/CIM query, service, or scheduled task.
+Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. Ctrl+Alt+C temporarily toggles battle/scenery for the current page. Navigation clears that manual override: a New Task page defaults to battle and a project/thread page defaults to scenery. If the automatic target group is already visible, the runtime does not decode, render, or fade again. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. A real New Task action may auto-advance only after the 20-minute cooldown. Ordinary same-mode task/history/hash/stream/resize/mutation activity does not rotate backgrounds. There is no timer rotation, steady poll, WMI/CIM query, service, or scheduled task.
 
 The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
 
 CUSTOM BACKGROUNDS
 
-Run scripts\prepare-background.ps1 with -Slot B01..B13 or S01..S09 and -InputPath. The script accepts B01..B99 and S01..S99 for future manifest expansion. Existing slots require -Force. The script leaves the source file unchanged, does not upscale, and defaults to a maximum 1920x1080 JPEG at quality 90. Optional CropTop/CropRight/CropBottom/CropLeft values remove source-image borders before scaling. Transparent pixels are placed on black. themes\active.json is the only active manifest. Playback order is controlled by each entry's matching slot/order pair; numbering must stay unique and contiguous inside each mode. To add a scene, prepare the next B or S file and append a complete gallery entry. See README.md for examples and the 48,000,000 decoded-pixel budget.
+Run backgrounds.cmd without arguments for the interactive manager, or use list, add, replace, move and remove commands. Targets accept a stable slot or scene id. Move changes only the contiguous order inside the group; it never renames a slot, id or asset. Add allocates an unused physical slot. Remove unlinks a scene from rotation but retains its image. Manifest and overwritten-asset backups are written under .wukong-runtime\background-backups. The manager calls scripts\prepare-background.ps1 for deterministic conversion without changing the source image, upscaling it, or exceeding the default 1920x1080 JPEG at quality 90. See README.md for commands, optional crop parameters and the 48,000,000 decoded-pixel budget.
 
 After replacing a background, run stop-theme.cmd and then start-theme.cmd to reload the same reusable official renderer. If no reusable managed channel remains, exit ChatGPT completely and start it once through the managed ChatGPT entry.
 

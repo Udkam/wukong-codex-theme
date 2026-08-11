@@ -30,8 +30,10 @@ test('minimal managed package imports independently and omits development surfac
     'scripts/install-chatgpt-hook.ps1',
     'scripts/install-native-supervisor.ps1',
     'scripts/prepare-background.ps1',
+    'scripts/manage-backgrounds.ps1',
     'scripts/verify-launch-adapter.ps1',
     'scripts/disable.ps1',
+    'backgrounds.cmd',
     'start-theme.cmd',
     'stop-theme.cmd',
     'remove-theme.cmd',
@@ -49,6 +51,15 @@ test('minimal managed package imports independently and omits development surfac
     path.join(target, 'scripts', 'prepare-background.ps1'),
     'utf8'
   );
+  const manageBackgrounds = fs.readFileSync(
+    path.join(target, 'scripts', 'manage-backgrounds.ps1'),
+    'utf8'
+  );
+  assert.match(manageBackgrounds, /ValidateSet\('list', 'add', 'replace', 'move', 'remove'\)/);
+  assert.match(manageBackgrounds, /Join-Path \$resolvedRoot '\.wukong-runtime'/);
+  assert.match(manageBackgrounds, /Join-Path \$runtimeRoot 'background-backups'/);
+  assert.match(manageBackgrounds, /\[IO\.File\]::Replace\(/);
+  assert.doesNotMatch(manageBackgrounds, /Get-CimInstance|Get-WmiObject|Win32_Process|Stop-Process|taskkill/i);
   const slotPatternText = prepareBackground.match(/\[ValidatePattern\('([^']+)'\)\]/)?.[1];
   assert.ok(slotPatternText, 'background slot validation pattern missing');
   const slotPattern = new RegExp(slotPatternText);
@@ -138,13 +149,18 @@ test('minimal managed package imports independently and omits development surfac
   ]) assert.equal(fs.existsSync(path.join(target, rejected)), false, `rejected asset packaged: ${rejected}`);
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'capture-live.mjs')), false);
   const portableReadme = fs.readFileSync(path.join(target, 'PORTABLE-README.txt'), 'utf8');
-  assert.match(portableReadme, /CURRENT V51\.9 ORDERED 22-BACKGROUND GALLERY/);
-  assert.match(portableReadme, /22-image gallery \(13 battle \+ 9 scenery\) in persistent numbered sequences/);
-  assert.match(portableReadme, /B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13/);
-  assert.match(portableReadme, /S01 -> S02 -> S03 -> S04 -> S05 -> S06 -> S07 -> S08 -> S09/);
+  assert.match(portableReadme, /CURRENT V52\.1 ORDERED 22-BACKGROUND GALLERY/);
+  assert.match(portableReadme, /22-image gallery \(13 battle \+ 9 scenery\) in two explicit playback sequences/);
+  assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13/);
+  assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09/);
   assert.match(portableReadme, /20-minute cooldown/);
+  assert.match(portableReadme, /Ctrl\+Alt\+F/);
   assert.match(portableReadme, /Ctrl\+Alt\+B/);
-  assert.match(portableReadme, /Ctrl\+Alt\+Shift\+B/);
+  assert.match(portableReadme, /Ctrl\+Alt\+C/);
+  assert.doesNotMatch(portableReadme, /Ctrl\+Alt\+Shift\+B/);
+  assert.match(portableReadme, /Run backgrounds\.cmd without arguments for the interactive manager/);
+  assert.match(portableReadme, /Move changes only the contiguous order inside the group/);
+  assert.match(portableReadme, /Remove unlinks a scene from rotation but retains its image/);
   assert.match(portableReadme, /without starting PowerShell, Get-AppxPackage or Add-Type/);
   assert.match(portableReadme, /does not create a separately named Wukong launcher/);
   assert.doesNotMatch(portableReadme, /HISTORICAL V12 INSTRUCTIONS/);
@@ -198,10 +214,10 @@ test('minimal managed package imports independently and omits development surfac
   assert.match(payload.variables, /--forge-paper:#[0-9a-f]{6}/i);
   assert.match(payload.variables, /--forge-scene-count:22/);
   assert.doesNotMatch(payload.variables, /--forge-primary-scene-count:/);
-  assert.match(payload.variables, /--forge-scenery-scenes:4 5 6 7 8 14 15 16 17/);
+  assert.match(payload.variables, /--forge-scenery-scenes:8 7 16 4 5 6 14 15 17/);
   assert.match(payload.variables, /--forge-battle-primary-scenes:0 1/);
-  assert.match(payload.variables, /--forge-battle-secondary-scenes:2 3 9 10 11 12 13 18 19 20 21/);
-  assert.match(payload.variables, /--forge-battle-scenes:0 1 2 3 9 10 11 12 13 18 19 20 21/);
+  assert.match(payload.variables, /--forge-battle-secondary-scenes:11 2 3 9 12 13 10 18 19 20 21/);
+  assert.match(payload.variables, /--forge-battle-scenes:11 0 1 2 3 9 12 13 10 18 19 20 21/);
   assert.doesNotMatch(payload.variables, /--forge-art-yaksha-king-rift:/);
   assert.match(payload.variables, /--forge-art-great-sage-staff:var\(--forge-bg-1\)/);
   assert.equal((payload.variables.match(/data:image\/jpeg;base64,/g) || []).length, 22, 'each gallery image must be embedded only once');

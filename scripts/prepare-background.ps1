@@ -29,18 +29,44 @@ param(
     [ValidateRange(0, 8192)]
     [int]$CropLeft = 0,
 
+    [ValidateScript({ Test-Path -LiteralPath $_ -PathType Container })]
+    [string]$RepositoryRoot,
+
+    [ValidatePattern('^backgrounds[\\/][^\\/]+\.jpg$')]
+    [string]$TargetAsset,
+
     [switch]$Force
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
+    $RepositoryRoot = Split-Path -Parent $PSScriptRoot
+}
 
 Add-Type -AssemblyName System.Drawing
 
-$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$resolvedRepositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $group = if ($Slot[0] -eq 'B') { 'battle' } else { 'scenery' }
 $number = [int]$Slot.Substring(1)
-$targetDirectory = Join-Path $repositoryRoot 'themes\backgrounds'
-$targetPath = Join-Path $targetDirectory ('{0}-{1:D2}.jpg' -f $group, $number)
+$themeDirectory = Join-Path $resolvedRepositoryRoot 'themes'
+$targetDirectory = Join-Path $themeDirectory 'backgrounds'
+$defaultFileName = '{0}-{1:D2}.jpg' -f $group, $number
+$relativeTarget = if ($TargetAsset) {
+    $TargetAsset -replace '/', '\'
+} else {
+    'backgrounds\{0}' -f $defaultFileName
+}
+$targetPath = [IO.Path]::GetFullPath((Join-Path $themeDirectory $relativeTarget))
+$backgroundRoot = [IO.Path]::GetFullPath($targetDirectory).TrimEnd('\') + '\'
+if (-not $targetPath.StartsWith($backgroundRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    throw "Background target must remain inside themes\backgrounds: $relativeTarget"
+}
+foreach ($directPath in @($resolvedRepositoryRoot, $themeDirectory, $targetDirectory, $targetPath)) {
+    $item = Get-Item -LiteralPath $directPath -Force -ErrorAction SilentlyContinue
+    if ($item -and (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0)) {
+        throw "Background preparation refuses a symbolic link or junction: $directPath"
+    }
+}
 
 if ((Test-Path -LiteralPath $targetPath) -and -not $Force) {
     throw "Background slot already exists: $targetPath. Pass -Force to replace it."

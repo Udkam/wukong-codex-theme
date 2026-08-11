@@ -2,16 +2,17 @@
 
 为 Windows 官方 ChatGPT/Codex 桌面应用制作的《黑神话：悟空》风格主题。项目直接从本地 Git 仓库加载背景、纸面材质与样式，最终窗口仍由官方 `ChatGPT.exe` 承载；不会修改 `ChatGPT.exe`、`app.asar`、WindowsApps、应用签名或 Codex 配置，也不会创建一个独立的“Wukong Codex”应用。
 
-当前源码版本为 **0.14.7 / V51.9**。主题提供 22 张有序背景、原生坐标上的四角纸面输入器、侧栏选中纸带、环境信息纸面以及清晰的运行进度状态色。
+当前源码版本为 **0.14.7 / V52.1**。主题提供 22 张有序背景、原生坐标上的四角纸面输入器、侧栏选中纸带、环境信息纸面以及清晰的运行进度状态色。
 
 ## 主要特性
 
 - 保留官方应用名称、图标、账号、项目、任务和原生交互。
-- 新建任务页使用 13 张战斗图，已有任务使用 9 张风景图；两组都按固定编号顺序切换，不随机抽取。
-- `Ctrl+Alt+B` 在当前模式内原位切换下一张背景，`Ctrl+Alt+Shift+B` 切换上一张；两者都在战斗或风景当前组内循环，不刷新页面、不重载或重建主题。
-- 普通任务切换、history/hash、流式回答、窗口缩放和 DOM 重挂载都不会换图。
+- 新建任务页默认使用 13 张战斗图，项目对话默认使用 9 张风景图；两组都按独立的固定顺序切换，不随机抽取。
+- `Ctrl+Alt+F` 在当前序列内原位切换下一张背景，`Ctrl+Alt+B` 切换上一张；`Ctrl+Alt+C` 临时在当前页面切换战斗/风景序列。
+- 页面导航会清除 `Ctrl+Alt+C` 的临时覆盖并恢复自动规则：新建任务页为战斗，项目对话为风景；如果当前已经是目标序列，则不重新解码、不重绘也不做过渡。
+- 同一自动模式内的普通任务切换、history/hash、流式回答、窗口缩放和 DOM 重挂载都不会换图。
 - 真正点击“新建任务”时，只有距上次自动推进至少 20 分钟才自动推进；没有后台定时轮播。
-- 下一张图由最终参与绘制的同一个 `<img>` 完成解码后才淡入；旧图在此之前持续可见。稳态只保留一张背景纹理，420 ms 过渡期最多两张，并且同时最多一个图片解码请求。
+- 下一张图由最终参与绘制的同一个 `<img>` 完成解码后，在连续两个绘制帧之间启动 420 ms 淡入；旧图在此之前持续可见。稳态只保留一张背景纹理，过渡期最多两张，并且同时最多一个图片解码请求。
 - 图片本身不使用亮度、饱和度或对比度滤镜；战斗与风景遮罩均按每张图的色调降至正文仍满足至少 4.5:1 模型对比度的范围。
 - 运行链不使用 WMI/CIM、固定周期进程扫描、renderer 轮询、服务或计划任务。
 - 删除仓库后主题来源消失，监督器会注销自身，后续启动回到官方原生界面。
@@ -44,99 +45,80 @@ cd wukong-codex-theme
 
 安装成功后，从开始菜单或已固定的官方名称 `ChatGPT` 入口启动即可，不需要运行 `npm`，也不需要保持 PowerShell 窗口。
 
-- 手动下一张背景：`Ctrl+Alt+B`（当前模式内循环）
-- 手动上一张背景：`Ctrl+Alt+Shift+B`（当前模式内循环）
-- 两个切图快捷键都原位解码与淡入，不刷新页面，也不重载或重建主题。
+- 手动下一张背景：`Ctrl+Alt+F`（当前模式内循环）
+- 手动上一张背景：`Ctrl+Alt+B`（当前模式内循环）
+- 临时切换战斗/风景序列：`Ctrl+Alt+C`（只影响当前页面；导航后恢复自动模式）
+- 三个切图快捷键都在当前 document 内工作，不刷新页面，也不重载或重建主题。
 - 临时恢复当前窗口为原生界面：运行 `stop-theme.cmd`
 - 在同一个可复用官方窗口重新应用主题：运行 `start-theme.cmd`
 - Store 更新覆盖入口后：重新运行 `install-theme.cmd`
 
 ## 背景编号与切换顺序
 
-手动切换永远在当前模式的编号序列内推进或后退并循环，因此不会随机抽图，也不会切换战斗/风景模式。
+`slot` 是图片与清单条目的稳定物理编号，`order` 才是该组内的播放位置。手动前进/后退按 `order` 循环，不随机抽图；`Ctrl+Alt+C` 只临时改变当前页面使用哪一组，不改写两组顺序。
 
-| 战斗顺序 | 场景 ID | 风景顺序 | 场景 ID |
-| --- | --- | --- | --- |
-| B01 | `erlang-ink-duel` | S01 | `ridge-gate` |
-| B02 | `great-sage-staff` | S02 | `forest-shrine` |
-| B03 | `storm-bearer` | S03 | `mountain-path` |
-| B04 | `shadow-confrontation` | S04 | `sunlit-mountain-vista` |
-| B05 | `training-sunset` | S05 | `sunset-ravine` |
-| B06 | `thunder-dragon-ascent` | S06 | `mist-temple` |
-| B07 | `ink-wanderer` | S07 | `cavern-temple` |
-| B08 | `white-tiger` | S08 | `snow-lake` |
-| B09 | `red-lightning` | S09 | `autumn-grove` |
-| B10 | `violet-dharma-ring` | — | — |
-| B11 | `white-dragon-frost` | — | — |
-| B12 | `bear-crush` | — | — |
-| B13 | `spider-blade` | — | — |
+| 顺序 | 战斗槽位 / 场景 ID | 风景槽位 / 场景 ID |
+| ---: | --- | --- |
+| 1 | B07 / `ink-wanderer` | S05 / `sunset-ravine` |
+| 2 | B01 / `erlang-ink-duel` | S04 / `sunlit-mountain-vista` |
+| 3 | B02 / `great-sage-staff` | S08 / `snow-lake` |
+| 4 | B03 / `storm-bearer` | S01 / `ridge-gate` |
+| 5 | B04 / `shadow-confrontation` | S02 / `forest-shrine` |
+| 6 | B05 / `training-sunset` | S03 / `mountain-path` |
+| 7 | B08 / `white-tiger` | S06 / `mist-temple` |
+| 8 | B09 / `red-lightning` | S07 / `cavern-temple` |
+| 9 | B06 / `thunder-dragon-ascent` | S09 / `autumn-grove` |
+| 10 | B10 / `violet-dharma-ring` | — |
+| 11 | B11 / `white-dragon-frost` | — |
+| 12 | B12 / `bear-crush` | — |
+| 13 | B13 / `spider-blade` | — |
 
 完整循环分别为：
 
 ```text
-B01 -> B02 -> B03 -> B04 -> B05 -> B06 -> B07 -> B08 -> B09 -> B10 -> B11 -> B12 -> B13 -> B01
-S01 -> S02 -> S03 -> S04 -> S05 -> S06 -> S07 -> S08 -> S09 -> S01
+B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13 -> B07
+S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09 -> S05
 ```
 
 当前 22 张 JPEG 合计 8,355,513 bytes（约 8.36 MB）、45,201,592 解码像素。图片不会在启动时全部解码，也不会进行相邻场景预取。
 
 ## 自行调整背景
 
-### 替换现有图片
-
-`scripts/prepare-background.ps1` 可以把 JPG、PNG 等 System.Drawing 可读取的图片转换为对应编号槽位。脚本不会修改源图，默认不放大小图，最大输出 1920×1080、JPEG 质量 90；带透明通道的区域会铺为黑色。需要去掉源图黑边时，可选传入 `-CropTop`、`-CropRight`、`-CropBottom`、`-CropLeft`，单位均为源图像素。
-
-例如，用自己的图片替换 B05：
+推荐从仓库根目录运行交互管理器；它会列出当前播放位置，并引导完成新增、替换、移动或移出轮播：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
-  -Slot B05 `
-  -InputPath "D:\Pictures\my-battle.png" `
-  -Force
+.\backgrounds.cmd
 ```
 
-替换 S03 并自定义编码质量：
+也可以直接执行命令：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
-  -Slot S03 `
-  -InputPath "D:\Pictures\my-scenery.jpg" `
-  -Quality 92 `
-  -Force
+# 查看真实播放顺序、稳定槽位和未加入轮播但仍保留的文件
+.\backgrounds.cmd list
+
+# 替换现有图片；可使用槽位或场景 ID 定位
+.\backgrounds.cmd replace -Target B05 -InputPath "D:\Pictures\my-battle.png" -Force
+
+# 只调整播放位置，不重命名图片或槽位
+.\backgrounds.cmd move -Target B07 -Position 1
+
+# 在战斗组第 3 位新增图片；省略 Position 时追加到组尾
+.\backgrounds.cmd add -Mode battle -Id my-battle -InputPath "D:\Pictures\new.jpg" -Position 3
+
+# 从轮播移除，图片文件仍保留在磁盘
+.\backgrounds.cmd remove -Target my-battle -Force
 ```
 
-使用规则：
+管理器遵循以下边界：
 
-1. 当前活动战斗槽位为 `B01`–`B13`，风景槽位为 `S01`–`S09`；准备脚本为后续扩展接受 `B01`–`B99` / `S01`–`S99`。
-2. 已存在的槽位必须显式传入 `-Force`，防止误覆盖。
-3. 活动清单只有 `themes/active.json`；`themes/ink-mountain.json` 是历史文件，不要编辑它来配置当前主题。
-4. 如需改变裁切焦点，可编辑对应条目的 `position`；`tone` 控制界面配色，`veil` 控制阅读遮罩强度，`mark` 可在浅/深“悟空”字标之间选择。
-5. 替换后依次运行 `stop-theme.cmd`、`start-theme.cmd`，即可让同一官方窗口重新载入资源，不需要重启 ChatGPT；只有受管调试通道本身已不存在时才需要退出并重开一次。
-6. 准备公开提交前请运行 `npm ci` 与 `npm run check`，确保总字节、解码像素和双图过渡预算没有超限。
+1. `slot`（如 B07/S05）是稳定物理身份；`order` 是组内播放位置。移动场景只重排 `order`，不会交换槽位、文件名或场景 ID。
+2. 活动清单只有 `themes/active.json`；战斗和风景组必须各保留至少一张，且两组 `order` 分别从 1 连续编号。
+3. 新增/替换会调用有界图片准备脚本：源图不被修改，默认不放大，最大 1920×1080、JPEG 质量 90。可额外传入 `-Quality`、`-CropTop`、`-CropRight`、`-CropBottom`、`-CropLeft`。
+4. 每次清单写入以及被覆盖的图片都会备份到 `.wukong-runtime/background-backups/`；移出轮播不会删除图片，`list` 会把它显示为 unlinked asset。
+5. 修改后依次运行 `stop-theme.cmd`、`start-theme.cmd`，即可让同一个受管官方窗口重新载入资源，不需要重启 ChatGPT；只有受管调试通道本身已不存在时才需要退出并重开一次。
+6. 准备公开提交前运行 `npm ci` 与 `npm run check`，确保图片数量、压缩字节、解码像素和双图过渡预算没有超限。
 
-### 调整播放顺序
-
-播放顺序由 `themes/active.json` 中每个场景的 `slot` 与 `order` 决定，JSON 条目本身排在哪一行不影响播放。战斗组与风景组分别从 1 连续编号，且 `slot` 必须和 `order` 一致：例如 `B03` 对应 `order: 3`，`S06` 对应 `order: 6`。
-
-要交换两张图的顺序，同时交换它们的 `slot` 和 `order` 即可；场景的 `id`、`asset`、`position`、`tone`、`veil` 和 `mark` 留在原条目中。修改后运行 `stop-theme.cmd`、`start-theme.cmd`。由于图片文件名和逻辑顺序可以不同，后续替换图片时应以该条目的 `asset` 文件名为准。
-
-### 增加一张背景
-
-例如增加第 14 张战斗图：
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-background.ps1 `
-  -Slot B14 `
-  -InputPath "D:\Pictures\my-new-battle.jpg"
-```
-
-然后在 `themes/active.json` 的 `background.gallery` 中增加：
-
-```json
-{ "id": "my-new-battle", "slot": "B14", "order": 14, "asset": "backgrounds/battle-14.jpg", "position": "center center", "mode": "battle-secondary", "tone": "celestial-ink", "veil": 0.8 }
-```
-
-风景图同理使用下一个连续编号（当前为 `S10`）并把 `mode` 设为 `scenery`。`id` 必须唯一；同一组的 `slot`/`order` 必须从 1 连续到末项，图库最多 24 项。当前图库已使用 45,201,592 / 48,000,000 解码像素，因此通常只能再加入一张不超过 1920×1080 的图片；如需更多图片，请降低尺寸或替换现有图片。仅本地自用时只需修改 `themes/active.json`；若要把新默认顺序公开提交，还应同步 `shared/theme-model.mjs`、固定数量测试、README 表格与 `docs/ASSET_SOURCES.md`。
+高级用户仍可直接编辑 `themes/active.json`。JSON 条目所在行不决定播放顺序；必须保持 `slot` 唯一、场景 `id` 唯一、每组 `order` 连续。图库最多 24 项，当前已使用 45,201,592 / 48,000,000 解码像素，因此增加高分辨率图片前应先运行完整检查。
 
 ## 停用与恢复原生
 
@@ -178,6 +160,7 @@ npm run check
 
 ```powershell
 npm run test:runtime-states
+npm run test:backgrounds
 npm run test:managed-package
 npm run test:native
 ```
@@ -187,6 +170,7 @@ npm run test:native
 - `themes/active.json`：唯一活动主题清单。
 - `themes/backgrounds/`：B/S 编号背景槽位。
 - `runtime/`：renderer 注入、背景状态机、宿主与原生入口组件。
+- `backgrounds.cmd`：交互式与命令行背景管理入口。
 - `scripts/`：安装、启动、停用、打包与背景准备工具。
 - `tests/`：资源预算、原生几何、生命周期和最小包合同。
 - `docs/`：需求、设计、素材来源、历史决策和验收记录。

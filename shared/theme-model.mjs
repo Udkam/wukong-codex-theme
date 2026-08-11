@@ -200,7 +200,6 @@ export function validateTheme(value) {
           entry.order < 1 ||
           entry.order > 99 ||
           entry.slot[0] !== (group === 'battle' ? 'B' : 'S') ||
-          Number.parseInt(entry.slot.slice(1), 10) !== entry.order ||
           slots.has(entry.slot)
         )) ||
         ids.has(entry.id)

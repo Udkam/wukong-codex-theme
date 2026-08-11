@@ -2818,9 +2818,11 @@ test('V14 re-maps a delayed React shell without resize or zoom assistance', asyn
     contentType: 'text/html; charset=utf-8'
   }));
   await page.goto('http://wukong-v14-first-frame.test/');
+  await installComposerState(page, 'guided');
   await page.evaluate(() => {
     window.__forgeResizeEvents = 0;
     window.addEventListener('resize', () => { window.__forgeResizeEvents += 1; });
+    window.ResizeObserver = undefined;
     window.__delayedAppWindow = document.querySelector('.app-window');
     window.__delayedAppWindow.remove();
   });
@@ -2829,10 +2831,49 @@ test('V14 re-maps a delayed React shell without resize or zoom assistance', asyn
   assert.equal(await page.locator('.forge-topbar-menu-item').count(), 0);
   assert.equal(await page.locator('.forge-composer-frame').count(), 0);
   await page.waitForTimeout(700);
-  const insertedAt = await page.evaluate(() => {
+  const firstPaint = await page.evaluate(() => new Promise(resolve => {
+    const insertedAt = performance.now();
+    const refreshCountBefore = window.__wukongCodexForgeRuntimeV13.refreshCount;
     document.querySelector('#root').append(window.__delayedAppWindow);
-    return performance.now();
-  });
+    requestAnimationFrame(() => {
+      const composer = document.querySelector('.composer-surface-chrome');
+      const rightCard = document.querySelector('[data-native-slot="right-card"]');
+      resolve({
+        insertedAt,
+        sampledAt: performance.now(),
+        topbarMenuCount: document.querySelectorAll('.forge-topbar-menu-item').length,
+        composerMarked: composer?.classList.contains('forge-composer-frame') || false,
+        composerPaperContent: getComputedStyle(composer, '::before').content,
+        composerPaperImage: getComputedStyle(composer, '::before').backgroundImage,
+        rightCardMarked: rightCard?.classList.contains('forge-right-card') || false,
+        rightCardPaperContent: getComputedStyle(rightCard, '::before').content,
+        rightCardPaperImage: getComputedStyle(rightCard, '::before').backgroundImage,
+        sidebarMarked: document.querySelector('[data-native-slot="project-active"]')
+          ?.classList.contains('forge-sidebar-selected') || false,
+        progressMarked: document.querySelector('[data-fixture-control="plan"]')
+          ?.classList.contains('forge-composer-progress-pill') || false,
+        progressFadeMarked: document.querySelector('.native-progress-gradient')
+          ?.classList.contains('forge-composer-progress-fade') || false,
+        goalPanelMarked: document.querySelector('[data-fixture-surface="goal-panel"]')
+          ?.classList.contains('forge-composer-panel') || false,
+        refreshCountDelta:
+          window.__wukongCodexForgeRuntimeV13.refreshCount - refreshCountBefore
+      });
+    });
+  }));
+  assert.equal(firstPaint.topbarMenuCount, 4);
+  assert.equal(firstPaint.composerMarked, true);
+  assert.equal(firstPaint.composerPaperContent, '""');
+  assert.notEqual(firstPaint.composerPaperImage, 'none');
+  assert.equal(firstPaint.rightCardMarked, true);
+  assert.equal(firstPaint.rightCardPaperContent, '""');
+  assert.notEqual(firstPaint.rightCardPaperImage, 'none');
+  assert.equal(firstPaint.sidebarMarked, true);
+  assert.equal(firstPaint.progressMarked, true);
+  assert.equal(firstPaint.progressFadeMarked, true);
+  assert.equal(firstPaint.goalPanelMarked, true);
+  assert.equal(firstPaint.refreshCountDelta, 1);
+  const insertedAt = firstPaint.insertedAt;
   await page.waitForFunction(() => (
     document.querySelectorAll('.forge-topbar-menu-item').length === 4 &&
     document.querySelector('.composer-surface-chrome')?.classList.contains('forge-composer-frame') &&
@@ -2849,6 +2890,116 @@ test('V14 re-maps a delayed React shell without resize or zoom assistance', asyn
     await page.evaluate(() => window.__forgeResizeEvents),
     0,
     'first-frame recovery must not depend on a window resize or zoom change'
+  );
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  assert.equal(await page.locator('[data-forge-mark]').count(), 0);
+  await page.close();
+});
+
+test('V52.1 themes persistent-shell replacements before their first visible frame', async () => {
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 820 },
+    deviceScaleFactor: nativeUiBaseline.rendererDeviceScaleFactor
+  });
+  await page.route('http://wukong-v52-persistent-shell.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-v52-persistent-shell.test/');
+  await installComposerState(page, 'guided');
+  await page.evaluate(() => { window.ResizeObserver = undefined; });
+  await page.evaluate(expression);
+  await page.waitForFunction(() => (
+    document.querySelector('.composer-surface-chrome')?.classList.contains('forge-composer-frame') &&
+    document.querySelector('[data-native-slot="right-card"]')?.classList.contains('forge-right-card') &&
+    document.querySelector('[data-native-slot="project-active"]')?.classList.contains('forge-sidebar-selected')
+  ));
+  await page.waitForTimeout(700);
+
+  const firstPaint = await page.evaluate(() => new Promise(resolve => {
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const refreshCountBefore = runtime.refreshCount;
+    const stripThemeMarks = element => {
+      for (const node of [element, ...element.querySelectorAll('*')]) {
+        for (const name of [...node.classList]) {
+          if (name.startsWith('forge-')) node.classList.remove(name);
+        }
+        node.removeAttribute('data-forge-mark');
+      }
+      return element;
+    };
+
+    const sidebarList = document.querySelector('[data-app-action-sidebar-project-list-id="wukong-codex-theme"]');
+    sidebarList.innerHTML = `
+      <div role="listitem"><div role="button" tabindex="0"><div>
+        <div role="button" tabindex="0" data-app-action-sidebar-thread-row
+          data-app-action-sidebar-thread-active="true" aria-current="page"
+          data-native-slot="persistent-project-active"><span data-thread-title>持久根切换任务</span></div>
+      </div></div></div>`;
+
+    const rightCard = document.querySelector('[data-native-slot="right-card"]');
+    const priorRightRow = rightCard.querySelector('[data-slot="thread-summary-panel-item"]');
+    const nextRightRow = stripThemeMarks(priorRightRow.cloneNode(true));
+    nextRightRow.dataset.persistentRightRow = 'true';
+    priorRightRow.replaceWith(nextRightRow);
+
+    const abovePortal = document.querySelector('[data-above-composer-portal]');
+    abovePortal.innerHTML = `
+      <div class="relative col-start-1 row-start-1 h-8 self-end">
+        <div class="pointer-events-none absolute inset-x-0 -bottom-1 h-7 bg-gradient-to-t from-token-main-surface-primary to-transparent native-progress-gradient"></div>
+        <div class="flex w-max max-w-full min-w-0 items-center gap-2 rounded-3xl border px-3 py-1.5 native-progress-pill"
+          data-state="active" data-fixture-control="persistent-plan">第 2 / 3 步 · +8 -2</div>
+      </div>`;
+    document.querySelector('[data-native-above-stack-slot]').innerHTML = `
+      <div class="order-2 flex min-w-0 flex-col">
+        <div class="relative min-w-0 overflow-clip text-token-foreground"
+          data-fixture-surface="persistent-goal-panel">进行中的目标</div>
+      </div>`;
+
+    document.querySelector('.landing-native')?.remove();
+    const conversation = document.createElement('section');
+    conversation.dataset.threadFindTarget = 'conversation';
+    conversation.style.minHeight = '240px';
+    conversation.innerHTML = '<div data-virtualized-turn-content style="min-height:80px">已进入项目对话</div>';
+    document.querySelector('.route-host').prepend(conversation);
+
+    requestAnimationFrame(() => resolve({
+      refreshCountDelta: runtime.refreshCount - refreshCountBefore,
+      surface: document.documentElement.dataset.forgeSurface,
+      mode: document.documentElement.dataset.forgeMode,
+      sidebarMarked: document.querySelector('[data-native-slot="persistent-project-active"]')
+        ?.classList.contains('forge-sidebar-selected') || false,
+      rightRowMarked: nextRightRow.classList.contains('forge-right-row'),
+      progressMarked: document.querySelector('[data-fixture-control="persistent-plan"]')
+        ?.classList.contains('forge-composer-progress-pill') || false,
+      progressFadeMarked: document.querySelector('.native-progress-gradient')
+        ?.classList.contains('forge-composer-progress-fade') || false,
+      goalPanelMarked: document.querySelector('[data-fixture-surface="persistent-goal-panel"]')
+        ?.classList.contains('forge-composer-panel') || false
+    }));
+  }));
+
+  assert.deepEqual(firstPaint, {
+    refreshCountDelta: 1,
+    surface: 'thread',
+    mode: 'scenery',
+    sidebarMarked: true,
+    rightRowMarked: true,
+    progressMarked: true,
+    progressFadeMarked: true,
+    goalPanelMarked: true
+  });
+
+  const beforeStreamingText = await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount);
+  await page.evaluate(() => {
+    document.querySelector('[data-virtualized-turn-content]').append(document.createTextNode(' · 流式增量'));
+  });
+  await page.waitForTimeout(700);
+  assert.equal(
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount),
+    beforeStreamingText,
+    'ordinary streaming text must not trigger a first-paint or delayed refresh'
   );
 
   await page.evaluate(RESTORE_EXPRESSION);

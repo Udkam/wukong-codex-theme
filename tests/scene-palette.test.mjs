@@ -24,6 +24,12 @@ test('all twenty-two numbered cinematic scenes declare a validated adaptive tone
   assert.equal(active.schemaVersion, 3);
   assert.equal(active.background.gallery.length, 22);
   assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 22);
+  assert.doesNotThrow(() => validateTheme(active));
+  assert.equal(
+    active.background.gallery.some(scene => Number.parseInt(scene.slot.slice(1), 10) !== scene.order),
+    true,
+    'stable scene slots must be allowed to differ from playback order'
+  );
   for (const scene of active.background.gallery) {
     const tone = SCENE_TONES[scene.tone];
     for (const key of ['ink', 'inkSoft', 'lacquer', 'jade', 'jadeLight', 'gold', 'goldLight', 'paper', 'composer', 'sidebar', 'rightCard', 'veil', 'brightness']) {

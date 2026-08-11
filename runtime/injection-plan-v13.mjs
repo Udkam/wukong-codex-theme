@@ -212,6 +212,19 @@ function applyRuntime(payload) {
     image.decoding = 'async';
     return image;
   };
+  const clearTransitionControls = () => {
+    if (state.transitionTimer) clearTimeout(state.transitionTimer);
+    state.transitionTimer = 0;
+    if (state.transitionFrameA) window.cancelAnimationFrame(state.transitionFrameA);
+    if (state.transitionFrameB) window.cancelAnimationFrame(state.transitionFrameB);
+    state.transitionFrameA = 0;
+    state.transitionFrameB = 0;
+    if (state.transitionEndLayer && state.transitionEndHandler) {
+      state.transitionEndLayer.removeEventListener('transitionend', state.transitionEndHandler);
+    }
+    state.transitionEndLayer = null;
+    state.transitionEndHandler = null;
+  };
   const ensureBackground = () => {
     let overlay = document.getElementById('wukong-forge-background');
     if (overlay && overlay.querySelectorAll(':scope > [data-forge-background-layer]').length !== 2) {
@@ -220,8 +233,7 @@ function applyRuntime(payload) {
     }
     if (overlay) return overlay;
     delete root.dataset.forgeBackgroundReady;
-    if (state.transitionTimer) clearTimeout(state.transitionTimer);
-    state.transitionTimer = 0;
+    clearTransitionControls();
     state.transitionInFlight = false;
     state.pendingSceneStyle = null;
     state.sceneRequestToken += 1;
@@ -420,7 +432,13 @@ function applyRuntime(payload) {
     const finishLoadedImage = async () => {
       if (settled || decodeStarted) return;
       decodeStarted = true;
-      try { await image.decode?.(); } catch { }
+      try {
+        await image.decode?.();
+      } catch {
+        finish(false);
+        return;
+      }
+      if (settled) return;
       const decoded = image.naturalWidth > 0;
       if (decoded) {
         image.dataset.forgeDecoded = 'true';
@@ -533,7 +551,6 @@ function applyRuntime(payload) {
       nextLayer.getBoundingClientRect();
       previousLayer.dataset.forgeActive = 'false';
       nextLayer.dataset.forgeActive = 'true';
-      nextLayer.style.opacity = '1';
     }
     overlay.dataset.forgeActiveLayer = String(nextIndex);
     overlay.dataset.forgeReady = 'true';
@@ -549,7 +566,7 @@ function applyRuntime(payload) {
       const generation = state.overlayGeneration;
       const finishTransition = () => {
         if (generation !== state.overlayGeneration || !overlay.isConnected) return;
-        state.transitionTimer = 0;
+        clearTransitionControls();
         state.transitionInFlight = false;
         delete overlay.dataset.forgeTransitioning;
         clearLayer(previousLayer);
@@ -560,9 +577,36 @@ function applyRuntime(payload) {
           requestScene(pending.scene, pending.mode);
         }
       };
-      const duration = transitionDuration();
-      if (duration === 0) queueMicrotask(finishTransition);
-      else state.transitionTimer = window.setTimeout(finishTransition, duration + 60);
+      const beginTransition = () => {
+        state.transitionFrameB = 0;
+        if (
+          generation !== state.overlayGeneration ||
+          !overlay.isConnected ||
+          !state.transitionInFlight
+        ) return;
+        const duration = transitionDuration();
+        if (duration === 0) {
+          nextLayer.style.opacity = '1';
+          queueMicrotask(finishTransition);
+          return;
+        }
+        state.transitionEndLayer = nextLayer;
+        state.transitionEndHandler = event => {
+          if (event.target === nextLayer && event.propertyName === 'opacity') finishTransition();
+        };
+        nextLayer.addEventListener('transitionend', state.transitionEndHandler);
+        nextLayer.style.opacity = '1';
+        state.transitionTimer = window.setTimeout(finishTransition, duration + 120);
+      };
+      /*
+       * Cached decodes can resolve inside the same rendering turn. Keep the
+       * incoming layer at opacity 0 for one painted frame before arming the
+       * fade, so cached and uncached images follow the exact same transition.
+       */
+      state.transitionFrameA = window.requestAnimationFrame(() => {
+        state.transitionFrameA = 0;
+        state.transitionFrameB = window.requestAnimationFrame(beginTransition);
+      });
     }
   };
   const requestScene = (scene, mode, force = false) => {
@@ -572,16 +616,25 @@ function applyRuntime(payload) {
     }
     const overlay = ensureBackground();
     const requestKey = `${mode}:${scene}:${state.overlayGeneration}`;
-    if (!force && (
-      (state.currentScene === scene && state.currentMode === mode) ||
-      (state.pendingSceneStyle?.scene === scene && state.pendingSceneStyle?.mode === mode) ||
-      state.requestedSceneKey === requestKey
-    )) return;
-    const sceneStyle = readSceneStyle(scene, mode);
     if (state.transitionInFlight) {
-      state.pendingSceneStyle = sceneStyle;
+      state.pendingSceneStyle = state.currentScene === scene && state.currentMode === mode
+        ? null
+        : readSceneStyle(scene, mode);
       return;
     }
+    if (!force && state.requestedSceneKey === requestKey) return;
+    if (state.requestedSceneKey && state.requestedSceneKey !== requestKey) {
+      state.sceneRequestToken += 1;
+      state.requestedSceneKey = null;
+      state.requestedScene = null;
+      state.preloadRequests.forEach(request => request.cancel());
+      state.preloadRequests.clear();
+    }
+    if (!force && (
+      (state.currentScene === scene && state.currentMode === mode) ||
+      (state.pendingSceneStyle?.scene === scene && state.pendingSceneStyle?.mode === mode)
+    )) return;
+    const sceneStyle = readSceneStyle(scene, mode);
     const initial = state.currentScene === null || !overlayReady();
     const nextIndex = initial ? 0 : (state.activeLayer === 0 ? 1 : 0);
     const nextLayer = overlay.querySelector(`[data-forge-background-layer="${nextIndex}"]`);
@@ -1601,7 +1654,13 @@ function applyRuntime(payload) {
     ensureBackground();
     const workspace = findWorkspace();
     const { surface, threadEvidence, landingTitle } = classifySurface(workspace);
-    const mode = surface === 'landing' ? 'battle' : 'scenery';
+    const automaticMode = surface === 'landing' ? 'battle' : 'scenery';
+    if (state.lastSurface && state.lastSurface !== surface) {
+      state.manualBackgroundMode = null;
+    }
+    state.lastSurface = surface;
+    state.automaticBackgroundMode = automaticMode;
+    const mode = state.manualBackgroundMode || automaticMode;
     root.dataset.forgeSurface = surface;
     root.dataset.forgeMode = mode;
     const plannedMarks = new Map();
@@ -1624,17 +1683,20 @@ function applyRuntime(payload) {
 
     const safeChoices = readSceneChoices(mode);
     ensureSceneSelection(mode, safeChoices);
+    const automaticChoices = automaticMode === mode
+      ? safeChoices
+      : readSceneChoices(automaticMode);
     /*
      * A qualifying New Task click rotates battle immediately, but scenery is
      * consumed only after this renderer has actually observed the landing
      * surface. This prevents a follow-up refresh of the old thread from
      * spending the paired scenery draw before navigation has completed.
      */
-    if (mode === 'battle' && state.autoSceneryPending && !state.autoSceneryReady) {
+    if (automaticMode === 'battle' && state.autoSceneryPending && !state.autoSceneryReady) {
       state.autoSceneryReady = true;
       persistSceneState();
-    } else if (mode === 'scenery' && state.autoSceneryPending && state.autoSceneryReady) {
-      advanceSceneSelection('scenery', safeChoices, false);
+    } else if (automaticMode === 'scenery' && state.autoSceneryPending && state.autoSceneryReady) {
+      advanceSceneSelection('scenery', automaticChoices, false);
       state.autoSceneryPending = false;
       state.autoSceneryReady = false;
       persistSceneState();
@@ -1699,6 +1761,8 @@ function applyRuntime(payload) {
     timer: 0,
     timerDueAt: 0,
     hiddenDirty: false,
+    firstPaintRefreshQueued: false,
+    disposed: false,
     routeTimers: new Set(),
     backgroundDecks: storedSceneState.decks,
     selectedScenes: storedSceneState.selections,
@@ -1708,6 +1772,10 @@ function applyRuntime(payload) {
     pendingAutoNewTask: false,
     pendingBackgroundMode: null,
     pendingBackgroundDirection: 1,
+    manualBackgroundMode: null,
+    automaticBackgroundMode: null,
+    lastSurface: null,
+    lastRouteHref: location.href,
     autoRotationCooldownMs: automaticRotationCooldownMs,
     sceneKey: null,
     currentScene: null,
@@ -1715,6 +1783,10 @@ function applyRuntime(payload) {
     activeLayer: 0,
     transitionInFlight: false,
     transitionTimer: 0,
+    transitionFrameA: 0,
+    transitionFrameB: 0,
+    transitionEndLayer: null,
+    transitionEndHandler: null,
     pendingSceneStyle: null,
     requestedSceneKey: null,
     requestedScene: null,
@@ -1728,13 +1800,17 @@ function applyRuntime(payload) {
     refresh,
     nextBackground: null,
     previousBackground: null,
+    toggleBackgroundMode: null,
     dispose: null
   };
   const persistSceneState = () => writeSceneState(state);
   const stepBackground = (requestedMode, direction = 1) => {
     const mode = requestedMode === 'battle' || requestedMode === 'scenery'
       ? requestedMode
-      : (root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery' ? 'scenery' : 'battle');
+      : (
+          state.manualBackgroundMode ||
+          (root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery' ? 'scenery' : 'battle')
+        );
     const step = direction < 0 ? -1 : 1;
     if (document.hidden) {
       if (!state.pendingAutoNewTask && state.pendingBackgroundMode === null) {
@@ -1750,6 +1826,23 @@ function applyRuntime(payload) {
   };
   const nextBackground = requestedMode => stepBackground(requestedMode, 1);
   const previousBackground = requestedMode => stepBackground(requestedMode, -1);
+  const toggleBackgroundMode = () => {
+    if (document.hidden) {
+      state.hiddenDirty = true;
+      return false;
+    }
+    const visibleMode = state.manualBackgroundMode || (
+      root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery'
+        ? 'scenery'
+        : 'battle'
+    );
+    const mode = visibleMode === 'battle' ? 'scenery' : 'battle';
+    const safeChoices = readSceneChoices(mode);
+    ensureSceneSelection(mode, safeChoices);
+    state.manualBackgroundMode = mode;
+    requestScene(state.selectedScenes[mode], mode);
+    return true;
+  };
   const requestAutomaticBackgroundCycle = () => {
     if (document.hidden) {
       state.pendingAutoNewTask = true;
@@ -1778,6 +1871,7 @@ function applyRuntime(payload) {
   };
   state.nextBackground = nextBackground;
   state.previousBackground = previousBackground;
+  state.toggleBackgroundMode = toggleBackgroundMode;
   const scheduleRefresh = maximumDelay => {
     if (document.hidden) {
       state.hiddenDirty = true;
@@ -1857,36 +1951,54 @@ function applyRuntime(payload) {
     const disabled = target.matches(':disabled, [aria-disabled="true"], [data-disabled="true"]');
     if (newTask && !disabled) requestAutomaticBackgroundCycle();
     const composerSubmit = Boolean(target.closest('[data-thread-find-composer="true"], .composer-surface-chrome'));
+    const sidebarNavigation = Boolean(target.closest([
+      '[data-app-action-sidebar-project-row]',
+      '[data-app-action-sidebar-thread-row]',
+      '[data-project-row]',
+      '[data-sidebar-project-row]',
+      '[data-sidebar-thread-row]',
+      '[data-root-thread-row]'
+    ].join(',')));
     const possibleNavigation = newTask ||
+      sidebarNavigation ||
       target.matches('a[href], [role="treeitem"], [aria-current], [aria-selected]') ||
       target.closest('a[href], [role="treeitem"]');
     if (!possibleNavigation && !composerSubmit) return;
+    if (possibleNavigation || root.dataset.forgeSurface === 'landing') {
+      state.manualBackgroundMode = null;
+    }
     queueRefreshes(composerSubmit ? [320, 1100] : [360]);
   };
   const scheduleComposerKeyboardSubmit = event => {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('[data-thread-find-composer="true"], .composer-surface-chrome')) return;
+    if (root.dataset.forgeSurface === 'landing') state.manualBackgroundMode = null;
     queueRefreshes([320, 1100]);
   };
   const scheduleBackgroundKeyboardStep = event => {
-    if (
-      event.repeat ||
-      !event.ctrlKey ||
-      !event.altKey ||
-      !(
-        String(event.key || '').toLowerCase() === 'b' ||
-        event.code === 'KeyB'
-      )
-    ) return;
+    if (!event.ctrlKey || !event.altKey || event.shiftKey || event.metaKey) return;
+    const key = String(event.key || '').toLowerCase();
+    const toggleMode = key === 'c' || event.code === 'KeyC';
+    const direction = key === 'f' || event.code === 'KeyF'
+      ? 1
+      : (key === 'b' || event.code === 'KeyB' ? -1 : 0);
+    if (!direction && !toggleMode) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    if (event.shiftKey) previousBackground();
+    if (event.repeat) return;
+    if (toggleMode) toggleBackgroundMode();
+    else if (direction < 0) previousBackground();
     else nextBackground();
   };
   const routeEventName = 'wukong-forge-route-v13';
-  const scheduleRouteRefresh = () => queueRefreshes([160, 720]);
+  const scheduleRouteRefresh = () => {
+    const routeHref = location.href;
+    if (routeHref !== state.lastRouteHref) state.manualBackgroundMode = null;
+    state.lastRouteHref = routeHref;
+    queueRefreshes([160, 720]);
+  };
   const originalPushState = history.pushState;
   const originalReplaceState = history.replaceState;
   const notifyRoute = () => window.dispatchEvent(new Event(routeEventName));
@@ -1979,6 +2091,7 @@ function applyRuntime(payload) {
     '.relative.min-w-0.overflow-clip.text-token-foreground',
     '.vertical-scroll-fade-mask.hide-scrollbar.flex.max-h-\\[30dvh\\].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y',
     '.relative.col-start-1.row-start-1.h-8.self-end',
+    '.flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\\.5',
     'button.size-token-button-composer'
   ].join(',');
   const nodeTouchesComposerSignal = node => (
@@ -1999,11 +2112,72 @@ function applyRuntime(payload) {
       [...record.addedNodes, ...record.removedNodes].some(nodeTouchesComposerSignal)
     );
   };
+  const firstPaintStructureSelector = [
+    '[data-codex-composer-root]',
+    '[data-thread-find-composer="true"]',
+    '[data-thread-scroll-footer="true"]',
+    '.composer-surface-chrome',
+    '[data-above-composer-portal]',
+    '[data-pip-obstacle="thread-summary-panel"]',
+    '.app-shell-left-panel'
+  ].join(',');
+  const nodeMountsFirstPaintStructure = node => (
+    node.nodeType === Node.ELEMENT_NODE &&
+    !node.matches('[data-forge-owned], [data-forge-owned] *') &&
+    (
+      node.matches(firstPaintStructureSelector) ||
+      Boolean(node.querySelector(firstPaintStructureSelector))
+    )
+  );
+  const recordMountsFirstPaintStructure = record => {
+    if (record.type !== 'childList') return false;
+    const addedElements = [...record.addedNodes].filter(node => (
+      node.nodeType === Node.ELEMENT_NODE &&
+      !node.matches('[data-forge-owned], [data-forge-owned] *')
+    ));
+    if (addedElements.some(nodeMountsFirstPaintStructure)) return true;
+    if (addedElements.some(nodeTouchesSurfaceSignal)) return true;
+    const target = record.target instanceof Element
+      ? record.target
+      : record.target?.parentElement;
+    if (!target?.closest(firstPaintStructureSelector)) return false;
+    return (
+      addedElements.length > 0 && (
+        !target.closest(composerBoundarySelector) ||
+        target.matches(composerSignalSelector) ||
+        addedElements.some(nodeTouchesComposerSignal)
+      )
+    );
+  };
+  const scheduleFirstPaintRefresh = () => {
+    if (document.hidden) {
+      state.hiddenDirty = true;
+      return;
+    }
+    if (state.firstPaintRefreshQueued || state.disposed) return;
+    state.firstPaintRefreshQueued = true;
+    const enqueue = typeof queueMicrotask === 'function'
+      ? queueMicrotask
+      : callback => Promise.resolve().then(callback);
+    enqueue(() => {
+      state.firstPaintRefreshQueued = false;
+      if (state.disposed) return;
+      if (document.hidden) {
+        state.hiddenDirty = true;
+        return;
+      }
+      if (state.timer) clearTimeout(state.timer);
+      state.timer = 0;
+      state.timerDueAt = 0;
+      refresh();
+    });
+  };
   const observer = new MutationObserver(records => {
     if (records.some(record => (
       record.target?.id === 'wukong-forge-background' ||
       [...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node.id === 'wukong-forge-background')
     ))) delete root.dataset.forgeBackgroundReady;
+    const firstPaintStructureMounted = records.some(recordMountsFirstPaintStructure);
     const composerSignalChanged = records.some(recordTouchesComposerSignal);
     const otherThemeStructureChanged = records.some(record => {
       if (recordTouchesSurfaceSignal(record)) return true;
@@ -2021,7 +2195,9 @@ function applyRuntime(payload) {
             [...record.addedNodes, ...record.removedNodes].some(nodeTouchesThemeStructure)
           );
     });
-    if (composerSignalChanged || otherThemeStructureChanged) {
+    if (firstPaintStructureMounted) {
+      scheduleFirstPaintRefresh();
+    } else if (composerSignalChanged || otherThemeStructureChanged) {
       scheduleRefresh(composerSignalChanged ? 140 : undefined);
     }
   });
@@ -2058,6 +2234,8 @@ function applyRuntime(payload) {
   state.observer = observer;
   state.resizeObserver = resizeObserver;
   state.dispose = () => {
+    state.disposed = true;
+    state.firstPaintRefreshQueued = false;
     window.removeEventListener('popstate', scheduleRouteRefresh);
     window.removeEventListener('hashchange', scheduleRouteRefresh);
     window.removeEventListener(routeEventName, scheduleRouteRefresh);
@@ -2070,7 +2248,7 @@ function applyRuntime(payload) {
     observer.disconnect();
     resizeObserver?.disconnect();
     if (state.timer) clearTimeout(state.timer);
-    if (state.transitionTimer) clearTimeout(state.transitionTimer);
+    clearTransitionControls();
     state.sceneRequestToken += 1;
     state.requestedSceneKey = null;
     state.requestedScene = null;

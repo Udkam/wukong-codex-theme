@@ -26,8 +26,8 @@ test('active page payload contains backgrounds and paint-only UI assets; pets re
   assert.match(payload.variables, /--forge-motif-xiangfei-gourd:none/);
   assert.doesNotMatch(payload.variables, /--forge-motif-little-(?:wukong|bajie):/);
   assert.doesNotMatch(payload.variables, /forge-motif-(?:yaksha|fanged-cyan)/);
-  assert.match(payload.variables, /--forge-battle-scenes:0 1 2 3 9 10 11 12 13 18 19 20 21/);
-  assert.match(payload.variables, /--forge-scenery-scenes:4 5 6 7 8 14 15 16 17/);
+  assert.match(payload.variables, /--forge-battle-scenes:11 0 1 2 3 9 12 13 10 18 19 20 21/);
+  assert.match(payload.variables, /--forge-scenery-scenes:8 7 16 4 5 6 14 15 17/);
   assert.doesNotMatch(payload.variables, /--forge-primary-scene-count:/);
 
   const modes = activeTheme.background.gallery.map(scene => scene.mode);
@@ -38,11 +38,11 @@ test('active page payload contains backgrounds and paint-only UI assets; pets re
   assert.equal(activeTheme.background.gallery.length, 22);
   assert.deepEqual(
     activeTheme.background.gallery.filter(scene => scene.mode.startsWith('battle')).sort((a, b) => a.order - b.order).map(scene => scene.slot),
-    ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07', 'B08', 'B09', 'B10', 'B11', 'B12', 'B13']
+    ['B07', 'B01', 'B02', 'B03', 'B04', 'B05', 'B08', 'B09', 'B06', 'B10', 'B11', 'B12', 'B13']
   );
   assert.deepEqual(
     activeTheme.background.gallery.filter(scene => scene.mode === 'scenery').sort((a, b) => a.order - b.order).map(scene => scene.slot),
-    ['S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07', 'S08', 'S09']
+    ['S05', 'S04', 'S08', 'S01', 'S02', 'S03', 'S06', 'S07', 'S09']
   );
 });
 
