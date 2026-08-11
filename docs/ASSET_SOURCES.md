@@ -1,8 +1,8 @@
 # 素材来源与发布边界
 
-## V52.1 当前活动背景边界
+## V53 当前活动背景边界
 
-活动 runtime 只从 `themes/active.json` 组装以下 22 个稳定物理槽位。`slot` 不随排序变化，B/S 两组分别按独立、连续的 `order` 循环，不使用随机牌堆；文件合计 `8,355,513 bytes`，解码总量 `45,201,592 px`，最大双图过渡 `5,337,600 px`。
+活动 runtime 只从 `themes/active.json` 组装以下 20 个稳定物理槽位（13 张战斗图、7 张风景图）。`slot` 不随排序变化，B/S 两组分别按独立、连续的 `order` 循环，不使用随机牌堆；文件合计 `6,574,985 bytes`，解码总量 `41,284,792 px`，最大双图过渡 `5,337,600 px`。
 
 | 槽位 | 播放位 | 场景 ID | 像素 | 字节 | 活动文件 | 来源类别 |
 | --- | ---: | --- | ---: | ---: | --- | --- |
@@ -15,29 +15,29 @@
 | B08 | 7 | `white-tiger` | 1920×1080 | 332,994 | `themes/backgrounds/battle-08.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
 | B09 | 8 | `red-lightning` | 1920×1080 | 659,828 | `themes/backgrounds/battle-09.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
 | B06 | 9 | `thunder-dragon-ascent` | 1920×980 | 357,973 | `themes/backgrounds/battle-06.jpg` | 2026-08-11 用户提供；可能来自网络搜集；仅裁去源图上下黑边 |
-| B10 | 10 | `violet-dharma-ring` | 1920×1080 | 529,667 | `themes/backgrounds/battle-10.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
-| B11 | 11 | `white-dragon-frost` | 1920×1080 | 416,627 | `themes/backgrounds/battle-11.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
-| B12 | 12 | `bear-crush` | 1920×1080 | 551,165 | `themes/backgrounds/battle-12.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
-| B13 | 13 | `spider-blade` | 1920×960 | 676,304 | `themes/backgrounds/battle-13.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B11 | 10 | `white-dragon-frost` | 1920×1080 | 416,627 | `themes/backgrounds/battle-11.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B12 | 11 | `bear-crush` | 1920×1080 | 551,165 | `themes/backgrounds/battle-12.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| B15 | 12 | `crimson-lightning-burst` | 1920×1080 | 342,914 | `themes/backgrounds/battle-15.jpg` | 2026-08-12 用户提供的替换图；替换同槽位上一版夜叉王背景；具体来源未单独断言 |
+| B16 | 13 | `night-spear-confrontation` | 1920×1080 | 151,080 | `themes/backgrounds/battle-16.jpg` | 2026-08-12 用户提供；具体来源未单独断言 |
 | S05 | 1 | `sunset-ravine` | 1920×1080 | 167,847 | `themes/backgrounds/scenery-05.jpg` | 用户提供的既有活动图 |
 | S04 | 2 | `sunlit-mountain-vista` | 1920×1080 | 395,960 | `themes/backgrounds/scenery-04.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
 | S08 | 3 | `snow-lake` | 1920×1080 | 518,319 | `themes/backgrounds/scenery-08.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
 | S01 | 4 | `ridge-gate` | 1920×1080 | 127,753 | `themes/backgrounds/scenery-01.jpg` | 用户提供的既有活动图 |
 | S02 | 5 | `forest-shrine` | 1920×1080 | 256,950 | `themes/backgrounds/scenery-02.jpg` | 用户提供的既有活动图 |
 | S03 | 6 | `mountain-path` | 1920×1080 | 391,525 | `themes/backgrounds/scenery-03.jpg` | 用户提供的既有活动图 |
-| S06 | 7 | `mist-temple` | 1920×1080 | 368,582 | `themes/backgrounds/scenery-06.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
-| S07 | 8 | `cavern-temple` | 1920×1080 | 305,333 | `themes/backgrounds/scenery-07.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
-| S09 | 9 | `autumn-grove` | 1920×1080 | 792,817 | `themes/backgrounds/scenery-09.jpg` | 2026-08-11 用户提供；可能来自网络搜集 |
+| S10 | 7 | `verdant-cavern` | 1920×1080 | 398,181 | `themes/backgrounds/scenery-10.jpg` | 2026-08-12 用户提供；具体来源未单独断言 |
 
-本轮只进行等比例缩小和 JPEG 重编码；B06 额外裁掉实测上下黑边，其他新图不裁切，不进行生成式改画或调色，源图保持原位不变。用户优先通过 `backgrounds.cmd` 管理新增、替换、移动和移出轮播；它把 `scripts/prepare-background.ps1` 作为低层确定性转码器，并在写清单或覆盖图片前建立本地备份。新的图片仍必须通过压缩字节、单图像素、图库总像素和双图过渡预算。
+本轮保留 S10、以用户新图替换 B15，并新增 B16；它们只进行有界缩放和 JPEG 重编码，不进行生成式改画或调色，源图保持原位不变。图片本身不使用亮度、饱和度或对比度滤镜；新建任务页使用固定 10% 全屏遮罩（保留 90% 原图），项目/对话页则读取每张活动图自己的 `threadVeil`，针对素材亮暗逐图均衡可读性。该参数绑定图片和页面类型，不绑定战斗/风景序列。新建任务页自动使用战斗序列，项目/对话页自动使用风景序列；`Ctrl+Alt+C` 只在当前页面临时覆盖，进入另一页面恢复自动默认。运行时没有定时轮换。用户优先通过 `backgrounds.cmd` 管理新增、替换、移动和移出轮播；它把 `scripts/prepare-background.ps1` 作为低层确定性转码器，并在写清单或覆盖图片前建立本地备份。`add` / `replace` 的 `-ThreadVeil 0..1` 可校准项目/对话页遮罩。新的图片仍必须通过压缩字节、单图像素、图库总像素和双图过渡预算。
 
-部分图片由网络搜集或由用户提供，仅用于非商业主题展示；其著作权、商标权和其他权利归原权利人所有。若权利人认为相关素材构成侵权，请发送邮件至 `chenlj89@mail2.sysu.edu.cn`；维护者核验后会及时处理或移除。
+新建任务页的题字与“悟空”字标可由 `Ctrl+Alt+T` 同时隐藏或显示；折叠侧栏从屏幕边缘临时展开时，也与常驻侧栏一样使用透明主题表面。
 
-用户否决的 `themes/assets/destined-afterimage.jpg`、`themes/assets/yaksha-king-rift.jpg` 和其他历史素材不被 active/default 引用，也不会进入最小运行包；历史文件原位保留。
+部分背景由维护者本人拍摄或自行截取，部分来自网络搜集或由用户提供，仅用于非商业主题展示。游戏画面、角色、美术及其他第三方内容的著作权、商标权和其他权利仍归相应权利人所有。若权利人认为相关素材构成侵权，请发送邮件至 `chenlj89@mail2.sysu.edu.cn`；维护者核验后会及时处理或移除。
+
+本轮移出活动清单的 B14、S09，以及此前移出的 B10、B13、S06、S07 文件仍原位保留（inactive retained），但不被 active/default 引用，也不会进入最小运行包。`themes/assets/destined-afterimage.jpg`、历史 `themes/assets/yaksha-king-rift.jpg` 和其他未链接素材同样不进入活动运行包；当前 B15 只引用 `themes/backgrounds/battle-15.jpg` 的用户替换图。
 
 ## 0.12.3 / V13.3 背景、新建页、输入框与动作证据
 
-- V13.3 当时的 runtime 只发布 `themes/assets/` 中 4 张战斗图与 5 张风景图；当时 9 个活动源文件 SHA-256 均不同。现行 V52.1 清单以本文顶部 22 个稳定槽位及独立播放位为准。runtime 不读取本机素材目录，不进行网络请求或视频解码。含退役葫芦/旧宠物引用的 `themes/ink-mountain.json` 保留为历史文件，但不进入最小运行包。
+- V13.3 当时的 runtime 只发布 `themes/assets/` 中 4 张战斗图与 5 张风景图；当时 9 个活动源文件 SHA-256 均不同。现行 V53 清单以本文顶部 20 个稳定槽位及独立播放位为准。runtime 不读取本机素材目录，不进行网络请求或视频解码。含退役葫芦/旧宠物引用的 `themes/ink-mountain.json` 保留为历史文件，但不进入最小运行包。
 - V8 composer 三案及上下文证据位于 `docs/design/composer-options/v8-black-myth-silhouette-study-20260723/`。这些是纯 UI 形状预览，不包含夜叉套、神锋或金箍棒的生成替身，不进入 0.12.3 最小运行包。
 - 新建页旧 56×56 内联 SVG 短棍、墨尾与 V15 微缩金箍棒均已因卡通贴纸感或器物失真被用户否决；文件继续原位保留但 active theme 和最小包不再引用。
 - V16 字标源为 Steam 官方 CDN 的 `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/2358720/logo_2x.png`，项目内只读副本是 `themes/ui/v16/sources/steam-black-myth-wukong-logo-2x.png`，310,824 bytes，SHA-256 `9B627BEE5BE0DB718A837A5DDFE1D367E02577AA5DF6168A5774382AF2BC0FA0`。

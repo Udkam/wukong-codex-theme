@@ -10,6 +10,8 @@
   --forge-paper: #101210;
   --forge-scene-brightness: 1;
   --forge-background-transition: 420ms;
+  --forge-landing-color-retention: .9;
+  --forge-thread-color-retention: .75;
   --forge-mode-veil:
     linear-gradient(90deg, rgba(8, 10, 9, .34), rgba(12, 14, 13, .18) 30%, rgba(12, 14, 13, .18) 70%, rgba(8, 10, 9, .32)),
     linear-gradient(180deg, rgba(8, 10, 9, .22), rgba(8, 10, 9, .09) 22%, rgba(8, 10, 9, .12) 78%, rgba(8, 10, 9, .28));
@@ -91,6 +93,18 @@
 :root.forge-ink-mountain [data-forge-background-veil] {
   background-repeat: no-repeat;
   background-size: cover;
+  transition: opacity 260ms cubic-bezier(.4, 0, .2, 1);
+}
+
+:root.forge-ink-mountain[data-forge-surface="landing"] [data-forge-background-veil] {
+  opacity: calc(1 - var(--forge-landing-color-retention));
+}
+
+:root.forge-ink-mountain[data-forge-surface="thread"] [data-forge-background-veil] {
+  opacity: var(
+    --forge-layer-thread-veil,
+    calc(1 - var(--forge-thread-color-retention))
+  );
 }
 
 /*
@@ -188,8 +202,10 @@
   pointer-events: none;
 }
 
-:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-title-copy]::after {
-  display: none;
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-title-copy]::after,
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-mark="1"]::before {
+  opacity: 0;
+  visibility: hidden;
 }
 
 :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] {
@@ -1075,7 +1091,10 @@
  */
 :root.forge-ink-mountain :is(
   .forge-sidebar-shell,
-  aside.app-shell-left-panel
+  aside.app-shell-left-panel,
+  aside[data-testid="app-shell-floating-left-panel"],
+  [data-testid="app-shell-floating-left-panel"] > aside,
+  [class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)
 ) {
   --color-token-side-bar-background: rgba(9, 8, 6, .66);
   --color-token-foreground: #d2cdc5;

@@ -1,6 +1,6 @@
 Wukong Codex Theme 0.14.7
 
-CURRENT V52.2 ORDERED 22-BACKGROUND GALLERY
+CURRENT V53 ORDERED 20-BACKGROUND GALLERY
 
 This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
 
@@ -14,20 +14,22 @@ INSTALL AND START
 
 BACKGROUND CONTRACT
 
-The runtime keeps a 22-image gallery (13 battle + 9 scenery) in two explicit playback sequences. A slot is the stable physical identity; order is the independent position inside its group:
+The runtime keeps a 20-image gallery (13 battle + 7 scenery) in two explicit playback sequences. A slot is the stable physical identity; order is the independent position inside its group:
 
-B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13
-S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09
+B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16
+S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10
 
-Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. Ctrl+Alt+C temporarily toggles battle/scenery for the current page. Navigation clears that manual override: a New Task page defaults to battle and a project/thread page defaults to scenery. If the automatic target group is already visible, the runtime does not decode, render, or fade again. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. A real New Task action may auto-advance only after the 20-minute cooldown. Ordinary same-mode task/history/hash/stream/resize/mutation activity does not rotate backgrounds. There is no timer rotation, steady poll, WMI/CIM query, service, or scheduled task.
+Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. New Task pages automatically use the battle sequence; project/thread pages automatically use the scenery sequence. Ctrl+Alt+C temporarily overrides that choice on the current page only. Entering another task, thread, or page restores its automatic default without advancing the sequence. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. There is no automatic or timer-based image rotation, steady poll, WMI/CIM query, service, or scheduled task.
 
-Ctrl+Alt+T hides or shows the New Task quote “此去，欲破何局？” in place. The preference survives background, task and thread changes in the current window and a no-reload hot apply; a new application process starts with the quote visible. It does not change the native title node, geometry, background selection or decode state.
+Background images are not filtered. New Task pages apply a fixed 10% full-screen veil (90% of the original image remains visible). Project/thread pages use a separately calibrated per-image threadVeil so bright and dark assets remain readable without one global value flattening every image. The calibration follows the image and page type, not the battle/scenery sequence. The composer, content surface, persistent sidebar, and the temporary flyout shown from a collapsed sidebar all retain the translucent theme treatment.
+
+Ctrl+Alt+T hides or shows both the New Task quote “此去，欲破何局？” and the “悟空” wordmark in place. The preference survives background, task and thread changes in the current window and a no-reload hot apply; a new application process starts with both visible. It does not change the native title node, geometry, background selection or decode state.
 
 The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
 
 CUSTOM BACKGROUNDS
 
-Run backgrounds.cmd without arguments for the interactive manager, or use list, add, replace, move and remove commands. Targets accept a stable slot or scene id. Move changes only the contiguous order inside the group; it never renames a slot, id or asset. Add allocates an unused physical slot. Remove unlinks a scene from rotation but retains its image. Manifest and overwritten-asset backups are written under .wukong-runtime\background-backups. The manager calls scripts\prepare-background.ps1 for deterministic conversion without changing the source image, upscaling it, or exceeding the default 1920x1080 JPEG at quality 90. See README.md for commands, optional crop parameters and the 48,000,000 decoded-pixel budget.
+Run backgrounds.cmd without arguments for the interactive manager, or use list, add, replace, move and remove commands. Targets accept a stable slot or scene id. Move changes only the contiguous order inside the group; it never renames a slot, id or asset. Add allocates an unused physical slot. Remove unlinks a scene from rotation but retains its image. Manifest and overwritten-asset backups are written under .wukong-runtime\background-backups. The manager calls scripts\prepare-background.ps1 for deterministic conversion without changing the source image, upscaling it, or exceeding the default 1920x1080 JPEG at quality 90. Add or replace accepts -ThreadVeil 0..1 to calibrate that image on project/thread pages; for example: backgrounds.cmd replace -Target B05 -InputPath "D:\Pictures\my.jpg" -ThreadVeil 0.42 -Force. See README.md for commands, optional crop parameters and the 48,000,000 decoded-pixel budget.
 
 After replacing a background, run stop-theme.cmd and then start-theme.cmd to reload the same reusable official renderer. If no reusable managed channel remains, exit ChatGPT completely and start it once through the managed ChatGPT entry.
 
@@ -47,4 +49,4 @@ releasedPetIds is empty. Pets are deferred and excluded from this release gate. 
 
 For full setup, customization, troubleshooting, asset notices, and licensing, read README.md.
 
-Some background images were collected online or supplied by users. Rights remain with their respective owners. If you are a rights holder and believe an included asset infringes your rights, email chenlj89@mail2.sysu.edu.cn; the maintainer will review and remove verified infringing material.
+Some backgrounds were photographed or captured by the maintainer; others were collected online or supplied by users. Rights in game imagery and other third-party content remain with their respective owners. If you are a rights holder and believe an included asset infringes your rights, email chenlj89@mail2.sysu.edu.cn; the maintainer will review and remove verified infringing material.

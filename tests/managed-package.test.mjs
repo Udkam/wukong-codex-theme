@@ -59,6 +59,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.match(manageBackgrounds, /Join-Path \$resolvedRoot '\.wukong-runtime'/);
   assert.match(manageBackgrounds, /Join-Path \$runtimeRoot 'background-backups'/);
   assert.match(manageBackgrounds, /\[IO\.File\]::Replace\(/);
+  assert.match(manageBackgrounds, /\[Nullable\[double\]\]\$ThreadVeil/);
   assert.doesNotMatch(manageBackgrounds, /Get-CimInstance|Get-WmiObject|Win32_Process|Stop-Process|taskkill/i);
   const slotPatternText = prepareBackground.match(/\[ValidatePattern\('([^']+)'\)\]/)?.[1];
   assert.ok(slotPatternText, 'background slot validation pattern missing');
@@ -149,15 +150,18 @@ test('minimal managed package imports independently and omits development surfac
   ]) assert.equal(fs.existsSync(path.join(target, rejected)), false, `rejected asset packaged: ${rejected}`);
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'capture-live.mjs')), false);
   const portableReadme = fs.readFileSync(path.join(target, 'PORTABLE-README.txt'), 'utf8');
-  assert.match(portableReadme, /CURRENT V52\.2 ORDERED 22-BACKGROUND GALLERY/);
-  assert.match(portableReadme, /22-image gallery \(13 battle \+ 9 scenery\) in two explicit playback sequences/);
-  assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13/);
-  assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09/);
-  assert.match(portableReadme, /20-minute cooldown/);
+  assert.match(portableReadme, /CURRENT V53 ORDERED 20-BACKGROUND GALLERY/);
+  assert.match(portableReadme, /20-image gallery \(13 battle \+ 7 scenery\) in two explicit playback sequences/);
+  assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16/);
+  assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10/);
+  assert.match(portableReadme, /were photographed or captured by the maintainer/i);
+  assert.doesNotMatch(portableReadme, /20-minute cooldown/);
+  assert.match(portableReadme, /There is no automatic or timer-based image rotation/);
   assert.match(portableReadme, /Ctrl\+Alt\+F/);
   assert.match(portableReadme, /Ctrl\+Alt\+B/);
   assert.match(portableReadme, /Ctrl\+Alt\+C/);
-  assert.match(portableReadme, /Ctrl\+Alt\+T hides or shows the New Task quote/);
+  assert.match(portableReadme, /Ctrl\+Alt\+T hides or shows both the New Task quote/);
+  assert.match(portableReadme, /New Task pages automatically use the battle sequence; project\/thread pages automatically use the scenery sequence/);
   assert.doesNotMatch(portableReadme, /Ctrl\+Alt\+Shift\+B/);
   assert.match(portableReadme, /Run backgrounds\.cmd without arguments for the interactive manager/);
   assert.match(portableReadme, /Move changes only the contiguous order inside the group/);
@@ -174,7 +178,7 @@ test('minimal managed package imports independently and omits development surfac
   const payload = runtime.payloadFromThemeFile(path.join(target, 'themes', 'active.json'));
   assert.match(payload.variables, /data:image\/jpeg;base64/);
   assert.match(payload.variables, /data:image\/webp;base64/);
-  assert.equal(payload.assets.length, 22);
+  assert.equal(payload.assets.length, 20);
   assert.deepEqual(payload.assets.map(asset => asset.id), [
     'erlang-ink-duel',
     'great-sage-staff',
@@ -190,14 +194,12 @@ test('minimal managed package imports independently and omits development surfac
     'ink-wanderer',
     'white-tiger',
     'red-lightning',
-    'mist-temple',
-    'cavern-temple',
     'snow-lake',
-    'autumn-grove',
-    'violet-dharma-ring',
     'white-dragon-frost',
     'bear-crush',
-    'spider-blade'
+    'crimson-lightning-burst',
+    'verdant-cavern',
+    'night-spear-confrontation'
   ]);
   assert.deepEqual(payload.motifs, {});
   assert.deepEqual(Object.keys(payload.uiAssets), [
@@ -213,15 +215,15 @@ test('minimal managed package imports independently and omits development surfac
   ]);
   assert.match(payload.theme.name, /\S/);
   assert.match(payload.variables, /--forge-paper:#[0-9a-f]{6}/i);
-  assert.match(payload.variables, /--forge-scene-count:22/);
+  assert.match(payload.variables, /--forge-scene-count:20/);
   assert.doesNotMatch(payload.variables, /--forge-primary-scene-count:/);
-  assert.match(payload.variables, /--forge-scenery-scenes:8 7 16 4 5 6 14 15 17/);
+  assert.match(payload.variables, /--forge-scenery-scenes:8 7 14 4 5 6 18/);
   assert.match(payload.variables, /--forge-battle-primary-scenes:0 1/);
-  assert.match(payload.variables, /--forge-battle-secondary-scenes:11 2 3 9 12 13 10 18 19 20 21/);
-  assert.match(payload.variables, /--forge-battle-scenes:11 0 1 2 3 9 12 13 10 18 19 20 21/);
+  assert.match(payload.variables, /--forge-battle-secondary-scenes:11 2 3 9 12 13 10 15 16 17 19/);
+  assert.match(payload.variables, /--forge-battle-scenes:11 0 1 2 3 9 12 13 10 15 16 17 19/);
   assert.doesNotMatch(payload.variables, /--forge-art-yaksha-king-rift:/);
   assert.match(payload.variables, /--forge-art-great-sage-staff:var\(--forge-bg-1\)/);
-  assert.equal((payload.variables.match(/data:image\/jpeg;base64,/g) || []).length, 22, 'each gallery image must be embedded only once');
+  assert.equal((payload.variables.match(/data:image\/jpeg;base64,/g) || []).length, 20, 'each gallery image must be embedded only once');
   assert.match(payload.variables, /--forge-motif-xiangfei-gourd:none/);
   assert.match(payload.variables, /--forge-ui-composer-main:url\("data:image\/webp;base64,/);
   assert.match(payload.variables, /--forge-ui-sidebar-level2-hover:url\("data:image\/webp;base64,/);
@@ -232,6 +234,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.deepEqual(payload.assets.map(asset => asset.tone), payload.theme.background.gallery.map(scene => scene.tone));
   assert.deepEqual(payload.assets.map(asset => asset.slot), payload.theme.background.gallery.map(scene => scene.slot));
   assert.deepEqual(payload.assets.map(asset => asset.order), payload.theme.background.gallery.map(scene => scene.order));
+  assert.deepEqual(payload.assets.map(asset => asset.threadVeil), payload.theme.background.gallery.map(scene => scene.threadVeil));
   const client = await import(pathToFileURL(path.join(target, 'runtime', 'cdp-client.mjs')));
   assert.equal(typeof client.getTargets, 'function');
   assert.equal(typeof client.commandTarget, 'function');

@@ -52,10 +52,10 @@ const makeFixture = () => {
   theme.background.position = 'center center';
   theme.background.landingPosition = 'center center';
   theme.background.gallery = [
-    { id: 'battle-one', slot: 'B01', order: 1, asset: 'backgrounds/battle-01.jpg', position: 'center center', mode: 'battle-primary', tone: 'celestial-ink', veil: 0.78 },
-    { id: 'scenery-one', slot: 'S01', order: 1, asset: 'backgrounds/scenery-01.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.75 },
-    { id: 'battle-two', slot: 'B02', order: 2, asset: 'backgrounds/battle-02.jpg', position: 'center center', mode: 'battle-secondary', tone: 'staff-gold', veil: 0.8 },
-    { id: 'scenery-two', slot: 'S02', order: 2, asset: 'backgrounds/scenery-02.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.7 }
+    { id: 'battle-one', slot: 'B01', order: 1, asset: 'backgrounds/battle-01.jpg', position: 'center center', mode: 'battle-primary', tone: 'celestial-ink', veil: 0.78, threadVeil: 0.42 },
+    { id: 'scenery-one', slot: 'S01', order: 1, asset: 'backgrounds/scenery-01.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.75, threadVeil: 0.31 },
+    { id: 'battle-two', slot: 'B02', order: 2, asset: 'backgrounds/battle-02.jpg', position: 'center center', mode: 'battle-secondary', tone: 'staff-gold', veil: 0.8, threadVeil: 0.2 },
+    { id: 'scenery-two', slot: 'S02', order: 2, asset: 'backgrounds/scenery-02.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.7, threadVeil: 0.36 }
   ];
   fs.writeFileSync(path.join(fixture, 'themes', 'active.json'), `${JSON.stringify(theme, null, 2)}\n`, 'utf8');
   return fixture;
@@ -74,6 +74,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   const initialList = JSON.parse(listed.stdout);
   assert.equal(initialList.count, 4);
   assert.deepEqual(initialList.scenes.map(scene => scene.slot), ['B01', 'B02', 'S01', 'S02']);
+  assert.deepEqual(initialList.scenes.map(scene => scene.threadVeil), [0.42, 0.2, 0.31, 0.36]);
   assert.deepEqual(initialList.unlinkedAssets, []);
 
   const manifestBeforeRejectedAdd = sha256(manifest);
@@ -86,10 +87,20 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   assert.equal(sha256(manifest), manifestBeforeRejectedAdd);
   assert.equal(fs.existsSync(path.join(fixture, 'themes', 'backgrounds', 'battle-03.jpg')), false);
 
+  const manifestBeforeRejectedThreadVeil = sha256(manifest);
+  const rejectedThreadVeilAdd = runManager(fixture, [
+    'add', '-Mode', 'battle', '-Id', 'invalid-thread-veil',
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-03.jpg'),
+    '-ThreadVeil', '1.01'
+  ]);
+  assert.notEqual(rejectedThreadVeilAdd.status, 0);
+  assert.match(`${rejectedThreadVeilAdd.stdout}\n${rejectedThreadVeilAdd.stderr}`, /ThreadVeil must be between 0 and 1/i);
+  assert.equal(sha256(manifest), manifestBeforeRejectedThreadVeil);
+
   expectSuccess(runManager(fixture, [
     'add', '-Mode', 'battle', '-Id', 'inserted-battle', '-Position', '2',
     '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-03.jpg'),
-    '-Tone', 'storm-cyan', '-Veil', '0.7', '-MaxWidth', '320', '-MaxHeight', '180'
+    '-Tone', 'storm-cyan', '-Veil', '0.7', '-ThreadVeil', '0.37', '-MaxWidth', '320', '-MaxHeight', '180'
   ]));
   let active = readJson(manifest);
   assert.doesNotThrow(() => validateTheme(active));
@@ -97,6 +108,8 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   assert.deepEqual(battles.map(scene => scene.id), ['battle-one', 'inserted-battle', 'battle-two']);
   assert.deepEqual(battles.map(scene => scene.slot), ['B01', 'B03', 'B02']);
   assert.deepEqual(battles.map(scene => scene.order), [1, 2, 3]);
+  assert.equal(battles[1].veil, 0.7, 'add ignored the explicitly supplied veil');
+  assert.equal(battles[1].threadVeil, 0.37, 'add ignored the explicitly supplied project/thread veil');
   const insertedAsset = path.join(fixture, 'themes', ...battles[1].asset.split('/'));
   assert.equal(fs.existsSync(insertedAsset), true);
   assert.ok(fs.statSync(insertedAsset).size > 0);
@@ -118,12 +131,36 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   assert.equal(active.background.landingPosition, battles[0].position);
 
   const insertedHashBeforeReplace = sha256(insertedAsset);
+  const manifestBeforeRejectedReplace = sha256(manifest);
+  const rejectedThreadVeilReplace = runManager(fixture, [
+    'replace', '-Target', 'inserted-battle',
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-02.jpg'),
+    '-ThreadVeil', '-0.01', '-Force'
+  ]);
+  assert.notEqual(rejectedThreadVeilReplace.status, 0);
+  assert.match(`${rejectedThreadVeilReplace.stdout}\n${rejectedThreadVeilReplace.stderr}`, /ThreadVeil must be between 0 and 1/i);
+  assert.equal(sha256(manifest), manifestBeforeRejectedReplace);
+  assert.equal(sha256(insertedAsset), insertedHashBeforeReplace);
+
   expectSuccess(runManager(fixture, [
     'replace', '-Target', 'inserted-battle',
     '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-02.jpg'),
-    '-Force', '-MaxWidth', '320', '-MaxHeight', '180'
+    '-Veil', '0.63', '-ThreadVeil', '0.44', '-Force', '-MaxWidth', '320', '-MaxHeight', '180'
   ]));
-  assert.doesNotThrow(() => validateTheme(readJson(manifest)));
+  active = readJson(manifest);
+  assert.doesNotThrow(() => validateTheme(active));
+  assert.equal(
+    active.background.gallery.find(scene => scene.id === 'inserted-battle').veil,
+    0.63,
+    'replace ignored the explicitly supplied veil'
+  );
+  assert.equal(
+    active.background.gallery.find(scene => scene.id === 'inserted-battle').threadVeil,
+    0.44,
+    'replace ignored the explicitly supplied project/thread veil'
+  );
+  const afterReplaceList = JSON.parse(expectSuccess(runManager(fixture, ['list', '-AsJson'])).stdout);
+  assert.equal(afterReplaceList.scenes.find(scene => scene.id === 'inserted-battle').threadVeil, 0.44);
   assert.notEqual(sha256(insertedAsset), insertedHashBeforeReplace);
   const assetBackups = fs.readdirSync(backupRoot).filter(file => file.endsWith('-battle-03.jpg'));
   assert.equal(assetBackups.length, 1);
@@ -161,6 +198,8 @@ test('background manager contracts stay event-free, non-process-controlling and 
   assert.match(script, /Join-Path \$resolvedRoot '\.wukong-runtime'/);
   assert.match(script, /Join-Path \$runtimeRoot 'background-backups'/);
   assert.match(script, /\[IO\.File\]::Replace\(/);
+  assert.match(script, /\[Nullable\[double\]\]\$ThreadVeil/);
+  assert.match(script, /threadVeil = \$effectiveThreadVeil/);
   assert.match(script, /Read-Host/);
   assert.match(script, /assetRetained/);
   assert.match(script, /Battle and scenery rotations must each retain at least one scene/);
@@ -171,7 +210,7 @@ test('background manager contracts stay event-free, non-process-controlling and 
   assert.match(entry, /scripts\\manage-backgrounds\.ps1/);
 });
 
-test('background manager preserves both automatic background groups', t => {
+test('background manager preserves both non-empty background groups', t => {
   if (process.platform !== 'win32') return t.skip('PowerShell 5.1 background manager is Windows-only');
   const fixture = makeFixture();
   t.after(() => fs.rmSync(fixture, { recursive: true, force: true }));

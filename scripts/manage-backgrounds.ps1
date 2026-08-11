@@ -40,6 +40,8 @@ param(
 
     [Nullable[double]]$Veil,
 
+    [Nullable[double]]$ThreadVeil,
+
     [ValidateSet('dark', 'light')]
     [string]$Mark,
 
@@ -75,6 +77,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $script:positionSpecified = $PSBoundParameters.ContainsKey('Position')
+$script:veilSpecified = $PSBoundParameters.ContainsKey('Veil')
+$script:threadVeilSpecified = $PSBoundParameters.ContainsKey('ThreadVeil')
 if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
     $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 }
@@ -276,6 +280,12 @@ function Test-ThemeManifest {
             if ($sceneVeil -lt 0 -or $sceneVeil -gt 1) {
                 throw "Invalid background veil on $($scene.id): $($scene.veil)"
             }
+            if ($scene.PSObject.Properties['threadVeil']) {
+                $sceneThreadVeil = [double]$scene.threadVeil
+                if ($sceneThreadVeil -lt 0 -or $sceneThreadVeil -gt 1) {
+                    throw "Invalid project/thread veil on $($scene.id): $($scene.threadVeil)"
+                }
+            }
             if ($scene.PSObject.Properties['mark'] -and $scene.mark -notin @('dark', 'light')) {
                 throw "Invalid background mark on $($scene.id): $($scene.mark)"
             }
@@ -398,6 +408,7 @@ function Write-ListResult {
                     asset = [string]$scene.asset
                     tone = [string]$scene.tone
                     veil = $scene.veil
+                    threadVeil = $(if ($scene.PSObject.Properties['threadVeil']) { $scene.threadVeil } else { 0.25 })
                 }
             }
         }
@@ -445,8 +456,11 @@ function Invoke-Add {
     if (@($Theme.background.gallery | Where-Object { ([string]$_.id).Equals($Id, [StringComparison]::OrdinalIgnoreCase) }).Count -gt 0) {
         throw "Background id already exists: $Id"
     }
-    if ($Veil.HasValue -and ($Veil.Value -lt 0 -or $Veil.Value -gt 1)) {
+    if ($script:veilSpecified -and ([double]$Veil -lt 0 -or [double]$Veil -gt 1)) {
         throw '-Veil must be between 0 and 1.'
+    }
+    if ($script:threadVeilSpecified -and ([double]$ThreadVeil -lt 0 -or [double]$ThreadVeil -gt 1)) {
+        throw '-ThreadVeil must be between 0 and 1.'
     }
     $effectiveSceneMode = if ($SceneMode) { $SceneMode } elseif ($Mode -eq 'battle') { 'battle-secondary' } else { 'scenery' }
     if (($Mode -eq 'battle' -and $effectiveSceneMode -notlike 'battle-*') -or
@@ -454,7 +468,8 @@ function Invoke-Add {
         throw "Scene mode '$effectiveSceneMode' does not belong to group '$Mode'."
     }
     $effectiveTone = if ($Tone) { $Tone } elseif ($Mode -eq 'battle') { 'celestial-ink' } else { 'forest-moss' }
-    $effectiveVeil = if ($Veil.HasValue) { $Veil.Value } elseif ($Mode -eq 'battle') { 0.78 } else { 0.75 }
+    $effectiveVeil = if ($script:veilSpecified) { [double]$Veil } elseif ($Mode -eq 'battle') { 0.78 } else { 0.75 }
+    $effectiveThreadVeil = if ($script:threadVeilSpecified) { [double]$ThreadVeil } else { 0.25 }
     $physicalSlot = Get-NextAssetSlot -Context $Context -Theme $Theme -Group $Mode
     $prepared = Invoke-PrepareBackground -Context $Context -PhysicalSlot $physicalSlot -SourcePath $InputPath
     $asset = 'backgrounds/{0}' -f (Split-Path -Leaf $prepared.Path)
@@ -467,6 +482,7 @@ function Invoke-Add {
         mode = $effectiveSceneMode
         tone = $effectiveTone
         veil = $effectiveVeil
+        threadVeil = $effectiveThreadVeil
     }
     if ($Mark) { $sceneData['mark'] = $Mark }
     $newScene = [pscustomobject]$sceneData
@@ -499,8 +515,11 @@ function Invoke-Replace {
     if (-not $Target) { throw 'replace requires -Target SLOT|ID.' }
     if (-not $InputPath) { throw 'replace requires -InputPath.' }
     if (-not $Force) { throw 'replace overwrites one referenced image; pass -Force after checking the target.' }
-    if ($Veil.HasValue -and ($Veil.Value -lt 0 -or $Veil.Value -gt 1)) {
+    if ($script:veilSpecified -and ([double]$Veil -lt 0 -or [double]$Veil -gt 1)) {
         throw '-Veil must be between 0 and 1.'
+    }
+    if ($script:threadVeilSpecified -and ([double]$ThreadVeil -lt 0 -or [double]$ThreadVeil -gt 1)) {
+        throw '-ThreadVeil must be between 0 and 1.'
     }
     $scene = Find-Scene -Theme $Theme -Value $Target
     if ($Id -and @($Theme.background.gallery | Where-Object {
@@ -536,7 +555,11 @@ function Invoke-Replace {
         $scene.mode = $SceneMode
     }
     if ($BackgroundPosition) { $scene.position = $BackgroundPosition }
-    if ($Veil.HasValue) { $scene.veil = $Veil.Value }
+    if ($script:veilSpecified) { $scene.veil = [double]$Veil }
+    if ($script:threadVeilSpecified) {
+        if ($scene.PSObject.Properties['threadVeil']) { $scene.threadVeil = [double]$ThreadVeil }
+        else { $scene | Add-Member -NotePropertyName threadVeil -NotePropertyValue ([double]$ThreadVeil) }
+    }
     if ($Mark) {
         if ($scene.PSObject.Properties['mark']) { $scene.mark = $Mark }
         else { $scene | Add-Member -NotePropertyName mark -NotePropertyValue $Mark }

@@ -101,35 +101,33 @@ export const DEFAULT_THEME = {
   background: {
     mode: 'gallery',
     source: 'managed-cinematic-gallery',
-    asset: 'backgrounds/battle-02.jpg',
+    asset: 'backgrounds/battle-07.jpg',
     position: 'center center',
     landingPosition: 'center center',
     dim: 0.3,
     taskIntensity: 0.7,
     landingIntensity: 0.84,
     gallery: [
-      { id: 'erlang-ink-duel', slot: 'B01', order: 1, asset: 'backgrounds/battle-01.jpg', position: '68% center', mode: 'battle-primary', tone: 'celestial-ink', veil: 0.78 },
-      { id: 'great-sage-staff', slot: 'B02', order: 2, asset: 'backgrounds/battle-02.jpg', position: 'center center', mode: 'battle-primary', tone: 'staff-gold', veil: 0.94 },
-      { id: 'storm-bearer', slot: 'B03', order: 3, asset: 'backgrounds/battle-03.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.72 },
-      { id: 'shadow-confrontation', slot: 'B04', order: 4, asset: 'backgrounds/battle-04.jpg', position: 'center center', mode: 'battle-secondary', tone: 'midnight-blue', veil: 0.99 },
-      { id: 'ridge-gate', slot: 'S01', order: 1, asset: 'backgrounds/scenery-01.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.67 },
-      { id: 'forest-shrine', slot: 'S02', order: 2, asset: 'backgrounds/scenery-02.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.83 },
-      { id: 'mountain-path', slot: 'S03', order: 3, asset: 'backgrounds/scenery-03.jpg', position: 'center center', mode: 'scenery', tone: 'mountain-jade', veil: 0.73 },
-      { id: 'sunlit-mountain-vista', slot: 'S04', order: 4, asset: 'backgrounds/scenery-04.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.67, mark: 'dark' },
-      { id: 'sunset-ravine', slot: 'S05', order: 5, asset: 'backgrounds/scenery-05.jpg', position: 'center center', mode: 'scenery', tone: 'sunset-copper', veil: 0.68 },
-      { id: 'training-sunset', slot: 'B05', order: 5, asset: 'backgrounds/battle-05.jpg', position: 'center center', mode: 'battle-secondary', tone: 'sage-sepia', veil: 0.85 },
-      { id: 'thunder-dragon-ascent', slot: 'B06', order: 6, asset: 'backgrounds/battle-06.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73 },
-      { id: 'ink-wanderer', slot: 'B07', order: 7, asset: 'backgrounds/battle-07.jpg', position: 'center center', mode: 'battle-secondary', tone: 'celestial-ink', veil: 0.78, mark: 'dark' },
-      { id: 'white-tiger', slot: 'B08', order: 8, asset: 'backgrounds/battle-08.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73, mark: 'dark' },
-      { id: 'red-lightning', slot: 'B09', order: 9, asset: 'backgrounds/battle-09.jpg', position: 'center center', mode: 'battle-secondary', tone: 'yaksha-lacquer', veil: 0.68 },
-      { id: 'mist-temple', slot: 'S06', order: 6, asset: 'backgrounds/scenery-06.jpg', position: 'center center', mode: 'scenery', tone: 'stone-ash', veil: 1.00 },
-      { id: 'cavern-temple', slot: 'S07', order: 7, asset: 'backgrounds/scenery-07.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.82 },
-      { id: 'snow-lake', slot: 'S08', order: 8, asset: 'backgrounds/scenery-08.jpg', position: 'center center', mode: 'scenery', tone: 'storm-cyan', veil: 0.48 },
-      { id: 'autumn-grove', slot: 'S09', order: 9, asset: 'backgrounds/scenery-09.jpg', position: 'center center', mode: 'scenery', tone: 'sunset-copper', veil: 0.68 },
-      { id: 'violet-dharma-ring', slot: 'B10', order: 10, asset: 'backgrounds/battle-10.jpg', position: 'center center', mode: 'battle-secondary', tone: 'midnight-blue', veil: 0.99 },
-      { id: 'white-dragon-frost', slot: 'B11', order: 11, asset: 'backgrounds/battle-11.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73, mark: 'dark' },
-      { id: 'bear-crush', slot: 'B12', order: 12, asset: 'backgrounds/battle-12.jpg', position: 'center center', mode: 'battle-secondary', tone: 'sage-sepia', veil: 0.86 },
-      { id: 'spider-blade', slot: 'B13', order: 13, asset: 'backgrounds/battle-13.jpg', position: 'center center', mode: 'battle-secondary', tone: 'celestial-ink', veil: 0.78, mark: 'dark' }
+      { id: 'erlang-ink-duel', slot: 'B01', order: 2, asset: 'backgrounds/battle-01.jpg', position: '68% center', mode: 'battle-primary', tone: 'celestial-ink', veil: 0.78, threadVeil: 0.84 },
+      { id: 'great-sage-staff', slot: 'B02', order: 3, asset: 'backgrounds/battle-02.jpg', position: 'center center', mode: 'battle-primary', tone: 'staff-gold', veil: 0.94, threadVeil: 0.18 },
+      { id: 'storm-bearer', slot: 'B03', order: 4, asset: 'backgrounds/battle-03.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.72, threadVeil: 0.40 },
+      { id: 'shadow-confrontation', slot: 'B04', order: 5, asset: 'backgrounds/battle-04.jpg', position: 'center center', mode: 'battle-secondary', tone: 'midnight-blue', veil: 0.99, threadVeil: 0.18 },
+      { id: 'ridge-gate', slot: 'S01', order: 4, asset: 'backgrounds/scenery-01.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.67, threadVeil: 0.28 },
+      { id: 'forest-shrine', slot: 'S02', order: 5, asset: 'backgrounds/scenery-02.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.83, threadVeil: 0.18 },
+      { id: 'mountain-path', slot: 'S03', order: 6, asset: 'backgrounds/scenery-03.jpg', position: 'center center', mode: 'scenery', tone: 'mountain-jade', veil: 0.73, threadVeil: 0.32 },
+      { id: 'sunlit-mountain-vista', slot: 'S04', order: 2, asset: 'backgrounds/scenery-04.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.67, threadVeil: 0.32, mark: 'dark' },
+      { id: 'sunset-ravine', slot: 'S05', order: 1, asset: 'backgrounds/scenery-05.jpg', position: 'center center', mode: 'scenery', tone: 'sunset-copper', veil: 0.68, threadVeil: 0.42 },
+      { id: 'training-sunset', slot: 'B05', order: 6, asset: 'backgrounds/battle-05.jpg', position: 'center center', mode: 'battle-secondary', tone: 'sage-sepia', veil: 0.85, threadVeil: 0.56 },
+      { id: 'thunder-dragon-ascent', slot: 'B06', order: 9, asset: 'backgrounds/battle-06.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73, threadVeil: 0.58 },
+      { id: 'ink-wanderer', slot: 'B07', order: 1, asset: 'backgrounds/battle-07.jpg', position: 'center center', mode: 'battle-secondary', tone: 'celestial-ink', veil: 0.78, threadVeil: 0.84, mark: 'dark' },
+      { id: 'white-tiger', slot: 'B08', order: 7, asset: 'backgrounds/battle-08.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73, threadVeil: 0.30, mark: 'dark' },
+      { id: 'red-lightning', slot: 'B09', order: 8, asset: 'backgrounds/battle-09.jpg', position: 'center center', mode: 'battle-secondary', tone: 'yaksha-lacquer', veil: 0.68, threadVeil: 0.18 },
+      { id: 'snow-lake', slot: 'S08', order: 3, asset: 'backgrounds/scenery-08.jpg', position: 'center center', mode: 'scenery', tone: 'storm-cyan', veil: 0.48, threadVeil: 0.48 },
+      { id: 'white-dragon-frost', slot: 'B11', order: 10, asset: 'backgrounds/battle-11.jpg', position: 'center center', mode: 'battle-secondary', tone: 'storm-cyan', veil: 0.73, threadVeil: 0.58, mark: 'dark' },
+      { id: 'bear-crush', slot: 'B12', order: 11, asset: 'backgrounds/battle-12.jpg', position: 'center center', mode: 'battle-secondary', tone: 'sage-sepia', veil: 0.86, threadVeil: 0.18 },
+      { id: 'crimson-lightning-burst', slot: 'B15', order: 12, asset: 'backgrounds/battle-15.jpg', position: 'center center', mode: 'battle-secondary', tone: 'yaksha-lacquer', veil: 0.62, threadVeil: 0.18 },
+      { id: 'verdant-cavern', slot: 'S10', order: 7, asset: 'backgrounds/scenery-10.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.75, threadVeil: 0.18 },
+      { id: 'night-spear-confrontation', slot: 'B16', order: 13, asset: 'backgrounds/battle-16.jpg', position: 'center center', mode: 'battle-secondary', tone: 'staff-gold', veil: 0.82, threadVeil: 0.34 }
     ]
   },
   accessibility: {
@@ -193,6 +191,7 @@ export function validateTheme(value) {
         !['scenery', 'battle-primary', 'battle-secondary'].includes(entry.mode) ||
         !(entry.tone in SCENE_TONES) ||
         (entry.veil !== undefined && !isUnit(entry.veil)) ||
+        (entry.threadVeil !== undefined && !isUnit(entry.threadVeil)) ||
         (entry.mark !== undefined && !['light', 'dark'].includes(entry.mark)) ||
         (sequenceProvided && (
           !/^[BS][0-9]{2}$/.test(entry.slot) ||
@@ -327,7 +326,7 @@ export function cssFor(theme, assetInput = '', motifInput = {}, uiAssetInput = {
       `--forge-ink:${tone.ink};--forge-ink-soft:${tone.inkSoft};--forge-lacquer:${tone.lacquer};` +
       `--forge-jade:${tone.jade};--forge-jade-light:${tone.jadeLight};--forge-gold:${tone.gold};` +
       `--forge-gold-light:${tone.goldLight};--forge-paper:${tone.paper};` +
-      `--forge-scene-brightness:${tone.brightness || 1};` +
+      `--forge-scene-brightness:${tone.brightness || 1};--forge-scene-thread-veil:${isUnit(entry.threadVeil) ? entry.threadVeil : .25};` +
       `--forge-topbar-bg:${surface('topbar', tone.paper)};--forge-sidebar-bg:${surface('sidebar', tone.paper)};` +
       `--forge-taskbar-bg:${surface('taskbar', tone.paper)};--forge-composer-bg:${surface('composer', tone.paper)};` +
       `--forge-right-card-bg:${surface('rightCard', tone.paper)};--forge-user-bg:${surface('user', tone.paper)};` +

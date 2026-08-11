@@ -46,7 +46,10 @@ test('active gallery stays inside decoded-pixel and two-scene transition budgets
   for (const asset of unique) {
     assert.ok(asset.pixels <= MAX_BACKGROUND_PIXELS, `${asset.asset} exceeds the per-background budget`);
   }
-  assert.equal(unique.length, 22, 'active gallery must contain 22 unique numbered assets');
+  assert.equal(unique.length, 20, 'active gallery must contain 20 unique numbered assets');
+  assert.equal(totalBytes, 6_574_985, 'encoded gallery changed without refreshing the reviewed asset budget');
+  assert.equal(totalPixels, 41_284_792, 'decoded gallery changed without refreshing the reviewed asset budget');
+  assert.equal(transitionPixels, 5_337_600, 'two-scene transition footprint changed unexpectedly');
   assert.ok(totalBytes <= MAX_GALLERY_BYTES, 'gallery exceeds its encoded-byte budget');
   assert.ok(totalPixels <= MAX_GALLERY_PIXELS, 'gallery exceeds its decoded-pixel budget');
   assert.ok(transitionPixels <= MAX_TRANSITION_PIXELS, 'crossfade exceeds its two-scene decoded-pixel budget');
@@ -77,7 +80,7 @@ test('active gallery stays inside decoded-pixel and two-scene transition budgets
   t.diagnostic(
     `encoded gallery: ${totalBytes.toLocaleString('en-US')} bytes; ` +
     `decoded gallery: ${totalPixels.toLocaleString('en-US')} px; transition: ${transitionPixels.toLocaleString('en-US')} px; ` +
-    '22 numbered slots satisfy the 960p-wide, approved ultrawide, or source-resolution contract'
+    '20 numbered slots satisfy the 960p-wide, approved ultrawide, or explicit source-resolution contract'
   );
 
   assert.equal(payloadFromThemeFile(themePath).assets.length, theme.background.gallery.length);

@@ -294,7 +294,6 @@ function applyRuntime(payload) {
 
   const sceneStateStorageKey = 'wukong-forge-scene-cursors-v13'; // gitleaks:allow -- public localStorage key, not a credential
   const orderedDeckStrategy = 'ordered-v1';
-  const automaticRotationCooldownMs = 20 * 60 * 1000;
   const normalizeStoredScene = value => Number.isInteger(value) && value >= 0 ? value : null;
   const normalizeStoredDeck = value => ({
     strategy: value?.strategy === orderedDeckStrategy ? orderedDeckStrategy : null,
@@ -327,23 +326,15 @@ function applyRuntime(payload) {
       selections: {
         battle: normalizeStoredScene(parsed.selectedBattle ?? parsed.selections?.battle),
         scenery: normalizeStoredScene(parsed.selectedScenery ?? parsed.selections?.scenery)
-      },
-      lastAutoRotationAt: Number.isFinite(parsed.lastAutoRotationAt) && parsed.lastAutoRotationAt >= 0
-        ? parsed.lastAutoRotationAt
-        : null,
-      autoSceneryPending: parsed.autoSceneryPending === true,
-      autoSceneryReady: parsed.autoSceneryPending === true && parsed.autoSceneryReady === true
+      }
     };
   };
   const writeSceneState = sceneState => {
     const serialized = JSON.stringify({
-      version: 3,
+      version: 5,
       backgroundDecks: sceneState.backgroundDecks,
       selectedBattle: sceneState.selectedScenes.battle,
-      selectedScenery: sceneState.selectedScenes.scenery,
-      lastAutoRotationAt: sceneState.lastAutoRotationAt,
-      autoSceneryPending: sceneState.autoSceneryPending,
-      autoSceneryReady: sceneState.autoSceneryReady
+      selectedScenery: sceneState.selectedScenes.scenery
     });
     for (const storageName of ['localStorage', 'sessionStorage']) {
       try {
@@ -415,9 +406,6 @@ function applyRuntime(payload) {
     if (persist) persistSceneState();
     return state.selectedScenes[mode];
   };
-  const advanceSceneSelection = (mode, choices, persist = true) => (
-    stepSceneSelection(mode, choices, 1, persist)
-  );
   const sourceFromCssUrl = value => {
     const trimmed = String(value || '').trim();
     if (!trimmed || trimmed === 'none') return '';
@@ -497,6 +485,7 @@ function applyRuntime(payload) {
       preloadImage: computed.getPropertyValue(backgroundVariable).trim() || 'none',
       backgroundPosition: computed.getPropertyValue(`--forge-position-${scene}`).trim() || 'center center',
       brightness: computed.getPropertyValue('--forge-scene-brightness').trim() || '1',
+      threadVeil: computed.getPropertyValue('--forge-scene-thread-veil').trim() || '.25',
       veil: [
         computed.getPropertyValue('--forge-mode-veil').trim(),
         computed.getPropertyValue('--forge-scene-veil').trim()
@@ -517,6 +506,7 @@ function applyRuntime(payload) {
     image.style.objectPosition = sceneStyle.backgroundPosition;
     image.style.setProperty('--forge-layer-brightness', sceneStyle.brightness);
     veil.style.backgroundImage = sceneStyle.veil || 'none';
+    veil.style.setProperty('--forge-layer-thread-veil', sceneStyle.threadVeil);
   };
   const clearLayer = layer => {
     if (!layer) return;
@@ -536,7 +526,10 @@ function applyRuntime(payload) {
       image.style.removeProperty('object-position');
       image.style.removeProperty('--forge-layer-brightness');
     }
-    if (veil) veil.style.backgroundImage = 'none';
+    if (veil) {
+      veil.style.backgroundImage = 'none';
+      veil.style.removeProperty('--forge-layer-thread-veil');
+    }
   };
   const transitionDuration = () => {
     const value = getComputedStyle(root).getPropertyValue('--forge-background-transition').trim();
@@ -1544,9 +1537,18 @@ function applyRuntime(payload) {
     if (explicitThreadRow(surface) || explicitThreadRow(source)) return 'root-thread';
     return 'action';
   };
+  const floatingSidebarShellSelector = [
+    'aside[data-testid="app-shell-floating-left-panel"]',
+    '[data-testid="app-shell-floating-left-panel"] > aside',
+    '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)'
+  ].join(',');
+  const sidebarShellSelector = [
+    floatingSidebarShellSelector,
+    'aside.app-shell-left-panel'
+  ].join(',');
   const markSidebarSurfaces = () => {
-    const sidebar = [...document.querySelectorAll('aside.app-shell-left-panel')]
-      .find(layoutPresent);
+    const sidebar = [...document.querySelectorAll(floatingSidebarShellSelector)].find(layoutPresent) ||
+      [...document.querySelectorAll('aside.app-shell-left-panel')].find(layoutPresent);
     if (!sidebar) return [];
     mark(sidebar, 'forge-sidebar');
     mark(sidebar, 'forge-sidebar-shell');
@@ -1670,18 +1672,19 @@ function applyRuntime(payload) {
     document.getElementById('wukong-forge-motif-overlay')?.remove();
 
     const overlayWasReady = overlayReady();
-    ensureBackground();
     const workspace = findWorkspace();
-    const { surface, threadEvidence, landingTitle } = classifySurface(workspace);
-    const automaticMode = surface === 'landing' ? 'battle' : 'scenery';
-    if (state.lastSurface && state.lastSurface !== surface) {
-      state.manualBackgroundMode = null;
-    }
+    const { surface, landingTitle } = classifySurface(workspace);
+    const routeHref = location.href;
+    const surfaceChanged = state.lastSurface !== null && state.lastSurface !== surface;
+    const routeChanged = state.lastRouteHref !== routeHref;
+    if (surfaceChanged || routeChanged) state.manualBackgroundMode = null;
     state.lastSurface = surface;
-    state.automaticBackgroundMode = automaticMode;
-    const mode = state.manualBackgroundMode || automaticMode;
+    state.lastRouteHref = routeHref;
+    state.automaticBackgroundMode = surface === 'landing' ? 'battle' : 'scenery';
+    const mode = state.manualBackgroundMode || state.automaticBackgroundMode;
     root.dataset.forgeSurface = surface;
     root.dataset.forgeMode = mode;
+    ensureBackground();
     const plannedMarks = new Map();
     pendingMarkPlan = plannedMarks;
     let topbarTargets;
@@ -1702,24 +1705,6 @@ function applyRuntime(payload) {
 
     const safeChoices = readSceneChoices(mode);
     ensureSceneSelection(mode, safeChoices);
-    const automaticChoices = automaticMode === mode
-      ? safeChoices
-      : readSceneChoices(automaticMode);
-    /*
-     * A qualifying New Task click rotates battle immediately, but scenery is
-     * consumed only after this renderer has actually observed the landing
-     * surface. This prevents a follow-up refresh of the old thread from
-     * spending the paired scenery draw before navigation has completed.
-     */
-    if (automaticMode === 'battle' && state.autoSceneryPending && !state.autoSceneryReady) {
-      state.autoSceneryReady = true;
-      persistSceneState();
-    } else if (automaticMode === 'scenery' && state.autoSceneryPending && state.autoSceneryReady) {
-      advanceSceneSelection('scenery', automaticChoices, false);
-      state.autoSceneryPending = false;
-      state.autoSceneryReady = false;
-      persistSceneState();
-    }
     state.sceneKey = `${mode}|renderer`;
     const plannedScene = state.selectedScenes[mode];
     const requestedSceneIsCurrent = state.requestedScene?.mode === mode &&
@@ -1785,19 +1770,20 @@ function applyRuntime(payload) {
     routeTimers: new Set(),
     backgroundDecks: storedSceneState.decks,
     selectedScenes: storedSceneState.selections,
-    lastAutoRotationAt: storedSceneState.lastAutoRotationAt,
-    autoSceneryPending: storedSceneState.autoSceneryPending,
-    autoSceneryReady: storedSceneState.autoSceneryReady,
-    pendingAutoNewTask: false,
     pendingBackgroundMode: null,
     pendingBackgroundDirection: 1,
-    manualBackgroundMode: null,
+    manualBackgroundMode: previous?.manualBackgroundMode === 'battle' || previous?.manualBackgroundMode === 'scenery'
+      ? previous.manualBackgroundMode
+      : null,
     automaticBackgroundMode: null,
     landingQuoteVisible: previousLandingQuoteVisible,
     selfManagedLandingAria: new WeakSet(),
-    lastSurface: null,
-    lastRouteHref: location.href,
-    autoRotationCooldownMs: automaticRotationCooldownMs,
+    lastSurface: previous?.lastSurface === 'landing' || previous?.lastSurface === 'thread'
+      ? previous.lastSurface
+      : null,
+    lastRouteHref: typeof previous?.lastRouteHref === 'string'
+      ? previous.lastRouteHref
+      : location.href,
     sceneKey: null,
     currentScene: null,
     currentMode: null,
@@ -1832,11 +1818,12 @@ function applyRuntime(payload) {
       ? requestedMode
       : (
           state.manualBackgroundMode ||
+          state.automaticBackgroundMode ||
           (root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery' ? 'scenery' : 'battle')
         );
     const step = direction < 0 ? -1 : 1;
     if (document.hidden) {
-      if (!state.pendingAutoNewTask && state.pendingBackgroundMode === null) {
+      if (state.pendingBackgroundMode === null) {
         state.pendingBackgroundMode = mode;
         state.pendingBackgroundDirection = step;
       }
@@ -1854,15 +1841,14 @@ function applyRuntime(payload) {
       state.hiddenDirty = true;
       return false;
     }
-    const visibleMode = state.manualBackgroundMode || (
-      root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery'
-        ? 'scenery'
-        : 'battle'
-    );
+    const visibleMode = root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery'
+      ? 'scenery'
+      : 'battle';
     const mode = visibleMode === 'battle' ? 'scenery' : 'battle';
     const safeChoices = readSceneChoices(mode);
     ensureSceneSelection(mode, safeChoices);
-    state.manualBackgroundMode = mode;
+    state.manualBackgroundMode = mode === state.automaticBackgroundMode ? null : mode;
+    root.dataset.forgeMode = mode;
     requestScene(state.selectedScenes[mode], mode);
     return true;
   };
@@ -1872,32 +1858,6 @@ function applyRuntime(payload) {
     const landingTitle = findLandingTitle(findWorkspace());
     if (landingTitle) applyLandingTitleCopy(landingTitle);
     return state.landingQuoteVisible;
-  };
-  const requestAutomaticBackgroundCycle = () => {
-    if (document.hidden) {
-      state.pendingAutoNewTask = true;
-      state.pendingBackgroundMode = null;
-      state.hiddenDirty = true;
-      return false;
-    }
-    const sampledNow = Date.now();
-    const now = Number.isFinite(sampledNow) ? sampledNow : 0;
-    const lastRotation = state.lastAutoRotationAt;
-    if (
-      Number.isFinite(lastRotation) &&
-      now >= lastRotation &&
-      now - lastRotation < automaticRotationCooldownMs
-    ) return false;
-
-    const battleScene = advanceSceneSelection('battle', readSceneChoices('battle'), false);
-    state.lastAutoRotationAt = now;
-    state.autoSceneryPending = true;
-    state.autoSceneryReady = root.dataset.forgeSurface === 'landing';
-    persistSceneState();
-    if (root.dataset.forgeSurface === 'landing' && root.dataset.forgeMode === 'battle') {
-      requestScene(battleScene, 'battle');
-    }
-    return true;
   };
   state.nextBackground = nextBackground;
   state.previousBackground = previousBackground;
@@ -1945,16 +1905,13 @@ function applyRuntime(payload) {
       return;
     }
     const hiddenDirty = state.hiddenDirty;
-    const pendingAutoNewTask = state.pendingAutoNewTask;
     const pendingBackgroundMode = state.pendingBackgroundMode;
     const pendingBackgroundDirection = state.pendingBackgroundDirection;
     state.hiddenDirty = false;
-    state.pendingAutoNewTask = false;
     state.pendingBackgroundMode = null;
     state.pendingBackgroundDirection = 1;
-    if (pendingAutoNewTask) requestAutomaticBackgroundCycle();
-    else if (pendingBackgroundMode) stepBackground(pendingBackgroundMode, pendingBackgroundDirection);
-    if (hiddenDirty || pendingAutoNewTask || pendingBackgroundMode) scheduleRefresh(0);
+    if (pendingBackgroundMode) stepBackground(pendingBackgroundMode, pendingBackgroundDirection);
+    if (hiddenDirty || pendingBackgroundMode) scheduleRefresh(0);
   };
   const queueRefreshes = delays => {
     /*
@@ -1979,8 +1936,6 @@ function applyRuntime(payload) {
     if (!target) return;
     const label = textOf(target);
     const newTask = exactNewTask(label);
-    const disabled = target.matches(':disabled, [aria-disabled="true"], [data-disabled="true"]');
-    if (newTask && !disabled) requestAutomaticBackgroundCycle();
     const composerSubmit = Boolean(target.closest('[data-thread-find-composer="true"], .composer-surface-chrome'));
     const sidebarNavigation = Boolean(target.closest([
       '[data-app-action-sidebar-project-row]',
@@ -1995,16 +1950,12 @@ function applyRuntime(payload) {
       target.matches('a[href], [role="treeitem"], [aria-current], [aria-selected]') ||
       target.closest('a[href], [role="treeitem"]');
     if (!possibleNavigation && !composerSubmit) return;
-    if (possibleNavigation || root.dataset.forgeSurface === 'landing') {
-      state.manualBackgroundMode = null;
-    }
     queueRefreshes(composerSubmit ? [320, 1100] : [360]);
   };
   const scheduleComposerKeyboardSubmit = event => {
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
     const target = event.target instanceof Element ? event.target : null;
     if (!target?.closest('[data-thread-find-composer="true"], .composer-surface-chrome')) return;
-    if (root.dataset.forgeSurface === 'landing') state.manualBackgroundMode = null;
     queueRefreshes([320, 1100]);
   };
   const handleThemeKeyboardShortcut = event => {
@@ -2027,9 +1978,6 @@ function applyRuntime(payload) {
   };
   const routeEventName = 'wukong-forge-route-v13';
   const scheduleRouteRefresh = () => {
-    const routeHref = location.href;
-    if (routeHref !== state.lastRouteHref) state.manualBackgroundMode = null;
-    state.lastRouteHref = routeHref;
     queueRefreshes([160, 720]);
   };
   const originalPushState = history.pushState;
@@ -2069,6 +2017,8 @@ function applyRuntime(payload) {
     '[data-pip-obstacle="thread-summary-panel"]',
     '[data-slot^="thread-summary-panel-"]',
     '.app-shell-left-panel',
+    '[data-testid="app-shell-floating-left-panel"]',
+    '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)',
     '[data-app-action-sidebar-scroll]',
     '[data-app-action-sidebar-section]',
     '[data-app-action-sidebar-section-heading]',
@@ -2152,7 +2102,9 @@ function applyRuntime(payload) {
     '.composer-surface-chrome',
     '[data-above-composer-portal]',
     '[data-pip-obstacle="thread-summary-panel"]',
-    '.app-shell-left-panel'
+    '.app-shell-left-panel',
+    '[data-testid="app-shell-floating-left-panel"]',
+    '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)'
   ].join(',');
   const nodeMountsFirstPaintStructure = node => (
     node.nodeType === Node.ELEMENT_NODE &&
@@ -2234,7 +2186,7 @@ function applyRuntime(payload) {
       return record.type === 'attributes'
         ? (
             nodeTouchesThemeStructure(record.target) ||
-            Boolean(record.target.closest?.('.app-shell-left-panel'))
+            Boolean(record.target.closest?.(sidebarShellSelector))
           )
         : (
             nodeIsWithinThemeStructure(record.target) ||
@@ -2467,7 +2419,7 @@ export const isActiveThemeState = state => Boolean(state) &&
   state.backgroundReady === true &&
   ['0', '1'].includes(state.backgroundActiveLayer) &&
   ['landing', 'thread'].includes(state.surface) &&
-  state.mode === (state.surface === 'landing' ? 'battle' : 'scenery') &&
+  ['battle', 'scenery'].includes(state.mode) &&
   /^\d+$/.test(String(state.scene || '')) &&
   state.backgroundActiveScene === state.scene &&
   state.backgroundActiveMode === state.mode &&

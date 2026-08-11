@@ -67,6 +67,7 @@ const sequenceFor = mode => activeTheme.background.gallery
   .filter(({ scene }) => mode === 'battle' ? scene.mode.startsWith('battle') : scene.mode === 'scenery')
   .sort((left, right) => left.scene.order - right.scene.order)
   .map(({ index }) => String(index));
+const threadVeilFor = scene => activeTheme.background.gallery[Number(scene)].threadVeil;
 let browser;
 let browserServer;
 
@@ -140,6 +141,14 @@ const currentBackground = page => page.evaluate(() => {
     preloadInFlight: runtime.preloadRequests.size,
     transitioning: runtime.transitionInFlight
   };
+});
+
+const activeVeilOpacity = page => page.evaluate(() => {
+  const active = document.querySelector(
+    '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+  );
+  const veil = active?.querySelector('[data-forge-background-veil]');
+  return Number.parseFloat(getComputedStyle(veil).opacity);
 });
 
 const waitForSceneChange = async (page, previousScene, expectedMode) => {
@@ -307,6 +316,7 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     const overlay = document.getElementById('wukong-forge-background');
     const active = overlay.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     const image = active.querySelector('[data-forge-background-image]');
+    const veil = active.querySelector('[data-forge-background-veil]');
     return {
       position: getComputedStyle(overlay).position,
       inset: getComputedStyle(overlay).inset,
@@ -316,6 +326,7 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
       objectPosition: getComputedStyle(image).objectPosition,
       imageBackground: getComputedStyle(image).backgroundColor,
       filter: getComputedStyle(image).filter,
+      veilOpacity: Number.parseFloat(getComputedStyle(veil).opacity),
       transform: getComputedStyle(image).transform,
       willChange: getComputedStyle(active).willChange,
       bodyIsolation: getComputedStyle(document.body).isolation,
@@ -332,6 +343,7 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   assert.equal(background.objectPosition, '68% 50%');
   assert.equal(background.imageBackground, 'rgba(0, 0, 0, 0)');
   assert.equal(background.filter, 'none');
+  assert.ok(Math.abs(background.veilOpacity - .1) < .001);
   assert.equal(background.transform, 'none');
   assert.equal(background.willChange, 'auto');
   assert.equal(background.bodyIsolation, 'auto');
@@ -523,9 +535,12 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     stale.innerHTML = '<div data-virtualized-turn-content>stale hidden turn</div>';
     document.querySelector('.route-host').append(stale);
   });
-  await waitForRuntime(page, 'scene', 0);
+  await waitForRuntime(page, 'surface', 'landing');
+  await page.waitForTimeout(700);
   assert.equal(await page.locator('html').getAttribute('data-forge-surface'), 'landing');
   assert.equal(await page.locator('html').getAttribute('data-forge-mode'), 'battle');
+  assert.equal((await currentBackground(page)).scene, '0');
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .1) < .001);
 
   await page.evaluate(RESTORE_EXPRESSION);
   const nativeState = await page.evaluate(THEME_STATE_EXPRESSION);
@@ -563,6 +578,61 @@ test('V13 covers the complete viewport on its first commit and after a window re
 
   await page.evaluate(RESTORE_EXPRESSION);
   assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+});
+
+test('V53 paints a collapsed-sidebar hover flyout transparently on its first frame and then marks it', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  await page.route('http://wukong-floating-sidebar.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-floating-sidebar.test/');
+  await page.evaluate(expression);
+
+  const firstFrame = await page.evaluate(() => {
+    const wrapper = document.createElement('div');
+    wrapper.dataset.forgeFloatingSidebarFixture = '';
+    wrapper.className = 'pointer-events-auto fixed bottom-0 left-0 z-[42] min-h-0 top-(--height-toolbar-sm)';
+    wrapper.innerHTML = `
+      <aside class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-token-main-surface-primary electron:elevation-prominent"
+        style="width:240px;height:700px;background-color:rgb(30,30,30)">
+        <nav class="sidebar-foreground-muted">
+          <button data-app-action-sidebar-thread-row>临时任务</button>
+        </nav>
+      </aside>`;
+    document.body.append(wrapper);
+    const sidebar = wrapper.querySelector('aside');
+    const style = getComputedStyle(sidebar);
+    return {
+      marked: sidebar.classList.contains('forge-sidebar-shell'),
+      backgroundColor: style.backgroundColor,
+      backgroundImage: style.backgroundImage,
+      backdropFilter: style.backdropFilter
+    };
+  });
+  assert.equal(firstFrame.marked, false, 'first-frame paint must not depend on runtime markers');
+  assert.equal(firstFrame.backgroundColor, 'rgba(0, 0, 0, 0)');
+  assert.match(firstFrame.backgroundImage, /linear-gradient/);
+  assert.equal(firstFrame.backdropFilter, 'none');
+
+  await page.waitForFunction(() => {
+    const sidebar = document.querySelector('[data-forge-floating-sidebar-fixture] > aside');
+    return sidebar?.classList.contains('forge-sidebar') &&
+      sidebar.classList.contains('forge-sidebar-shell');
+  });
+  const marked = await page.locator('[data-forge-floating-sidebar-fixture] > aside').evaluate(sidebar => ({
+    shell: sidebar.classList.contains('forge-sidebar-shell'),
+    sidebar: sidebar.classList.contains('forge-sidebar'),
+    backgroundColor: getComputedStyle(sidebar).backgroundColor,
+    backgroundImage: getComputedStyle(sidebar).backgroundImage
+  }));
+  assert.deepEqual(
+    { shell: marked.shell, sidebar: marked.sidebar, backgroundColor: marked.backgroundColor },
+    { shell: true, sidebar: true, backgroundColor: 'rgba(0, 0, 0, 0)' }
+  );
+  assert.match(marked.backgroundImage, /linear-gradient/);
+
+  await page.evaluate(RESTORE_EXPRESSION);
 });
 
 test('V13 keeps native carriers painted until the first background is decoded', async () => {
@@ -853,6 +923,14 @@ test('V13 prefers a visible conversation over an opacity-zero retained home hero
 
   await waitForRuntime(page, 'surface', 'thread');
   assert.equal(await page.locator('html').getAttribute('data-forge-mode'), 'scenery');
+  await page.waitForFunction(expected => {
+    const active = document.querySelector(
+      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+    );
+    const veil = active?.querySelector('[data-forge-background-veil]');
+    return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - expected) < .001;
+  }, .25);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
   assert.equal(await page.locator('[data-feature="game-source"]').getAttribute('data-forge-title-copy'), null);
 
   await page.evaluate(RESTORE_EXPRESSION);
@@ -897,8 +975,10 @@ test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decod
   await page.goto('http://wukong-low-resource.test/');
   await page.evaluate(expression);
   await enterThreadState(page);
-  await waitForRuntime(page, 'scene', 6);
+  await waitForRuntime(page, 'surface', 'thread');
   await page.waitForTimeout(800);
+  assert.equal((await currentBackground(page)).mode, 'scenery');
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
 
   const beforeStreaming = await page.evaluate(() => ({
     refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount,
@@ -1029,7 +1109,7 @@ test('V51.7 merges hidden background requests and resumes with one refresh and o
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V51.7 advances on real New Task clicks only after the 20 minute cooldown and has no timer rotation', async () => {
+test('V53 has no timer rotation and automatically selects battle for New Task and scenery for threads', async () => {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 760 },
     reducedMotion: 'reduce'
@@ -1060,59 +1140,44 @@ test('V51.7 advances on real New Task clicks only after the 20 minute cooldown a
   );
 
   const initial = await currentBackground(page);
-  await page.locator('[data-native-slot="new-task"]').click();
-  const firstAdvance = await waitForSceneChange(page, initial.scene, 'battle');
-  assert.equal(firstAdvance.renderCount, initial.renderCount + 1);
+  for (const elapsed of [0, 20 * 60 * 1000 - 1, 1, 24 * 60 * 60 * 1000]) {
+    await page.evaluate(delta => { window.__forgeNow += delta; }, elapsed);
+    await page.locator('[data-native-slot="new-task"]').click();
+    await page.waitForTimeout(650);
+    assert.deepEqual(
+      await currentBackground(page),
+      initial,
+      'New Task navigation changed the selected background'
+    );
+  }
 
-  await page.locator('[data-native-slot="new-task"]').click();
-  await page.waitForTimeout(650);
-  assert.deepEqual(await currentBackground(page), firstAdvance);
-
-  await page.evaluate(() => {
-    window.__forgeNow += 20 * 60 * 1000 - 1;
-  });
-  await page.locator('[data-native-slot="new-task"]').click();
-  await page.waitForTimeout(650);
-  assert.deepEqual(await currentBackground(page), firstAdvance);
-
-  await page.evaluate(() => {
-    window.__forgeNow += 1;
-  });
-  await page.locator('[data-native-slot="new-task"]').click();
-  const secondAdvance = await waitForSceneChange(page, firstAdvance.scene, 'battle');
-  assert.equal(secondAdvance.renderCount, firstAdvance.renderCount + 1);
-
-  assert.deepEqual(
-    await page.evaluate(() => ({
-      pending: window.__wukongCodexForgeRuntimeV13.autoSceneryPending,
-      ready: window.__wukongCodexForgeRuntimeV13.autoSceneryReady
-    })),
-    { pending: true, ready: true }
-  );
   await enterThreadState(page);
+  await waitForRuntime(page, 'scene', 6);
+  const threaded = await currentBackground(page);
+  assert.equal(threaded.mode, 'scenery');
+  assert.equal(threaded.scene, '6');
+  assert.equal(threaded.renderCount, initial.renderCount + 1);
   await page.waitForFunction(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
-    return runtime.currentMode === 'scenery' &&
-      runtime.currentScene === runtime.selectedScenes.scenery &&
-      runtime.currentScene !== 6 &&
-      runtime.autoSceneryPending === false &&
-      runtime.autoSceneryReady === false;
+    const active = document.querySelector(
+      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+    );
+    const veil = active?.querySelector('[data-forge-background-veil]');
+    return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - .25) < .001;
   });
-  await page.waitForFunction(() => !window.__wukongCodexForgeRuntimeV13.transitionInFlight);
-
-  await page.waitForTimeout(900);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
   assert.equal(await page.evaluate(() => window.__forgeIntervalCalls), 0);
   assert.equal(await page.evaluate(() => window.__forgeLongTimeoutCalls), 0);
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).backgroundLoadedLayerCount, 1);
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V51.9 follows the complete numbered battle and scenery sequences and bounds decoded textures', async () => {
+test('V53 follows all 20 numbered assets and keeps per-scene thread veils on both crossfade layers', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   const expectedBattle = sequenceFor('battle');
   const expectedScenery = sequenceFor('scenery');
   assert.equal(expectedBattle.length, 13);
-  assert.equal(expectedScenery.length, 9);
+  assert.equal(expectedScenery.length, 7);
+  assert.equal(activeTheme.background.gallery.length, 20);
   await page.route('http://wukong-background-decks.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-background-decks.test/');
   await page.evaluate(({ battle, scenery }) => {
@@ -1162,7 +1227,50 @@ test('V51.9 follows the complete numbered battle and scenery sequences and bound
 
   await enterThreadState(page);
   await waitForRuntime(page, 'scene', Number(expectedScenery[0]));
+  assert.equal((await currentBackground(page)).mode, 'scenery');
+  assert.ok(
+    Math.abs((await activeVeilOpacity(page)) - threadVeilFor(expectedScenery[0])) < .001
+  );
   const sceneryScenes = [(await currentBackground(page)).scene];
+
+  await page.keyboard.press('Control+Alt+F');
+  await waitForRuntime(page, 'transition', Number(expectedScenery[1]));
+  const transitionVeils = await page.locator('[data-forge-background-layer]').evaluateAll(layers => (
+    layers
+      .filter(layer => layer.dataset.forgeScene)
+      .map(layer => {
+        const veil = layer.querySelector('[data-forge-background-veil]');
+        return {
+          scene: layer.dataset.forgeScene,
+          active: layer.dataset.forgeActive,
+          inlineThreadVeil: Number.parseFloat(
+            veil.style.getPropertyValue('--forge-layer-thread-veil')
+          ),
+          computedOpacity: Number.parseFloat(getComputedStyle(veil).opacity)
+        };
+      })
+  ));
+  assert.deepEqual(
+    transitionVeils.map(layer => layer.scene).sort(),
+    [expectedScenery[0], expectedScenery[1]].sort()
+  );
+  for (const layer of transitionVeils) {
+    const expectedVeil = threadVeilFor(layer.scene);
+    assert.ok(Math.abs(layer.inlineThreadVeil - expectedVeil) < .001);
+    assert.ok(Number.isFinite(layer.computedOpacity));
+  }
+  sceneryScenes.push((await waitForSceneChange(
+    page,
+    expectedScenery[0],
+    'scenery'
+  )).scene);
+  await page.waitForFunction(expected => {
+    const active = document.querySelector(
+      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+    );
+    const veil = active?.querySelector('[data-forge-background-veil]');
+    return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - expected) < .001;
+  }, threadVeilFor(expectedScenery[1]));
   while (sceneryScenes.length < expectedScenery.length) {
     sceneryScenes.push((await advanceBackground(page, 'scenery')).scene);
   }
@@ -1182,7 +1290,8 @@ test('V51.9 follows the complete numbered battle and scenery sequences and bound
   const persisted = await page.evaluate(() => JSON.parse(
     localStorage.getItem('wukong-forge-scene-cursors-v13')
   ));
-  assert.equal(persisted.version, 3);
+  assert.equal(persisted.version, 5);
+  assert.equal(Object.hasOwn(persisted, 'backgroundMode'), false);
   assert.equal(persisted.backgroundDecks.battle.strategy, 'ordered-v1');
   assert.equal(persisted.backgroundDecks.scenery.strategy, 'ordered-v1');
   assert.deepEqual(persisted.backgroundDecks.battle.order.map(String), expectedBattle);
@@ -1195,7 +1304,7 @@ test('V51.9 follows the complete numbered battle and scenery sequences and bound
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V52.1 toggles battle and scenery locally while route defaults remain automatic', async () => {
+test('V53 treats Ctrl+Alt+C as a temporary override cleared by route and page changes', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   const firstBattle = Number(sequenceFor('battle')[0]);
   const firstScenery = Number(sequenceFor('scenery')[0]);
@@ -1210,121 +1319,75 @@ test('V52.1 toggles battle and scenery locally while route defaults remain autom
 
   await page.keyboard.press('Control+Alt+C');
   await waitForRuntime(page, 'scene', firstScenery);
-  const landingScenery = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
-    return {
-      surface: document.documentElement.dataset.forgeSurface,
-      mode: runtime.currentMode,
-      automaticMode: runtime.automaticBackgroundMode,
-      manualMode: runtime.manualBackgroundMode,
-      renderCount: runtime.renderCount
-    };
-  });
-  assert.deepEqual(landingScenery, {
-    surface: 'landing',
-    mode: 'scenery',
-    automaticMode: 'battle',
-    manualMode: 'scenery',
-    renderCount: initialBattle.renderCount + 1
-  });
+  const landingScenery = await currentBackground(page);
+  assert.equal(landingScenery.mode, 'scenery');
+  assert.equal(landingScenery.scene, String(firstScenery));
+  assert.equal(landingScenery.renderCount, initialBattle.renderCount + 1);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .1) < .001);
 
-  await page.evaluate(() => history.replaceState({ sameRouteRefresh: true }, '', location.href));
-  await page.waitForTimeout(850);
-  assert.deepEqual(
-    await page.evaluate(() => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      return {
-        mode: runtime.currentMode,
-        manualMode: runtime.manualBackgroundMode,
-        renderCount: runtime.renderCount
-      };
-    }),
-    { mode: 'scenery', manualMode: 'scenery', renderCount: landingScenery.renderCount },
-    'same-URL history state updates must not clear the current-page sequence override'
-  );
-
-  await enterThreadState(page);
-  await page.waitForFunction(expectedScene => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
-    return document.documentElement.dataset.forgeSurface === 'thread' &&
-      runtime.currentMode === 'scenery' &&
-      runtime.currentScene === expectedScene &&
-      !runtime.transitionInFlight;
-  }, firstScenery);
-  await page.waitForTimeout(700);
-  assert.deepEqual(
-    await page.evaluate(() => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      return {
-        automaticMode: runtime.automaticBackgroundMode,
-        manualMode: runtime.manualBackgroundMode,
-        renderCount: runtime.renderCount
-      };
-    }),
-    { automaticMode: 'scenery', manualMode: null, renderCount: landingScenery.renderCount },
-    'entering a thread should keep an already visible scenery frame without decoding it again'
+  await page.evaluate(() => history.replaceState({ routeRefresh: true }, '', '#landing-route'));
+  await waitForRuntime(page, 'scene', firstBattle);
+  const routeResetBattle = await currentBackground(page);
+  assert.equal(routeResetBattle.mode, 'battle');
+  assert.equal(routeResetBattle.renderCount, landingScenery.renderCount + 1);
+  assert.equal(
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    null
   );
 
   await page.keyboard.press('Control+Alt+C');
-  await waitForRuntime(page, 'scene', firstBattle);
-  const manualBattle = await currentBackground(page);
-  await page.locator('[data-app-action-sidebar-thread-row]').last().click();
   await waitForRuntime(page, 'scene', firstScenery);
-  assert.deepEqual(
-    await page.evaluate(() => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      return {
-        surface: document.documentElement.dataset.forgeSurface,
-        automaticMode: runtime.automaticBackgroundMode,
-        manualMode: runtime.manualBackgroundMode,
-        renderCount: runtime.renderCount
-      };
-    }),
-    {
-      surface: 'thread',
-      automaticMode: 'scenery',
-      manualMode: null,
-      renderCount: manualBattle.renderCount + 1
-    }
+  const landingSceneryAgain = await currentBackground(page);
+
+  await enterThreadState(page);
+  await waitForRuntime(page, 'surface', 'thread');
+  await page.waitForTimeout(700);
+  assert.deepEqual(await currentBackground(page), landingSceneryAgain);
+  assert.ok(
+    Math.abs((await activeVeilOpacity(page)) - threadVeilFor(firstScenery)) < .001
   );
+  assert.equal(
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    null
+  );
+
+  await page.locator('[data-app-action-sidebar-thread-row]').last().click();
+  await page.waitForTimeout(700);
+  assert.deepEqual(await currentBackground(page), landingSceneryAgain);
 
   await page.keyboard.press('Control+Alt+C');
   await waitForRuntime(page, 'scene', firstBattle);
   const beforeLanding = await currentBackground(page);
+  assert.equal(beforeLanding.mode, 'battle');
+  assert.equal(beforeLanding.renderCount, landingSceneryAgain.renderCount + 1);
   await installLanding(page);
-  await page.waitForFunction(expectedScene => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
-    return document.documentElement.dataset.forgeSurface === 'landing' &&
-      runtime.currentMode === 'battle' &&
-      runtime.currentScene === expectedScene &&
-      !runtime.transitionInFlight;
-  }, firstBattle);
+  await waitForRuntime(page, 'surface', 'landing');
   await page.waitForTimeout(700);
-  assert.deepEqual(
-    await page.evaluate(() => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      return {
-        automaticMode: runtime.automaticBackgroundMode,
-        manualMode: runtime.manualBackgroundMode,
-        renderCount: runtime.renderCount
-      };
-    }),
-    { automaticMode: 'battle', manualMode: null, renderCount: beforeLanding.renderCount },
-    'returning to New Task should keep an already visible battle frame without decoding it again'
+  assert.deepEqual(await currentBackground(page), beforeLanding);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .1) < .001);
+  assert.equal(
+    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    null
   );
+
+  const persisted = await page.evaluate(() => JSON.parse(
+    localStorage.getItem('wukong-forge-scene-cursors-v13')
+  ));
+  assert.equal(persisted.version, 5);
+  assert.equal(Object.hasOwn(persisted, 'backgroundMode'), false);
 
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background work', async () => {
+test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layout or background work', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
-  const firstBattle = Number(sequenceFor('battle')[0]);
+  const firstBattle = 0;
   await page.route('http://wukong-quote-toggle.test/**', route => route.fulfill({
     body: runtimeFixtureHtml,
     contentType: 'text/html; charset=utf-8'
   }));
   await page.goto('http://wukong-quote-toggle.test/');
-  await page.evaluate(orderedExpression);
+  await page.evaluate(expression);
   await waitForRuntime(page, 'scene', firstBattle);
   await page.waitForFunction(() => (
     document.documentElement.dataset.forgeLandingQuoteVisible === 'true' &&
@@ -1334,8 +1397,10 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
 
   const baseline = await page.evaluate(() => {
     const title = document.querySelector('[data-feature="game-source"]');
+    const icon = document.querySelector('[data-testid="home-icon"]');
     const runtime = window.__wukongCodexForgeRuntimeV13;
     const rect = title.getBoundingClientRect();
+    const iconRect = icon.getBoundingClientRect();
     window.__forgeQuoteReferences = {
       document,
       runtime,
@@ -1368,7 +1433,18 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
       nativeText: title.textContent,
       pseudoContent: getComputedStyle(title, '::after').content,
       pseudoDisplay: getComputedStyle(title, '::after').display,
+      pseudoOpacity: getComputedStyle(title, '::after').opacity,
+      pseudoVisibility: getComputedStyle(title, '::after').visibility,
+      iconPseudoImage: getComputedStyle(icon, '::before').backgroundImage,
+      iconPseudoOpacity: getComputedStyle(icon, '::before').opacity,
+      iconPseudoVisibility: getComputedStyle(icon, '::before').visibility,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      iconRect: {
+        x: iconRect.x,
+        y: iconRect.y,
+        width: iconRect.width,
+        height: iconRect.height
+      },
       scene: String(runtime.currentScene),
       refreshCount: runtime.refreshCount,
       renderCount: runtime.renderCount
@@ -1379,6 +1455,11 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
   assert.equal(baseline.aria, '此去，欲破何局？');
   assert.match(baseline.pseudoContent, /此去，欲破何局/);
   assert.equal(baseline.pseudoDisplay, 'flex');
+  assert.equal(baseline.pseudoOpacity, '1');
+  assert.equal(baseline.pseudoVisibility, 'visible');
+  assert.match(baseline.iconPseudoImage, /data:image\/svg\+xml/);
+  assert.equal(baseline.iconPseudoOpacity, '1');
+  assert.equal(baseline.iconPseudoVisibility, 'visible');
 
   const repeated = await page.evaluate(() => {
     const event = new KeyboardEvent('keydown', {
@@ -1414,7 +1495,9 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
     const references = window.__forgeQuoteReferences;
     const runtime = window.__wukongCodexForgeRuntimeV13;
     const title = document.querySelector('[data-feature="game-source"]');
+    const icon = document.querySelector('[data-testid="home-icon"]');
     const rect = title.getBoundingClientRect();
+    const iconRect = icon.getBoundingClientRect();
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
@@ -1430,7 +1513,17 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
       nativeText: title.textContent,
       titleCopy: title.dataset.forgeTitleCopy,
       pseudoDisplay: getComputedStyle(title, '::after').display,
+      pseudoOpacity: getComputedStyle(title, '::after').opacity,
+      pseudoVisibility: getComputedStyle(title, '::after').visibility,
+      iconPseudoOpacity: getComputedStyle(icon, '::before').opacity,
+      iconPseudoVisibility: getComputedStyle(icon, '::before').visibility,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      iconRect: {
+        x: iconRect.x,
+        y: iconRect.y,
+        width: iconRect.width,
+        height: iconRect.height
+      },
       scene: String(runtime.currentScene),
       refreshCount: runtime.refreshCount,
       renderCount: runtime.renderCount,
@@ -1451,8 +1544,13 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
   assert.equal(hidden.aria, null);
   assert.equal(hidden.nativeText, baseline.nativeText);
   assert.equal(hidden.titleCopy, '此去，欲破何局？');
-  assert.equal(hidden.pseudoDisplay, 'none');
+  assert.equal(hidden.pseudoDisplay, 'flex');
+  assert.equal(hidden.pseudoOpacity, '0');
+  assert.equal(hidden.pseudoVisibility, 'hidden');
+  assert.equal(hidden.iconPseudoOpacity, '0');
+  assert.equal(hidden.iconPseudoVisibility, 'hidden');
   assert.deepEqual(hidden.rect, baseline.rect);
+  assert.deepEqual(hidden.iconRect, baseline.iconRect);
   assert.equal(hidden.scene, baseline.scene);
   assert.equal(hidden.refreshCount, baseline.refreshCount);
   assert.equal(hidden.renderCount, baseline.renderCount);
@@ -1492,15 +1590,24 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
     document.documentElement.dataset.forgeSurface === 'landing' &&
     document.querySelector('[data-feature="game-source"]')?.dataset.forgeTitleCopy === '此去，欲破何局？'
   ));
-  assert.equal(
-    await page.locator('[data-feature="game-source"]').evaluate(title => getComputedStyle(title, '::after').display),
-    'none'
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      titleOpacity: getComputedStyle(
+        document.querySelector('[data-feature="game-source"]'),
+        '::after'
+      ).opacity,
+      markOpacity: getComputedStyle(
+        document.querySelector('[data-testid="home-icon"]'),
+        '::before'
+      ).opacity
+    })),
+    { titleOpacity: '0', markOpacity: '0' }
   );
 
   await page.evaluate(() => {
     window.__forgeQuoteRuntimeBeforeReapply = window.__wukongCodexForgeRuntimeV13;
   });
-  await page.evaluate(orderedExpression);
+  await page.evaluate(expression);
   await page.waitForFunction(() => (
     window.__wukongCodexForgeRuntimeV13 !== window.__forgeQuoteRuntimeBeforeReapply &&
     document.documentElement.dataset.forgeBackgroundReady === 'true' &&
@@ -1509,13 +1616,17 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
   assert.deepEqual(
     await page.evaluate(() => ({
       quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
-      pseudoDisplay: getComputedStyle(
+      titleOpacity: getComputedStyle(
         document.querySelector('[data-feature="game-source"]'),
         '::after'
-      ).display
+      ).opacity,
+      markOpacity: getComputedStyle(
+        document.querySelector('[data-testid="home-icon"]'),
+        '::before'
+      ).opacity
     })),
-    { quoteVisible: false, pseudoDisplay: 'none' },
-    'a no-reload hot apply should retain the current-window quote preference'
+    { quoteVisible: false, titleOpacity: '0', markOpacity: '0' },
+    'a no-reload hot apply should retain both hidden landing inscriptions'
   );
 
   await page.keyboard.press('Control+Alt+T');
@@ -1524,18 +1635,23 @@ test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background
   ));
   const visibleAgain = await page.evaluate(() => {
     const title = document.querySelector('[data-feature="game-source"]');
+    const icon = document.querySelector('[data-testid="home-icon"]');
     return {
       quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
       aria: title.getAttribute('aria-label'),
       nativeText: title.textContent,
       pseudoContent: getComputedStyle(title, '::after').content,
-      pseudoDisplay: getComputedStyle(title, '::after').display
+      pseudoDisplay: getComputedStyle(title, '::after').display,
+      pseudoOpacity: getComputedStyle(title, '::after').opacity,
+      iconPseudoOpacity: getComputedStyle(icon, '::before').opacity
     };
   });
   assert.equal(visibleAgain.quoteVisible, true);
   assert.equal(visibleAgain.aria, '此去，欲破何局？');
   assert.match(visibleAgain.pseudoContent, /此去，欲破何局/);
   assert.equal(visibleAgain.pseudoDisplay, 'flex');
+  assert.equal(visibleAgain.pseudoOpacity, '1');
+  assert.equal(visibleAgain.iconPseudoOpacity, '1');
 
   await page.evaluate(RESTORE_EXPRESSION);
   const native = await page.evaluate(() => {
@@ -2016,19 +2132,39 @@ test('V13 bounds pending background decoding to one request and cancels it on re
 
   await enterThreadState(page);
   await waitForRuntime(page, 'surface', 'thread');
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+  ));
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
 
   await installLanding(page);
   await waitForRuntime(page, 'surface', 'landing');
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 0
+  ));
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 0);
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
   assert.equal(await page.evaluate(() => Boolean(window.__forgeDecodeControls[1].image.getAttribute('src'))), false);
 
   await enterThreadState(page);
-  await waitForRuntime(page, 'surface', 'thread');
-  assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+  ));
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 3);
+
+  await page.keyboard.press('Control+Alt+C');
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 0
+  ));
+  assert.equal(await page.evaluate(() => Boolean(window.__forgeDecodeControls[2].image.getAttribute('src'))), false);
+
+  await page.keyboard.press('Control+Alt+C');
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+  ));
+  assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
+  assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 4);
 
   await page.evaluate(() => {
     window.__retiredForgeRuntime = window.__wukongCodexForgeRuntimeV13;
@@ -2046,6 +2182,7 @@ test('V13 bounds pending background decoding to one request and cancels it on re
     {
       pending: 0,
       images: [
+        { hasSource: false, onload: null, onerror: null },
         { hasSource: false, onload: null, onerror: null },
         { hasSource: false, onload: null, onerror: null },
         { hasSource: false, onload: null, onerror: null }

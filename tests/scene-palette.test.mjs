@@ -5,9 +5,9 @@ import { chromium } from '@playwright/test';
 import { SCENE_TONES, cssFor, validateTheme } from '../shared/theme-model.mjs';
 
 const active = JSON.parse(fs.readFileSync('themes/active.json', 'utf8').replace(/^\uFEFF/, ''));
+const backgroundStyleSheet = fs.readFileSync('runtime/forge-background-v13.css', 'utf8');
 
 const rgb = hex => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16));
-const blend = (under, over, alpha) => under.map((channel, index) => channel * (1 - alpha) + over[index] * alpha);
 const luminance = color => {
   const linear = color.map(channel => {
     const unit = channel / 255;
@@ -20,10 +20,10 @@ const contrast = (left, right) => {
   return (values[0] + .05) / (values[1] + .05);
 };
 
-test('all twenty-two numbered cinematic scenes declare a validated adaptive tone', () => {
+test('all twenty numbered cinematic scenes declare a validated adaptive tone and project veil', () => {
   assert.equal(active.schemaVersion, 3);
-  assert.equal(active.background.gallery.length, 22);
-  assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 22);
+  assert.equal(active.background.gallery.length, 20);
+  assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 20);
   assert.doesNotThrow(() => validateTheme(active));
   assert.equal(
     active.background.gallery.some(scene => Number.parseInt(scene.slot.slice(1), 10) !== scene.order),
@@ -32,6 +32,8 @@ test('all twenty-two numbered cinematic scenes declare a validated adaptive tone
   );
   for (const scene of active.background.gallery) {
     const tone = SCENE_TONES[scene.tone];
+    assert.equal(typeof scene.threadVeil, 'number', `${scene.id} is missing threadVeil`);
+    assert.ok(scene.threadVeil >= 0 && scene.threadVeil <= 1, `${scene.id} threadVeil is outside 0..1`);
     for (const key of ['ink', 'inkSoft', 'lacquer', 'jade', 'jadeLight', 'gold', 'goldLight', 'paper', 'composer', 'sidebar', 'rightCard', 'veil', 'brightness']) {
       assert.ok(tone[key], `${scene.id} is missing ${key}`);
     }
@@ -40,35 +42,35 @@ test('all twenty-two numbered cinematic scenes declare a validated adaptive tone
   delete invalid.background.gallery[3].tone;
   assert.throws(() => validateTheme(invalid), /Invalid background\.gallery entry/);
   const invalidSequence = structuredClone(active);
-  invalidSequence.background.gallery.find(scene => scene.slot === 'B13').order = 12;
+  invalidSequence.background.gallery.find(scene => scene.slot === 'B16').order = 12;
   assert.throws(() => validateTheme(invalidSequence), /Invalid background\.gallery/);
+  const invalidThreadVeil = structuredClone(active);
+  invalidThreadVeil.background.gallery[0].threadVeil = 1.01;
+  assert.throws(() => validateTheme(invalidThreadVeil), /Invalid background\.gallery entry/);
   assert.equal(active.background.gallery[0].position, '68% center');
 });
 
-test('all active scene veils preserve copy contrast while battle art remains lighter than scenery art', () => {
-  const backdropLuminances = { battle: [], scenery: [] };
+test('landing retains 90% colour and project threads use per-image veils while local panels preserve copy contrast', () => {
+  assert.match(backgroundStyleSheet, /--forge-landing-color-retention:\s*\.9\s*;/);
+  assert.match(backgroundStyleSheet, /--forge-thread-color-retention:\s*\.75\s*;/);
+  assert.match(
+    backgroundStyleSheet,
+    /\[data-forge-surface="landing"\][^{]*\{[^}]*opacity:\s*calc\(1\s*-\s*var\(--forge-landing-color-retention\)\)/s
+  );
+  assert.match(
+    backgroundStyleSheet,
+    /\[data-forge-surface="thread"\][^{]*\{[^}]*opacity:\s*var\(\s*--forge-layer-thread-veil,\s*calc\(1\s*-\s*var\(--forge-thread-color-retention\)\)\s*\)/s
+  );
   for (const scene of active.background.gallery) {
     const tone = SCENE_TONES[scene.tone];
-    const [, , toneCenter] = tone.veil;
-    const sceneCenter = toneCenter * (scene.veil ?? 1);
-    const scenery = scene.mode === 'scenery';
-    const modeHorizontal = scenery ? ['#0c0f0d', .25] : ['#0c0e0d', .035];
-    const modeVertical = scenery ? ['#0a0d0b', .12] : ['#0a0c0b', .018];
-    let backdrop = [255, 255, 255];
-    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneCenter);
-    backdrop = blend(backdrop, rgb(tone.veil[0]), sceneCenter);
-    backdrop = blend(backdrop, rgb(modeVertical[0]), modeVertical[1]);
-    backdrop = blend(backdrop, rgb(modeHorizontal[0]), modeHorizontal[1]);
-    const ratio = contrast(rgb(tone.ink), backdrop);
-    assert.ok(ratio >= 4.5, `${scene.id} primary copy contrast is ${ratio.toFixed(2)}:1`);
-    const group = scenery ? 'scenery' : 'battle';
-    backdropLuminances[group].push(luminance(backdrop));
+    for (const surface of ['composer', 'sidebar', 'rightCard']) {
+      const ratio = contrast(rgb(tone.ink), rgb(tone[surface][0]));
+      assert.ok(
+        ratio >= 4.5,
+        `${scene.id} ${surface} primary copy contrast is ${ratio.toFixed(2)}:1`
+      );
+    }
   }
-  const average = values => values.reduce((sum, value) => sum + value, 0) / values.length;
-  assert.ok(
-    average(backdropLuminances.battle) > average(backdropLuminances.scenery),
-    'battle backdrops must remain perceptually lighter than scenery backdrops'
-  );
 });
 
 test('scene switching updates image, shell surfaces and text minerals together', async t => {
@@ -98,6 +100,7 @@ test('scene switching updates image, shell surfaces and text minerals together',
         composer: style.getPropertyValue('--forge-composer-bg').trim(),
         rightCard: style.getPropertyValue('--forge-right-card-bg').trim(),
         sceneVeil: style.getPropertyValue('--forge-scene-veil').trim(),
+        sceneThreadVeil: Number(style.getPropertyValue('--forge-scene-thread-veil')),
         sceneBrightness: style.getPropertyValue('--forge-scene-brightness').trim(),
         sceneSlot: style.getPropertyValue('--forge-scene-slot').trim(),
         sceneOrder: Number(style.getPropertyValue('--forge-scene-order')),
@@ -115,6 +118,7 @@ test('scene switching updates image, shell surfaces and text minerals together',
     assert.equal(state.ink, tone.ink);
     assert.equal(state.paper, tone.paper);
     assert.match(state.sceneVeil, /linear-gradient/);
+    assert.equal(state.sceneThreadVeil, active.background.gallery[index].threadVeil);
     assert.equal(Number(state.sceneBrightness), tone.brightness);
     assert.equal(state.sceneSlot, active.background.gallery[index].slot);
     assert.equal(state.sceneOrder, active.background.gallery[index].order);

@@ -182,6 +182,7 @@ export function resolveThemeAssets(themePath, theme) {
       mode: entry.mode,
       tone: entry.tone,
       veil: entry.veil,
+      threadVeil: entry.threadVeil,
       mark: entry.mark
     };
   });
