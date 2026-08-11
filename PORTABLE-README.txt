@@ -1,6 +1,6 @@
 Wukong Codex Theme 0.14.7
 
-CURRENT V52.1 ORDERED 22-BACKGROUND GALLERY
+CURRENT V52.2 ORDERED 22-BACKGROUND GALLERY
 
 This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
 
@@ -20,6 +20,8 @@ B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12
 S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09
 
 Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. Ctrl+Alt+C temporarily toggles battle/scenery for the current page. Navigation clears that manual override: a New Task page defaults to battle and a project/thread page defaults to scenery. If the automatic target group is already visible, the runtime does not decode, render, or fade again. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. A real New Task action may auto-advance only after the 20-minute cooldown. Ordinary same-mode task/history/hash/stream/resize/mutation activity does not rotate backgrounds. There is no timer rotation, steady poll, WMI/CIM query, service, or scheduled task.
+
+Ctrl+Alt+T hides or shows the New Task quote “此去，欲破何局？” in place. The preference survives background, task and thread changes in the current window and a no-reload hot apply; a new application process starts with the quote visible. It does not change the native title node, geometry, background selection or decode state.
 
 The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
 

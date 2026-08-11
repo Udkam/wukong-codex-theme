@@ -149,7 +149,7 @@ test('minimal managed package imports independently and omits development surfac
   ]) assert.equal(fs.existsSync(path.join(target, rejected)), false, `rejected asset packaged: ${rejected}`);
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'capture-live.mjs')), false);
   const portableReadme = fs.readFileSync(path.join(target, 'PORTABLE-README.txt'), 'utf8');
-  assert.match(portableReadme, /CURRENT V52\.1 ORDERED 22-BACKGROUND GALLERY/);
+  assert.match(portableReadme, /CURRENT V52\.2 ORDERED 22-BACKGROUND GALLERY/);
   assert.match(portableReadme, /22-image gallery \(13 battle \+ 9 scenery\) in two explicit playback sequences/);
   assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13/);
   assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09/);
@@ -157,6 +157,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.match(portableReadme, /Ctrl\+Alt\+F/);
   assert.match(portableReadme, /Ctrl\+Alt\+B/);
   assert.match(portableReadme, /Ctrl\+Alt\+C/);
+  assert.match(portableReadme, /Ctrl\+Alt\+T hides or shows the New Task quote/);
   assert.doesNotMatch(portableReadme, /Ctrl\+Alt\+Shift\+B/);
   assert.match(portableReadme, /Run backgrounds\.cmd without arguments for the interactive manager/);
   assert.match(portableReadme, /Move changes only the contiguous order inside the group/);

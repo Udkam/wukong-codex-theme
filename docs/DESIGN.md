@@ -1,10 +1,12 @@
 # 大圣归来 · 潇湘双境 — 设计与实现
 
-## V52.1 稳定叠化、临时双序列切换与首帧持久绘制
+## V52.2 稳定叠化、临时双序列、题字开关与首帧持久绘制
 
-V52.1 保留 V49–V51.9 的低占用核心：同模式项目/任务、history/hash、流式变化与 resize 只触发表面对账，不选择新图。活动清单把 `slot` 定义为稳定物理身份，把 `order` 定义为各组独立、连续的播放位；当前战斗序列为 `B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13`，风景序列为 `S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09`。
+V52.2 保留 V49–V52.1 的低占用核心：同模式项目/任务、history/hash、流式变化与 resize 只触发表面对账，不选择新图。活动清单把 `slot` 定义为稳定物理身份，把 `order` 定义为各组独立、连续的播放位；当前战斗序列为 `B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B10 -> B11 -> B12 -> B13`，风景序列为 `S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S06 -> S07 -> S09`。
 
 键盘切图保持同一原位运行时合同：`Ctrl+Alt+F` / `Ctrl+Alt+B` 取当前可见序列的下一张/上一张；`Ctrl+Alt+C` 只在当前页面建立 battle/scenery 临时覆盖，不推进或改写自动模式。真实路由或 surface 变化清除覆盖，新建任务页仍默认 battle，项目/已有对话仍默认 scenery。自动目标序列已经可见时，状态机直接返回，不创建 decode、render 或 transition。
+
+`Ctrl+Alt+T` 只控制新建任务页题字的根 dataset 与原生标题 ARIA。隐藏时保留 `data-forge-title-copy` 和原生占位，但停止绘制 `::after`；显示时恢复题字 paint。运行时自有的 ARIA 写入从 MutationObserver 事件中定点扣除，因此开关不触发 refresh、背景 render 或 decode。该布尔值保存在当前 V13 runtime，跨 surface 和 React 重挂载保持，并在无重载热应用时从旧 runtime 继承；完整退出后的新 runtime 默认显示。
 
 双层加载仍只允许一个可取消解码请求，但 incoming `<img>` 解码完成后也保持 `opacity:0`。运行时等待连续两个 `requestAnimationFrame`：第一帧让浏览器提交透明层，第二帧才开始 420 ms 淡入；`transitionend` 负责正常收束，有界 timeout 只作事件丢失兜底。旧层在整个等待期和叠化期保持不透明，过期 decode/token 被清除，失败 decode 保留当前画面，稳定层不保留 transition。因此缓存命中和首次解码走同一绘制时序，不再偶发跳变或亮度断层。
 

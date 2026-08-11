@@ -188,6 +188,10 @@
   pointer-events: none;
 }
 
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-title-copy]::after {
+  display: none;
+}
+
 :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] {
   position: relative !important;
   overflow: visible !important;

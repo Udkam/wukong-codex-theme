@@ -56,6 +56,7 @@
 | V15-50 | `Ctrl+Alt+C` 仅在当前页面临时切换 battle/scenery 可见序列；F/B 随当前可见组移动。真实导航或 landing/thread surface 变化清除覆盖，新建任务页仍默认 battle，项目/已有对话仍默认 scenery；同 URL `replaceState` 不得误清覆盖，自动目标已可见时 render/decode/transition 均不得增加 | F/B/C 真实键盘事件、重复键/Shift/Meta 排除、同 URL replaceState、侧栏/新建任务导航、自动默认恢复、游标独立与同组零工作计数 |
 | V15-51 | 公开 `backgrounds.cmd` 必须提供交互模式以及 `list/add/replace/move/remove`：Target 支持稳定 slot 或 scene id；move 只重排 order，add 分配未使用物理 slot，remove 只退出轮播并保留资产。战斗/风景必须各保留至少一张；清单以 UTF-8 无 BOM 原子替换，清单和覆盖前图片备份到仓库本地状态目录，replace/remove 需要显式确认 | 隔离仓库端到端 manager 测试、真实清单 SHA 不变、两组最小保留、稳定 slot/order、备份/原子写/assetRetained、reparse/path confinement、包白名单与无 WMI/CIM/进程控制扫描 |
 | V15-52 | 当前用户路径中的历史 `scripts/launch.ps1` 兼容入口不得继续执行旧 WMI/CIM 或重复启动逻辑；它只能验证仓库 marker 后委托公开 `scripts/start.ps1`。正式运行仍保持事件驱动 host，不新增周期性进程/renderer 扫描 | PowerShell AST/静态禁词、launch wrapper 精确委托、生命周期与最小包合同 |
+| V15-53 | `Ctrl+Alt+T` 必须在同一 document/runtime/style/overlay 上原位隐藏或显示新建任务页“此去，欲破何局？”；不得改变原生标题文本、DOMRect、背景 scene/mode、refresh/render/decode 或 lifecycle。隐藏时恢复原生 ARIA，显示时恢复题字 ARIA；选择跨背景、task/thread surface、React 重挂载和无重载热应用保持，新进程默认显示。重复键只消费不切换，Shift/Meta 组合不接管，停用必须清除控制 dataset 并完整恢复原生标题 | 真实 T 键、repeat/Shift 排除、伪元素 display/ARIA、节点与几何全等、计数零变化、surface 往返、热应用继承、RESTORE 原生状态合同 |
 
 V50 当前证据边界：保留式 release `0.13.0-20260808-121354` 已新建并通过双入口 verifier；仓库与安装副本的 CSS/注入计划 SHA-256 一致，旧 `0.13.0-20260803-191843` 中曾用于验收同步的两份文件已按其安装时 Git 检查点恢复原始 SHA。同一个真实 `2050×1106 @ 125%` 任务中已同时出现 queue/goal、300px 环境卡与四角长方形输入器；原生/主题 surface 均为 `736×98px`，完整比较最大 DOMRect 差为 `0`，四角 paint 保留。核心联合合同 45/45、非宠物增量 19/19、UI 材质 4/4 通过。不包含两只延期宠物或已取消葫芦。
 

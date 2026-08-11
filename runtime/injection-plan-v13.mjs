@@ -85,6 +85,7 @@ function applyRuntime(payload) {
     delete window[retiredKey];
   }
   const previous = window[runtimeKey];
+  const previousLandingQuoteVisible = previous?.landingQuoteVisible !== false;
   previous?.observer?.disconnect();
   previous?.resizeObserver?.disconnect();
   previous?.dispose?.();
@@ -105,15 +106,43 @@ function applyRuntime(payload) {
   style.textContent = `${payload.styleSheet}\n${payload.variables}`;
   root.classList.add('forge-ink-mountain');
 
+  const updateLandingAria = (element, value) => {
+    if (!(element instanceof Element)) return;
+    if (value === null) {
+      if (!element.hasAttribute('aria-label')) return;
+      state.selfManagedLandingAria.add(element);
+      element.removeAttribute('aria-label');
+      return;
+    }
+    if (element.getAttribute('aria-label') === value) return;
+    state.selfManagedLandingAria.add(element);
+    element.setAttribute('aria-label', value);
+  };
   const restoreLandingCopy = element => {
     if (!(element instanceof Element)) return;
     if (Object.hasOwn(element.dataset, 'forgeOriginalAriaLabel')) {
       const original = element.dataset.forgeOriginalAriaLabel;
-      if (original === '__forge_absent__') element.removeAttribute('aria-label');
-      else element.setAttribute('aria-label', original);
+      updateLandingAria(element, original === '__forge_absent__' ? null : original);
       delete element.dataset.forgeOriginalAriaLabel;
     }
     delete element.dataset.forgeTitleCopy;
+  };
+  const landingQuoteCopy = '此去，欲破何局？';
+  const applyLandingTitleCopy = element => {
+    if (!(element instanceof Element)) return;
+    if (!Object.hasOwn(element.dataset, 'forgeOriginalAriaLabel')) {
+      element.dataset.forgeOriginalAriaLabel =
+        element.hasAttribute('aria-label')
+          ? element.getAttribute('aria-label')
+          : '__forge_absent__';
+    }
+    element.dataset.forgeTitleCopy = landingQuoteCopy;
+    if (state.landingQuoteVisible !== false) {
+      updateLandingAria(element, landingQuoteCopy);
+      return;
+    }
+    const original = element.dataset.forgeOriginalAriaLabel;
+    updateLandingAria(element, original === '__forge_absent__' ? null : original);
   };
   let pendingMarkPlan = null;
   const reconcileMarks = planned => {
@@ -760,17 +789,7 @@ function applyRuntime(payload) {
   };
   const markLandingHero = (workspace, landingTitle) => {
     if (!(landingTitle instanceof Element)) return;
-    const titleCopy = '此去，欲破何局？';
-    if (!Object.hasOwn(landingTitle.dataset, 'forgeOriginalAriaLabel')) {
-      landingTitle.dataset.forgeOriginalAriaLabel =
-        landingTitle.hasAttribute('aria-label')
-          ? landingTitle.getAttribute('aria-label')
-          : '__forge_absent__';
-    }
-    landingTitle.dataset.forgeTitleCopy = titleCopy;
-    if (landingTitle.getAttribute('aria-label') !== titleCopy) {
-      landingTitle.setAttribute('aria-label', titleCopy);
-    }
+    applyLandingTitleCopy(landingTitle);
     mark(landingTitle, 'forge-landing-title');
 
     const icon = [...(workspace || document).querySelectorAll('[data-testid="home-icon"]')]
@@ -1774,6 +1793,8 @@ function applyRuntime(payload) {
     pendingBackgroundDirection: 1,
     manualBackgroundMode: null,
     automaticBackgroundMode: null,
+    landingQuoteVisible: previousLandingQuoteVisible,
+    selfManagedLandingAria: new WeakSet(),
     lastSurface: null,
     lastRouteHref: location.href,
     autoRotationCooldownMs: automaticRotationCooldownMs,
@@ -1801,8 +1822,10 @@ function applyRuntime(payload) {
     nextBackground: null,
     previousBackground: null,
     toggleBackgroundMode: null,
+    toggleLandingQuote: null,
     dispose: null
   };
+  root.dataset.forgeLandingQuoteVisible = state.landingQuoteVisible ? 'true' : 'false';
   const persistSceneState = () => writeSceneState(state);
   const stepBackground = (requestedMode, direction = 1) => {
     const mode = requestedMode === 'battle' || requestedMode === 'scenery'
@@ -1843,6 +1866,13 @@ function applyRuntime(payload) {
     requestScene(state.selectedScenes[mode], mode);
     return true;
   };
+  const toggleLandingQuote = () => {
+    state.landingQuoteVisible = !state.landingQuoteVisible;
+    root.dataset.forgeLandingQuoteVisible = state.landingQuoteVisible ? 'true' : 'false';
+    const landingTitle = findLandingTitle(findWorkspace());
+    if (landingTitle) applyLandingTitleCopy(landingTitle);
+    return state.landingQuoteVisible;
+  };
   const requestAutomaticBackgroundCycle = () => {
     if (document.hidden) {
       state.pendingAutoNewTask = true;
@@ -1872,6 +1902,7 @@ function applyRuntime(payload) {
   state.nextBackground = nextBackground;
   state.previousBackground = previousBackground;
   state.toggleBackgroundMode = toggleBackgroundMode;
+  state.toggleLandingQuote = toggleLandingQuote;
   const scheduleRefresh = maximumDelay => {
     if (document.hidden) {
       state.hiddenDirty = true;
@@ -1976,19 +2007,21 @@ function applyRuntime(payload) {
     if (root.dataset.forgeSurface === 'landing') state.manualBackgroundMode = null;
     queueRefreshes([320, 1100]);
   };
-  const scheduleBackgroundKeyboardStep = event => {
+  const handleThemeKeyboardShortcut = event => {
     if (!event.ctrlKey || !event.altKey || event.shiftKey || event.metaKey) return;
     const key = String(event.key || '').toLowerCase();
     const toggleMode = key === 'c' || event.code === 'KeyC';
+    const toggleQuote = key === 't' || event.code === 'KeyT';
     const direction = key === 'f' || event.code === 'KeyF'
       ? 1
       : (key === 'b' || event.code === 'KeyB' ? -1 : 0);
-    if (!direction && !toggleMode) return;
+    if (!direction && !toggleMode && !toggleQuote) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
     if (event.repeat) return;
-    if (toggleMode) toggleBackgroundMode();
+    if (toggleQuote) toggleLandingQuote();
+    else if (toggleMode) toggleBackgroundMode();
     else if (direction < 0) previousBackground();
     else nextBackground();
   };
@@ -2173,13 +2206,26 @@ function applyRuntime(payload) {
     });
   };
   const observer = new MutationObserver(records => {
-    if (records.some(record => (
+    const observedRecords = records.filter(record => {
+      if (
+        record.type === 'attributes' &&
+        record.attributeName === 'aria-label' &&
+        record.target instanceof Element &&
+        state.selfManagedLandingAria.has(record.target)
+      ) {
+        state.selfManagedLandingAria.delete(record.target);
+        return false;
+      }
+      return true;
+    });
+    if (!observedRecords.length) return;
+    if (observedRecords.some(record => (
       record.target?.id === 'wukong-forge-background' ||
       [...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node.id === 'wukong-forge-background')
     ))) delete root.dataset.forgeBackgroundReady;
-    const firstPaintStructureMounted = records.some(recordMountsFirstPaintStructure);
-    const composerSignalChanged = records.some(recordTouchesComposerSignal);
-    const otherThemeStructureChanged = records.some(record => {
+    const firstPaintStructureMounted = observedRecords.some(recordMountsFirstPaintStructure);
+    const composerSignalChanged = observedRecords.some(recordTouchesComposerSignal);
+    const otherThemeStructureChanged = observedRecords.some(record => {
       if (recordTouchesSurfaceSignal(record)) return true;
       const target = record.target instanceof Element
         ? record.target
@@ -2230,7 +2276,7 @@ function applyRuntime(payload) {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   document.addEventListener('click', scheduleNavigationRefresh, true);
   document.addEventListener('keydown', scheduleComposerKeyboardSubmit, true);
-  document.addEventListener('keydown', scheduleBackgroundKeyboardStep, true);
+  document.addEventListener('keydown', handleThemeKeyboardShortcut, true);
   state.observer = observer;
   state.resizeObserver = resizeObserver;
   state.dispose = () => {
@@ -2244,7 +2290,7 @@ function applyRuntime(payload) {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     document.removeEventListener('click', scheduleNavigationRefresh, true);
     document.removeEventListener('keydown', scheduleComposerKeyboardSubmit, true);
-    document.removeEventListener('keydown', scheduleBackgroundKeyboardStep, true);
+    document.removeEventListener('keydown', handleThemeKeyboardShortcut, true);
     observer.disconnect();
     resizeObserver?.disconnect();
     if (state.timer) clearTimeout(state.timer);
@@ -2265,6 +2311,7 @@ function applyRuntime(payload) {
     document.getElementById('wukong-forge-pet-overlay')?.remove();
     document.getElementById('wukong-forge-motif-overlay')?.remove();
     document.getElementById('wukong-forge-background')?.remove();
+    delete root.dataset.forgeLandingQuoteVisible;
   };
   state.patchedPushState = history.pushState;
   state.patchedReplaceState = history.replaceState;
@@ -2349,6 +2396,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
     surface: document.documentElement.dataset.forgeSurface || null,
     mode: document.documentElement.dataset.forgeMode || null,
     scene: document.documentElement.dataset.forgeScene || null,
+    landingQuoteVisible: document.documentElement.dataset.forgeLandingQuoteVisible === 'true',
     refreshCount: window.__wukongCodexForgeRuntimeV13?.refreshCount || 0,
     renderCount: window.__wukongCodexForgeRuntimeV13?.renderCount || 0,
     runtimeV4: Boolean(window.__wukongCodexForgeRuntimeV4),
@@ -2479,6 +2527,7 @@ export const RESTORE_EXPRESSION = `(() => {
   delete document.documentElement.dataset.forgeScene;
   delete document.documentElement.dataset.forgeMode;
   delete document.documentElement.dataset.forgeBackgroundReady;
+  delete document.documentElement.dataset.forgeLandingQuoteVisible;
   delete document.documentElement.dataset.forgeWukongSafe;
   delete document.documentElement.dataset.forgeBajieSafe;
   delete document.documentElement.dataset.forgeGourdSafe;

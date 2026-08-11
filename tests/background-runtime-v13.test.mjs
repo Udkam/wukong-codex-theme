@@ -644,18 +644,38 @@ test('V13 restores native paint while rebuilding an overlay removed during cross
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   await page.route('http://wukong-overlay-generation.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-overlay-generation.test/');
+  const nativeMainPaint = await page.locator('main.main-surface').evaluate(element => ({
+    color: getComputedStyle(element).backgroundColor,
+    image: getComputedStyle(element).backgroundImage
+  }));
   await page.evaluate(expression);
   await enterThreadState(page);
   await waitForRuntime(page, 'transition', 6);
 
+  await page.evaluate(() => {
+    window.__forgeRepairDecodeResolvers = [];
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => {
+        window.__forgeRepairDecodeResolvers.push(resolve);
+      });
+    };
+  });
+
   await page.locator('#wukong-forge-background').evaluate(element => element.remove());
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.forgeBackgroundReady !== 'true' &&
+    window.__forgeRepairDecodeResolvers?.length === 1
+  ));
   assert.equal(await page.locator('html').getAttribute('data-forge-background-ready'), null);
-  assert.notEqual(
-    await page.locator('main.main-surface').evaluate(element => getComputedStyle(element).backgroundColor),
-    'rgba(0, 0, 0, 0)'
+  assert.deepEqual(
+    await page.locator('main.main-surface').evaluate(element => ({
+      color: getComputedStyle(element).backgroundColor,
+      image: getComputedStyle(element).backgroundImage
+    })),
+    nativeMainPaint
   );
 
+  await page.evaluate(() => window.__forgeRepairDecodeResolvers.shift()?.());
   await page.waitForFunction(ACTIVE_PROBE_EXPRESSION, null, { timeout: 5000 });
   const repaired = await page.evaluate(THEME_STATE_EXPRESSION);
   assert.equal(repaired.backgroundReady, true);
@@ -1294,6 +1314,246 @@ test('V52.1 toggles battle and scenery locally while route defaults remain autom
   );
 
   await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V52.2 toggles the landing quote on Ctrl+Alt+T without reload or background work', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const firstBattle = Number(sequenceFor('battle')[0]);
+  await page.route('http://wukong-quote-toggle.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-quote-toggle.test/');
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', firstBattle);
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.forgeLandingQuoteVisible === 'true' &&
+    document.querySelector('[data-feature="game-source"]')?.dataset.forgeTitleCopy === '此去，欲破何局？'
+  ));
+  await page.waitForTimeout(900);
+
+  const baseline = await page.evaluate(() => {
+    const title = document.querySelector('[data-feature="game-source"]');
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const rect = title.getBoundingClientRect();
+    window.__forgeQuoteReferences = {
+      document,
+      runtime,
+      style: document.getElementById('wukong-forge-style'),
+      overlay: document.getElementById('wukong-forge-background'),
+      url: location.href,
+      historyLength: history.length,
+      timeOrigin: performance.timeOrigin
+    };
+    window.__forgeQuoteLifecycle = {
+      beforeunload: 0,
+      pagehide: 0,
+      unload: 0,
+      load: 0,
+      pageshow: 0
+    };
+    for (const name of Object.keys(window.__forgeQuoteLifecycle)) {
+      window.addEventListener(name, () => { window.__forgeQuoteLifecycle[name] += 1; });
+    }
+    window.__forgeDownstreamQuoteKeys = 0;
+    document.addEventListener('keydown', event => {
+      if (event.ctrlKey && event.altKey && event.code === 'KeyT') {
+        window.__forgeDownstreamQuoteKeys += 1;
+      }
+    });
+    return {
+      quoteVisible: runtime.landingQuoteVisible,
+      rootState: document.documentElement.dataset.forgeLandingQuoteVisible,
+      aria: title.getAttribute('aria-label'),
+      nativeText: title.textContent,
+      pseudoContent: getComputedStyle(title, '::after').content,
+      pseudoDisplay: getComputedStyle(title, '::after').display,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      scene: String(runtime.currentScene),
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount
+    };
+  });
+  assert.equal(baseline.quoteVisible, true);
+  assert.equal(baseline.rootState, 'true');
+  assert.equal(baseline.aria, '此去，欲破何局？');
+  assert.match(baseline.pseudoContent, /此去，欲破何局/);
+  assert.equal(baseline.pseudoDisplay, 'flex');
+
+  const repeated = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: 't',
+      code: 'KeyT',
+      ctrlKey: true,
+      altKey: true,
+      repeat: true,
+      bubbles: true,
+      cancelable: true
+    });
+    const accepted = document.dispatchEvent(event);
+    return {
+      accepted,
+      defaultPrevented: event.defaultPrevented,
+      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      downstream: window.__forgeDownstreamQuoteKeys
+    };
+  });
+  assert.deepEqual(repeated, {
+    accepted: false,
+    defaultPrevented: true,
+    quoteVisible: true,
+    downstream: 0
+  });
+
+  await page.keyboard.press('Control+Alt+T');
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.forgeLandingQuoteVisible === 'false'
+  ));
+  await page.waitForTimeout(650);
+  const hidden = await page.evaluate(() => {
+    const references = window.__forgeQuoteReferences;
+    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const title = document.querySelector('[data-feature="game-source"]');
+    const rect = title.getBoundingClientRect();
+    return {
+      sameDocument: references.document === document,
+      sameRuntime: references.runtime === runtime,
+      sameStyle: references.style === document.getElementById('wukong-forge-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameUrl: references.url === location.href,
+      sameHistoryLength: references.historyLength === history.length,
+      sameTimeOrigin: references.timeOrigin === performance.timeOrigin,
+      lifecycle: { ...window.__forgeQuoteLifecycle },
+      quoteVisible: runtime.landingQuoteVisible,
+      rootState: document.documentElement.dataset.forgeLandingQuoteVisible,
+      aria: title.getAttribute('aria-label'),
+      nativeText: title.textContent,
+      titleCopy: title.dataset.forgeTitleCopy,
+      pseudoDisplay: getComputedStyle(title, '::after').display,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      scene: String(runtime.currentScene),
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      preloadInFlight: runtime.preloadRequests.size,
+      downstream: window.__forgeDownstreamQuoteKeys
+    };
+  });
+  assert.equal(hidden.sameDocument, true);
+  assert.equal(hidden.sameRuntime, true);
+  assert.equal(hidden.sameStyle, true);
+  assert.equal(hidden.sameOverlay, true);
+  assert.equal(hidden.sameUrl, true);
+  assert.equal(hidden.sameHistoryLength, true);
+  assert.equal(hidden.sameTimeOrigin, true);
+  assert.deepEqual(hidden.lifecycle, { beforeunload: 0, pagehide: 0, unload: 0, load: 0, pageshow: 0 });
+  assert.equal(hidden.quoteVisible, false);
+  assert.equal(hidden.rootState, 'false');
+  assert.equal(hidden.aria, null);
+  assert.equal(hidden.nativeText, baseline.nativeText);
+  assert.equal(hidden.titleCopy, '此去，欲破何局？');
+  assert.equal(hidden.pseudoDisplay, 'none');
+  assert.deepEqual(hidden.rect, baseline.rect);
+  assert.equal(hidden.scene, baseline.scene);
+  assert.equal(hidden.refreshCount, baseline.refreshCount);
+  assert.equal(hidden.renderCount, baseline.renderCount);
+  assert.equal(hidden.preloadInFlight, 0);
+  assert.equal(hidden.downstream, 0);
+
+  const shifted = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'T',
+      code: 'KeyT',
+      ctrlKey: true,
+      altKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true
+    });
+    const accepted = document.dispatchEvent(event);
+    return {
+      accepted,
+      defaultPrevented: event.defaultPrevented,
+      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible
+    };
+  });
+  assert.deepEqual(shifted, { accepted: true, defaultPrevented: false, quoteVisible: false });
+
+  await enterThreadState(page);
+  await waitForRuntime(page, 'surface', 'thread');
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      rootState: document.documentElement.dataset.forgeLandingQuoteVisible
+    })),
+    { quoteVisible: false, rootState: 'false' }
+  );
+  await installLanding(page);
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.forgeSurface === 'landing' &&
+    document.querySelector('[data-feature="game-source"]')?.dataset.forgeTitleCopy === '此去，欲破何局？'
+  ));
+  assert.equal(
+    await page.locator('[data-feature="game-source"]').evaluate(title => getComputedStyle(title, '::after').display),
+    'none'
+  );
+
+  await page.evaluate(() => {
+    window.__forgeQuoteRuntimeBeforeReapply = window.__wukongCodexForgeRuntimeV13;
+  });
+  await page.evaluate(orderedExpression);
+  await page.waitForFunction(() => (
+    window.__wukongCodexForgeRuntimeV13 !== window.__forgeQuoteRuntimeBeforeReapply &&
+    document.documentElement.dataset.forgeBackgroundReady === 'true' &&
+    document.documentElement.dataset.forgeLandingQuoteVisible === 'false'
+  ));
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      pseudoDisplay: getComputedStyle(
+        document.querySelector('[data-feature="game-source"]'),
+        '::after'
+      ).display
+    })),
+    { quoteVisible: false, pseudoDisplay: 'none' },
+    'a no-reload hot apply should retain the current-window quote preference'
+  );
+
+  await page.keyboard.press('Control+Alt+T');
+  await page.waitForFunction(() => (
+    document.documentElement.dataset.forgeLandingQuoteVisible === 'true'
+  ));
+  const visibleAgain = await page.evaluate(() => {
+    const title = document.querySelector('[data-feature="game-source"]');
+    return {
+      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      aria: title.getAttribute('aria-label'),
+      nativeText: title.textContent,
+      pseudoContent: getComputedStyle(title, '::after').content,
+      pseudoDisplay: getComputedStyle(title, '::after').display
+    };
+  });
+  assert.equal(visibleAgain.quoteVisible, true);
+  assert.equal(visibleAgain.aria, '此去，欲破何局？');
+  assert.match(visibleAgain.pseudoContent, /此去，欲破何局/);
+  assert.equal(visibleAgain.pseudoDisplay, 'flex');
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  const native = await page.evaluate(() => {
+    const title = document.querySelector('[data-feature="game-source"]');
+    return {
+      rootControlPresent: document.documentElement.hasAttribute('data-forge-landing-quote-visible'),
+      titleCopyPresent: Object.hasOwn(title.dataset, 'forgeTitleCopy'),
+      aria: title.getAttribute('aria-label'),
+      nativeText: title.textContent
+    };
+  });
+  assert.deepEqual(native, {
+    rootControlPresent: false,
+    titleCopyPresent: false,
+    aria: null,
+    nativeText: visibleAgain.nativeText
+  });
+  assert.equal(isNativeThemeState(await page.evaluate(THEME_STATE_EXPRESSION)), true);
 });
 
 test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading the page or theme', async () => {
