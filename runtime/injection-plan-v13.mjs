@@ -59,6 +59,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexForgeRuntimeV13';
+const RUNTIME_REVISION = 'v54-native-pages-and-toggle';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV4',
   '__wukongCodexForgeRuntimeV5',
@@ -1758,6 +1759,7 @@ function applyRuntime(payload) {
   });
   const storedSceneState = readSceneState();
   const state = {
+    revision: payload.runtimeRevision,
     observer: null,
     resizeObserver: null,
     observedResizeTargets: [],
@@ -2283,6 +2285,7 @@ export function makeApplyExpression({ styleSheet, variables }) {
     variables,
     markClasses: MARK_CLASSES,
     runtimeKey: RUNTIME_KEY,
+    runtimeRevision: RUNTIME_REVISION,
     retiredRuntimeKeys: RETIRED_RUNTIME_KEYS
   });
   return `(${applyRuntime.toString()})(${payload})`;
@@ -2318,6 +2321,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
     Boolean(frame.querySelector('.ProseMirror[role="textbox"]'))
   ));
   return {
+    documentHidden: document.hidden,
     stylePresent: Boolean(document.getElementById('wukong-forge-style')),
     rootClass: document.documentElement.classList.contains('forge-ink-mountain'),
     markedElements: document.querySelectorAll('[data-forge-mark]').length,
@@ -2351,6 +2355,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
     landingQuoteVisible: document.documentElement.dataset.forgeLandingQuoteVisible === 'true',
     refreshCount: window.__wukongCodexForgeRuntimeV13?.refreshCount || 0,
     renderCount: window.__wukongCodexForgeRuntimeV13?.renderCount || 0,
+    runtimeRevision: window.__wukongCodexForgeRuntimeV13?.revision || null,
     runtimeV4: Boolean(window.__wukongCodexForgeRuntimeV4),
     runtimeV5: Boolean(window.__wukongCodexForgeRuntimeV5),
     runtimeV6: Boolean(window.__wukongCodexForgeRuntimeV6),
@@ -2430,6 +2435,23 @@ export const isActiveThemeState = state => Boolean(state) &&
   state.visibleThemedComposerCount === state.visibleNativeComposerCount &&
   state.runtimeV12 === false &&
   state.runtimeV13 === true;
+
+export const isDeferredThemeState = state => Boolean(state) &&
+  state.documentHidden === true &&
+  state.stylePresent === true &&
+  state.rootClass === true &&
+  state.backgroundLayerPresent === true &&
+  state.backgroundLayerCount === 2 &&
+  state.backgroundReady === false &&
+  ['landing', 'thread'].includes(state.surface) &&
+  ['battle', 'scenery'].includes(state.mode) &&
+  state.motifLayerPresent === false &&
+  Number.isInteger(state.visibleNativeComposerCount) &&
+  Number.isInteger(state.visibleThemedComposerCount) &&
+  state.visibleThemedComposerCount === state.visibleNativeComposerCount &&
+  state.runtimeV12 === false &&
+  state.runtimeV13 === true &&
+  state.runtimeRevision === RUNTIME_REVISION;
 
 export const isNativeThemeState = state => Boolean(state) &&
   state.stylePresent === false &&

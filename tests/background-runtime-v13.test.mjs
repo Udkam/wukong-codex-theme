@@ -5,6 +5,7 @@ import { chromium } from '@playwright/test';
 import {
   ACTIVE_PROBE_EXPRESSION,
   isActiveThemeState,
+  isDeferredThemeState,
   isNativeThemeState,
   makeApplyExpression,
   RESTORE_EXPRESSION,
@@ -578,6 +579,225 @@ test('V13 covers the complete viewport on its first commit and after a window re
 
   await page.evaluate(RESTORE_EXPRESSION);
   assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+});
+
+test('V54 clears Plugins and Scheduled Tasks search bands without changing native search chrome', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  await page.route('http://wukong-searchable-pages.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-searchable-pages.test/');
+  await page.evaluate(() => {
+    const nativeStyle = document.createElement('style');
+    nativeStyle.textContent = `
+      #native-searchable-pages {
+        position: absolute;
+        inset: 54px 0 auto;
+        z-index: 40;
+        display: grid;
+        gap: 64px;
+      }
+      #native-searchable-pages .native-search-band {
+        position: sticky;
+        top: 0;
+        z-index: 30;
+        height: 64px;
+        padding: 16px 256px;
+        background-color: rgb(24, 24, 24);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, .45);
+      }
+      #native-searchable-pages .native-search-band::after {
+        content: '';
+        pointer-events: none;
+        position: absolute;
+        top: 100%;
+        right: 0;
+        left: 0;
+        height: 32px;
+        background-image: linear-gradient(rgb(24, 24, 24), rgba(24, 24, 24, 0));
+      }
+      #native-searchable-pages .native-search-chrome {
+        display: flex;
+        width: 100%;
+        height: 32px;
+        align-items: center;
+        border: 1px solid rgb(78, 78, 78);
+        border-radius: 16px;
+        background-color: rgba(52, 52, 52, .9);
+        backdrop-filter: blur(4px);
+      }
+      #native-searchable-pages input {
+        width: 100%;
+        height: 30px;
+        border: 0;
+        padding: 0 12px;
+        color: white;
+        background: transparent;
+      }
+    `;
+    document.head.append(nativeStyle);
+    const fixture = document.createElement('section');
+    fixture.id = 'native-searchable-pages';
+    fixture.innerHTML = [
+      'plugins-page-search',
+      'scheduled-page-search',
+      'other-page-search'
+    ].map(id => `
+      <div class="native-search-band sticky top-0 z-30 bg-token-main-surface-primary after:pointer-events-none after:absolute after:top-full after:right-0 after:left-0 after:h-8 after:bg-linear-to-b after:from-token-main-surface-primary after:to-transparent after:content-['']">
+        <div class="native-search-chrome">
+          <input id="${id}" type="text" aria-label="${id}" placeholder="${id}">
+        </div>
+      </div>
+    `).join('');
+    document.querySelector('main.main-surface').append(fixture);
+  });
+
+  const readSurfaces = () => page.evaluate(() => (
+    [...document.querySelectorAll('#native-searchable-pages .native-search-band')].map(band => {
+      const input = band.querySelector('input');
+      const chrome = input.parentElement;
+      const bandRect = band.getBoundingClientRect();
+      const inputRect = input.getBoundingClientRect();
+      return {
+        id: input.id,
+        bandBackground: getComputedStyle(band).backgroundColor,
+        bandImage: getComputedStyle(band).backgroundImage,
+        bandShadow: getComputedStyle(band).boxShadow,
+        fadeBackground: getComputedStyle(band, '::after').backgroundColor,
+        fadeImage: getComputedStyle(band, '::after').backgroundImage,
+        chromeBackground: getComputedStyle(chrome).backgroundColor,
+        chromeBorder: getComputedStyle(chrome).border,
+        chromeBackdrop: getComputedStyle(chrome).backdropFilter,
+        bandRect: { x: bandRect.x, y: bandRect.y, width: bandRect.width, height: bandRect.height },
+        inputRect: { x: inputRect.x, y: inputRect.y, width: inputRect.width, height: inputRect.height },
+        disabled: input.disabled,
+        readOnly: input.readOnly,
+        value: input.value
+      };
+    })
+  ));
+
+  const native = await readSurfaces();
+  assert.deepEqual(native.map(surface => surface.id), [
+    'plugins-page-search',
+    'scheduled-page-search',
+    'other-page-search'
+  ]);
+  assert.ok(native.every(surface => surface.bandBackground === 'rgb(24, 24, 24)'));
+  assert.ok(native.every(surface => /linear-gradient/.test(surface.fadeImage)));
+  assert.ok(native.every(surface => surface.chromeBackground === 'rgba(52, 52, 52, 0.9)'));
+
+  await page.evaluate(expression);
+  await page.waitForFunction(() => document.documentElement.dataset.forgeBackgroundReady === 'true');
+  const themed = await readSurfaces();
+  for (let index = 0; index < 2; index += 1) {
+    const surface = themed[index];
+    const baseline = native[index];
+    assert.equal(surface.bandBackground, 'rgba(0, 0, 0, 0)');
+    assert.equal(surface.bandImage, 'none');
+    assert.equal(surface.bandShadow, 'none');
+    assert.equal(surface.fadeBackground, 'rgba(0, 0, 0, 0)');
+    assert.equal(surface.fadeImage, 'none');
+    assert.equal(surface.chromeBackground, baseline.chromeBackground);
+    assert.equal(surface.chromeBorder, baseline.chromeBorder);
+    assert.equal(surface.chromeBackdrop, baseline.chromeBackdrop);
+    assert.deepEqual(surface.bandRect, baseline.bandRect);
+    assert.deepEqual(surface.inputRect, baseline.inputRect);
+    assert.equal(surface.disabled, false);
+    assert.equal(surface.readOnly, false);
+  }
+
+  const decoy = themed[2];
+  const nativeDecoy = native[2];
+  assert.equal(decoy.bandBackground, nativeDecoy.bandBackground);
+  assert.equal(decoy.bandImage, nativeDecoy.bandImage);
+  assert.equal(decoy.bandShadow, nativeDecoy.bandShadow);
+  assert.equal(decoy.fadeBackground, nativeDecoy.fadeBackground);
+  assert.equal(decoy.fadeImage, nativeDecoy.fadeImage);
+  assert.equal(decoy.chromeBackground, nativeDecoy.chromeBackground);
+  assert.equal(decoy.chromeBorder, nativeDecoy.chromeBorder);
+  assert.equal(decoy.chromeBackdrop, nativeDecoy.chromeBackdrop);
+  assert.deepEqual(decoy.bandRect, nativeDecoy.bandRect);
+  assert.deepEqual(decoy.inputRect, nativeDecoy.inputRect);
+  assert.equal(decoy.disabled, false);
+  assert.equal(decoy.readOnly, false);
+
+  const lateMounted = await page.evaluate(() => new Promise(resolve => {
+    const oldBand = document.querySelector('#plugins-page-search').closest('.native-search-band');
+    const replacement = oldBand.cloneNode(true);
+    oldBand.replaceWith(replacement);
+    const readPaint = () => ({
+      background: getComputedStyle(replacement).backgroundColor,
+      image: getComputedStyle(replacement).backgroundImage,
+      shadow: getComputedStyle(replacement).boxShadow,
+      fadeBackground: getComputedStyle(replacement, '::after').backgroundColor,
+      fadeImage: getComputedStyle(replacement, '::after').backgroundImage
+    });
+    const immediate = readPaint();
+    requestAnimationFrame(() => resolve({ immediate, nextFrame: readPaint() }));
+  }));
+  assert.deepEqual(lateMounted.immediate, {
+    background: 'rgba(0, 0, 0, 0)',
+    image: 'none',
+    shadow: 'none',
+    fadeBackground: 'rgba(0, 0, 0, 0)',
+    fadeImage: 'none'
+  });
+  assert.deepEqual(lateMounted.nextFrame, lateMounted.immediate);
+
+  await page.locator('#plugins-page-search').fill('browser');
+  await page.locator('#scheduled-page-search').fill('每日简报');
+  assert.deepEqual(
+    await page.locator('#native-searchable-pages input').evaluateAll(inputs => inputs.map(input => input.value)),
+    ['browser', '每日简报', '']
+  );
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  const restored = await readSurfaces();
+  assert.ok(restored.every(surface => surface.bandBackground === 'rgb(24, 24, 24)'));
+  assert.ok(restored.every(surface => /linear-gradient/.test(surface.fadeImage)));
+});
+
+test('V54 settles a hidden hot apply as deferred and completes on visibility without reload', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  await page.route('http://wukong-hidden-hot-apply.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-hidden-hot-apply.test/');
+  await page.evaluate(() => {
+    window.__forgeDocumentHidden = true;
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      get: () => window.__forgeDocumentHidden
+    });
+  });
+
+  await page.evaluate(detachedExpression => {
+    // Mirrors CDP Runtime.evaluate with awaitPromise:false: synchronous setup
+    // runs, while the hidden renderer retains ownership of initial readiness.
+    window.__forgeOriginalDocument = document;
+    (0, eval)(detachedExpression);
+    window.__forgeRuntimeBeforeVisibility = window.__wukongCodexForgeRuntimeV13;
+  }, `void ${expression}`);
+  const deferredState = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(isDeferredThemeState(deferredState), true);
+  assert.equal(isActiveThemeState(deferredState), false);
+  assert.equal(deferredState.backgroundLoadedLayerCount, 0);
+
+  await page.evaluate(() => {
+    window.__forgeDocumentHidden = false;
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForFunction(() => document.documentElement.dataset.forgeBackgroundReady === 'true');
+
+  assert.equal(await page.evaluate(THEME_STATE_EXPRESSION).then(isActiveThemeState), true);
+  assert.equal(await page.evaluate(() => (
+    window.__forgeOriginalDocument === document &&
+    window.__wukongCodexForgeRuntimeV13 === window.__forgeRuntimeBeforeVisibility
+  )), true);
+  await page.evaluate(RESTORE_EXPRESSION);
 });
 
 test('V53 paints a collapsed-sidebar hover flyout transparently on its first frame and then marks it', async () => {
@@ -1379,7 +1599,7 @@ test('V53 treats Ctrl+Alt+C as a temporary override cleared by route and page ch
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layout or background work', async () => {
+test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hiding the composer', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
   const firstBattle = 0;
   await page.route('http://wukong-quote-toggle.test/**', route => route.fulfill({
@@ -1398,9 +1618,11 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
   const baseline = await page.evaluate(() => {
     const title = document.querySelector('[data-feature="game-source"]');
     const icon = document.querySelector('[data-testid="home-icon"]');
+    const composer = document.querySelector('.composer-surface-chrome');
     const runtime = window.__wukongCodexForgeRuntimeV13;
     const rect = title.getBoundingClientRect();
     const iconRect = icon.getBoundingClientRect();
+    const composerRect = composer.getBoundingClientRect();
     window.__forgeQuoteReferences = {
       document,
       runtime,
@@ -1438,12 +1660,22 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
       iconPseudoImage: getComputedStyle(icon, '::before').backgroundImage,
       iconPseudoOpacity: getComputedStyle(icon, '::before').opacity,
       iconPseudoVisibility: getComputedStyle(icon, '::before').visibility,
+      composerPseudoContent: getComputedStyle(composer, '::before').content,
+      composerPseudoImage: getComputedStyle(composer, '::before').backgroundImage,
+      composerPseudoOpacity: getComputedStyle(composer, '::before').opacity,
+      composerPseudoVisibility: getComputedStyle(composer, '::before').visibility,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       iconRect: {
         x: iconRect.x,
         y: iconRect.y,
         width: iconRect.width,
         height: iconRect.height
+      },
+      composerRect: {
+        x: composerRect.x,
+        y: composerRect.y,
+        width: composerRect.width,
+        height: composerRect.height
       },
       scene: String(runtime.currentScene),
       refreshCount: runtime.refreshCount,
@@ -1460,6 +1692,10 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
   assert.match(baseline.iconPseudoImage, /data:image\/svg\+xml/);
   assert.equal(baseline.iconPseudoOpacity, '1');
   assert.equal(baseline.iconPseudoVisibility, 'visible');
+  assert.equal(baseline.composerPseudoContent, '\"\"');
+  assert.match(baseline.composerPseudoImage, /data:image\//);
+  assert.equal(baseline.composerPseudoOpacity, '1');
+  assert.equal(baseline.composerPseudoVisibility, 'visible');
 
   const repeated = await page.evaluate(() => {
     const event = new KeyboardEvent('keydown', {
@@ -1496,8 +1732,10 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
     const runtime = window.__wukongCodexForgeRuntimeV13;
     const title = document.querySelector('[data-feature="game-source"]');
     const icon = document.querySelector('[data-testid="home-icon"]');
+    const composer = document.querySelector('.composer-surface-chrome');
     const rect = title.getBoundingClientRect();
     const iconRect = icon.getBoundingClientRect();
+    const composerRect = composer.getBoundingClientRect();
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
@@ -1517,12 +1755,22 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
       pseudoVisibility: getComputedStyle(title, '::after').visibility,
       iconPseudoOpacity: getComputedStyle(icon, '::before').opacity,
       iconPseudoVisibility: getComputedStyle(icon, '::before').visibility,
+      composerPseudoContent: getComputedStyle(composer, '::before').content,
+      composerPseudoImage: getComputedStyle(composer, '::before').backgroundImage,
+      composerPseudoOpacity: getComputedStyle(composer, '::before').opacity,
+      composerPseudoVisibility: getComputedStyle(composer, '::before').visibility,
       rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
       iconRect: {
         x: iconRect.x,
         y: iconRect.y,
         width: iconRect.width,
         height: iconRect.height
+      },
+      composerRect: {
+        x: composerRect.x,
+        y: composerRect.y,
+        width: composerRect.width,
+        height: composerRect.height
       },
       scene: String(runtime.currentScene),
       refreshCount: runtime.refreshCount,
@@ -1549,8 +1797,13 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
   assert.equal(hidden.pseudoVisibility, 'hidden');
   assert.equal(hidden.iconPseudoOpacity, '0');
   assert.equal(hidden.iconPseudoVisibility, 'hidden');
+  assert.equal(hidden.composerPseudoContent, baseline.composerPseudoContent);
+  assert.equal(hidden.composerPseudoImage, baseline.composerPseudoImage);
+  assert.equal(hidden.composerPseudoOpacity, baseline.composerPseudoOpacity);
+  assert.equal(hidden.composerPseudoVisibility, baseline.composerPseudoVisibility);
   assert.deepEqual(hidden.rect, baseline.rect);
   assert.deepEqual(hidden.iconRect, baseline.iconRect);
+  assert.deepEqual(hidden.composerRect, baseline.composerRect);
   assert.equal(hidden.scene, baseline.scene);
   assert.equal(hidden.refreshCount, baseline.refreshCount);
   assert.equal(hidden.renderCount, baseline.renderCount);
@@ -1623,9 +1876,33 @@ test('V53 toggles both landing quote and Wukong mark on Ctrl+Alt+T without layou
       markOpacity: getComputedStyle(
         document.querySelector('[data-testid="home-icon"]'),
         '::before'
-      ).opacity
+      ).opacity,
+      composerContent: getComputedStyle(
+        document.querySelector('.composer-surface-chrome'),
+        '::before'
+      ).content,
+      composerImage: getComputedStyle(
+        document.querySelector('.composer-surface-chrome'),
+        '::before'
+      ).backgroundImage,
+      composerOpacity: getComputedStyle(
+        document.querySelector('.composer-surface-chrome'),
+        '::before'
+      ).opacity,
+      composerVisibility: getComputedStyle(
+        document.querySelector('.composer-surface-chrome'),
+        '::before'
+      ).visibility
     })),
-    { quoteVisible: false, titleOpacity: '0', markOpacity: '0' },
+    {
+      quoteVisible: false,
+      titleOpacity: '0',
+      markOpacity: '0',
+      composerContent: baseline.composerPseudoContent,
+      composerImage: baseline.composerPseudoImage,
+      composerOpacity: baseline.composerPseudoOpacity,
+      composerVisibility: baseline.composerPseudoVisibility
+    },
     'a no-reload hot apply should retain both hidden landing inscriptions'
   );
 

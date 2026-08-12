@@ -148,6 +148,36 @@
 }
 
 /*
+ * Plugins and Scheduled Tasks share SearchablePageLayout. Its source-backed
+ * sticky search carrier paints a full-width main-surface strip and a 32px
+ * ::after fade. Clear only those two paint layers when they own one of the
+ * two native page-search inputs; the search chrome, blur, border, geometry and
+ * hit targets remain entirely native.
+ */
+:root.forge-ink-mountain[data-forge-background-ready="true"] :is(
+  main.main-surface,
+  .forge-workspace
+) .sticky.top-0.z-30.bg-token-main-surface-primary:has(:is(
+  #plugins-page-search,
+  #scheduled-page-search
+)) {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+:root.forge-ink-mountain[data-forge-background-ready="true"] :is(
+  main.main-surface,
+  .forge-workspace
+) .sticky.top-0.z-30.bg-token-main-surface-primary:has(:is(
+  #plugins-page-search,
+  #scheduled-page-search
+))::after {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/*
  * New-task hero: preserve the official 56×56 icon and title footprints while
  * replacing only their paint. The motif is the official 悟空 brush wordmark
  * and seal, painted at three times the native icon size from a 2× raster.
@@ -203,7 +233,7 @@
 }
 
 :root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-title-copy]::after,
-:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-mark="1"]::before {
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-testid="home-icon"][data-forge-mark="1"]::before {
   opacity: 0;
   visibility: hidden;
 }

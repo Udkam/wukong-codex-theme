@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { commandTimeoutMs, isCodexTarget } from '../runtime/cdp-client.mjs';
+import { isDeferredThemeState } from '../runtime/injection-plan-v13.mjs';
 import { browserIdentity, isProcessAlive, runWatcher } from '../runtime/watch.mjs';
 
 const read = file => fs.readFileSync(file, 'utf8');
@@ -385,7 +386,35 @@ test('large runtime expressions receive a bounded 45 second transport window', (
   assert.equal(commandTimeoutMs('Runtime.evaluate', { expression: 'x'.repeat(1_000_001) }), 45000);
   assert.equal(commandTimeoutMs('Runtime.evaluate', { expression: 'x' }), 12000);
   assert.equal(commandTimeoutMs('Page.captureScreenshot'), 20000);
-  assert.match(read('runtime/cdp-client.mjs'), /awaitPromise:\s*true/);
+  assert.match(read('runtime/cdp-client.mjs'), /\{ awaitPromise = true \} = \{\}/);
+  assert.match(read('runtime/cdp-client.mjs'), /awaitPromise\s*\n\s*\}/);
+});
+
+test('hidden renderer apply settles as an explicit deferred state', () => {
+  const deferredState = {
+    documentHidden: true,
+    stylePresent: true,
+    rootClass: true,
+    backgroundLayerPresent: true,
+    backgroundLayerCount: 2,
+    backgroundReady: false,
+    surface: 'thread',
+    mode: 'scenery',
+    motifLayerPresent: false,
+    visibleNativeComposerCount: 1,
+    visibleThemedComposerCount: 1,
+    runtimeV12: false,
+    runtimeV13: true,
+    runtimeRevision: 'v54-native-pages-and-toggle'
+  };
+  assert.equal(isDeferredThemeState(deferredState), true);
+  assert.equal(isDeferredThemeState({ ...deferredState, documentHidden: false }), false);
+  assert.equal(isDeferredThemeState({ ...deferredState, backgroundReady: true }), false);
+  assert.equal(isDeferredThemeState({ ...deferredState, runtimeRevision: 'old' }), false);
+  assert.match(read('runtime/injector.mjs'), /\{ awaitPromise: false \}/);
+  assert.match(read('runtime/injector.mjs'), /Date\.now\(\) \+ 7_000/);
+  assert.match(read('runtime/injector.mjs'), /isActiveThemeState\(state\) \|\| isDeferredThemeState\(state\)/);
+  assert.doesNotMatch(read('runtime/host.mjs'), /awaitPromise:\s*false/);
 });
 
 test('renderer refreshes are structural, throttled, and layout-loop free', () => {
