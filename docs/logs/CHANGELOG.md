@@ -1,5 +1,17 @@
 # Local work log
 
+## 2026-08-14 — V61 / 0.15.0 全背景可见“悟空”字标增强
+
+- 修正 V60 虽已切换 profile、但整体增量过小而在实机上仍近似未增强的问题；四档字标统一满不透明度，并显著拉开亮度、饱和度和对比度。
+- 复杂浅色背景使用深墨字标与紧凑浅边，复杂深色背景使用高亮骨色字标与紧凑深边；平坦背景采用较轻的同向处理，保留笔刷纹理而不制造泛光。
+- 20 张全页 fixture、profile/computed style 合同和本机热注入共同作为修正证据；V61 仍归入未推送的 0.15.0 发布候选，不包含两只宠物与授权改动。
+
+## 2026-08-14 — V60 / 0.15.0 分背景“悟空”字标增强
+
+- 把首页 hero profile 从“只选择深/浅字标”扩展为浅色/深色、平坦/复杂四档静态视觉合同；每档独立输出字标 opacity 与小范围 brightness/contrast/drop-shadow，避免在暗蓝、烟尘、雪地和强光背景中变灰或融入画面。
+- 保留官方 56×56 锚点、168×168 绘制尺寸、原生 DOM/布局/命中区与 `Ctrl+Alt+T` 行为；没有统一发光、动画、额外表面或全屏 filter。
+- 新增 profile 变量、computed style 和有界 filter 合同；20 场景全页矩阵用于发布前构图复核。本轮发布范围排除两只宠物与授权结论。
+
 ## 2026-08-11 — Wukong Codex Theme repository rename
 
 - Merged PR 1 into `main` at `ad0bef0`, renamed the public repository to `wukong-codex-theme`, and updated the canonical npm/package marker, current installer/runtime checks, Studio labels and user clone instructions.

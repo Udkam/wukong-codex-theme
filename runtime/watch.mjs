@@ -166,7 +166,7 @@ async function main() {
   const rootPid = Number(rootPidRaw);
   const themePath = providedTheme || 'themes/active.json';
   const expression = makeApplyExpression({
-    styleSheet: fs.readFileSync(new URL('./forge-background-v13.css', import.meta.url), 'utf8'),
+    styleSheet: fs.readFileSync(new URL('./wukong-codex-theme-background-v13.css', import.meta.url), 'utf8'),
     variables: payloadFromThemeFile(themePath).variables
   });
   let stopping = false;

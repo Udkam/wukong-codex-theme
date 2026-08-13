@@ -7,12 +7,12 @@ using System.Security.AccessControl;
 using System.Text;
 using System.Threading;
 
-namespace WukongCodexForge
+namespace WukongCodexTheme
 {
     internal static class ActivateAppxProgram
     {
         private const string ManagedLaunchEventName =
-            @"Local\WukongCodexForge.NativeEntrySupervisor.ManagedLaunch";
+            @"Local\WukongCodexTheme.NativeEntrySupervisor.ManagedLaunch";
 
         private sealed class Options
         {

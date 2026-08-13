@@ -13,7 +13,7 @@ foreach ($requiredRelative in @(
     'runtime\activate-appx.cs',
     'runtime\host.mjs',
     'runtime\native-entry-supervisor.cs',
-    'runtime\forge-background-v13.css',
+    'runtime\wukong-codex-theme-background-v13.css',
     'themes\active.json',
     'scripts\install-chatgpt-hook.ps1',
     'scripts\install-native-supervisor.ps1',

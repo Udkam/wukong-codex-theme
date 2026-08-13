@@ -23,6 +23,8 @@ export const MARK_CLASSES = [
   'forge-composer-input-shell',
   'forge-composer-footer',
   'forge-composer-context',
+  'forge-composer-context-above',
+  'forge-composer-context-below',
   'forge-composer-panel-stack',
   'forge-composer-panel',
   'forge-composer-queue-item',
@@ -58,9 +60,10 @@ export const MARK_CLASSES = [
   'forge-button'
 ];
 
-const RUNTIME_KEY = '__wukongCodexForgeRuntimeV13';
-const RUNTIME_REVISION = 'v54-native-pages-and-toggle';
+const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
+const RUNTIME_REVISION = 'v61-visible-wordmark';
 const RETIRED_RUNTIME_KEYS = [
+  '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
   '__wukongCodexForgeRuntimeV5',
   '__wukongCodexForgeRuntimeV6',
@@ -87,6 +90,12 @@ function applyRuntime(payload) {
   }
   const previous = window[runtimeKey];
   const previousLandingQuoteVisible = previous?.landingQuoteVisible !== false;
+  const previousBackgroundLock = previous?.backgroundLocked === true &&
+    (previous.lockedMode === 'battle' || previous.lockedMode === 'scenery') &&
+    Number.isInteger(previous.lockedScene) &&
+    previous.lockedScene >= 0
+      ? { mode: previous.lockedMode, scene: previous.lockedScene }
+      : null;
   previous?.observer?.disconnect();
   previous?.resizeObserver?.disconnect();
   previous?.dispose?.();
@@ -94,13 +103,15 @@ function applyRuntime(payload) {
 
   document.getElementById('wukong-forge-pet-overlay')?.remove();
   document.getElementById('wukong-forge-motif-overlay')?.remove();
+  document.getElementById('wukong-forge-style')?.remove();
   document.getElementById('wukong-forge-background')?.remove();
+  document.getElementById('wukong-codex-theme-background')?.remove();
   delete root.dataset.forgeBackgroundReady;
 
-  let style = document.getElementById('wukong-forge-style');
+  let style = document.getElementById('wukong-codex-theme-style');
   if (!style) {
     style = document.createElement('style');
-    style.id = 'wukong-forge-style';
+    style.id = 'wukong-codex-theme-style';
     style.dataset.forgeOwned = 'style';
     document.head.append(style);
   }
@@ -256,7 +267,7 @@ function applyRuntime(payload) {
     state.transitionEndHandler = null;
   };
   const ensureBackground = () => {
-    let overlay = document.getElementById('wukong-forge-background');
+    let overlay = document.getElementById('wukong-codex-theme-background');
     if (overlay && overlay.querySelectorAll(':scope > [data-forge-background-layer]').length !== 2) {
       overlay.remove();
       overlay = null;
@@ -273,7 +284,7 @@ function applyRuntime(payload) {
     state.preloadRequests.clear();
     state.activeLayer = 0;
     overlay = document.createElement('div');
-    overlay.id = 'wukong-forge-background';
+    overlay.id = 'wukong-codex-theme-background';
     overlay.dataset.forgeOwned = 'background';
     overlay.setAttribute('aria-hidden', 'true');
     overlay.setAttribute('inert', '');
@@ -293,7 +304,8 @@ function applyRuntime(payload) {
     return overlay;
   };
 
-  const sceneStateStorageKey = 'wukong-forge-scene-cursors-v13'; // gitleaks:allow -- public localStorage key, not a credential
+  const sceneStateStorageKey = 'wukong-codex-theme-scene-cursors-v13'; // gitleaks:allow -- public localStorage key, not a credential
+  const legacySceneStateStorageKey = 'wukong-forge-scene-cursors-v13'; // gitleaks:allow -- compatibility key, not a credential
   const orderedDeckStrategy = 'ordered-v1';
   const normalizeStoredScene = value => Number.isInteger(value) && value >= 0 ? value : null;
   const normalizeStoredDeck = value => ({
@@ -307,15 +319,27 @@ function applyRuntime(payload) {
     let parsed = null;
     for (const storageName of ['localStorage', 'sessionStorage']) {
       try {
-        const value = window[storageName]?.getItem(sceneStateStorageKey);
+        const storage = window[storageName];
+        const currentValue = storage?.getItem(sceneStateStorageKey);
+        const legacyValue = currentValue ? null : storage?.getItem(legacySceneStateStorageKey);
+        const value = currentValue || legacyValue;
         if (!value) continue;
         const candidate = JSON.parse(value);
         if (candidate && typeof candidate === 'object') {
+          if (legacyValue) storage?.setItem(sceneStateStorageKey, value);
+          storage?.removeItem(legacySceneStateStorageKey);
           parsed = candidate;
           break;
         }
       } catch {
         // Sandboxed fixture pages may disable either storage implementation.
+      }
+    }
+    for (const storageName of ['localStorage', 'sessionStorage']) {
+      try {
+        window[storageName]?.removeItem(legacySceneStateStorageKey);
+      } catch {
+        // Legacy cleanup is best-effort when a storage implementation is disabled.
       }
     }
     parsed ||= {};
@@ -327,15 +351,26 @@ function applyRuntime(payload) {
       selections: {
         battle: normalizeStoredScene(parsed.selectedBattle ?? parsed.selections?.battle),
         scenery: normalizeStoredScene(parsed.selectedScenery ?? parsed.selections?.scenery)
-      }
+      },
+      lock: parsed.backgroundLocked === true &&
+        (parsed.lockedMode === 'battle' || parsed.lockedMode === 'scenery') &&
+        normalizeStoredScene(parsed.lockedScene) !== null
+        ? {
+            mode: parsed.lockedMode,
+            scene: normalizeStoredScene(parsed.lockedScene)
+          }
+        : null
     };
   };
   const writeSceneState = sceneState => {
     const serialized = JSON.stringify({
-      version: 5,
+      version: 6,
       backgroundDecks: sceneState.backgroundDecks,
       selectedBattle: sceneState.selectedScenes.battle,
-      selectedScenery: sceneState.selectedScenes.scenery
+      selectedScenery: sceneState.selectedScenes.scenery,
+      backgroundLocked: sceneState.backgroundLocked,
+      lockedMode: sceneState.backgroundLocked ? sceneState.lockedMode : null,
+      lockedScene: sceneState.backgroundLocked ? sceneState.lockedScene : null
     });
     for (const storageName of ['localStorage', 'sessionStorage']) {
       try {
@@ -699,7 +734,7 @@ function applyRuntime(payload) {
     });
   };
   const overlayReady = () => {
-    const overlay = document.getElementById('wukong-forge-background');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     if (!overlay || overlay.querySelectorAll(':scope > [data-forge-background-layer]').length !== 2) return false;
     const active = overlay.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     const image = active?.querySelector('[data-forge-background-image]');
@@ -1002,7 +1037,28 @@ function applyRuntime(payload) {
       context !== composerRoot &&
       context !== surface &&
       context.getBoundingClientRect().height <= 64
-    ) mark(context, 'forge-composer-context');
+    ) {
+      const contextRect = context.getBoundingClientRect();
+      const surfaceRect = surface.getBoundingClientRect();
+      /*
+       * The home utility component is not a placement contract. Codex mounts
+       * the same scrollable utility bar above the new-task composer by using
+       * a negative overlap wrapper, while ChatGPT Work places it below. Use
+       * the painted vertical order so those two products keep independent
+       * upper/lower strip ends even when their component signature is shared.
+       */
+      const contextIsAbove = (
+        contextRect.top + contextRect.height / 2 <
+        surfaceRect.top + surfaceRect.height / 2
+      );
+      mark(context, 'forge-composer-context');
+      mark(
+        context,
+        contextIsAbove
+          ? 'forge-composer-context-above'
+          : 'forge-composer-context-below'
+      );
+    }
 
     /*
      * Codex owns two distinct layers here:
@@ -1678,11 +1734,14 @@ function applyRuntime(payload) {
     const routeHref = location.href;
     const surfaceChanged = state.lastSurface !== null && state.lastSurface !== surface;
     const routeChanged = state.lastRouteHref !== routeHref;
-    if (surfaceChanged || routeChanged) state.manualBackgroundMode = null;
+    if ((surfaceChanged || routeChanged) && !state.backgroundLocked) state.manualBackgroundMode = null;
     state.lastSurface = surface;
     state.lastRouteHref = routeHref;
     state.automaticBackgroundMode = surface === 'landing' ? 'battle' : 'scenery';
-    const mode = state.manualBackgroundMode || state.automaticBackgroundMode;
+    let mode = state.backgroundLocked
+      ? state.lockedMode
+      : (state.manualBackgroundMode || state.automaticBackgroundMode);
+    if (mode !== 'battle' && mode !== 'scenery') mode = state.automaticBackgroundMode;
     root.dataset.forgeSurface = surface;
     root.dataset.forgeMode = mode;
     ensureBackground();
@@ -1706,8 +1765,16 @@ function applyRuntime(payload) {
 
     const safeChoices = readSceneChoices(mode);
     ensureSceneSelection(mode, safeChoices);
+    if (state.backgroundLocked) {
+      if (!safeChoices.includes(state.lockedScene)) {
+        state.lockedScene = state.selectedScenes[mode];
+        state.lockedMode = mode;
+        persistSceneState();
+      }
+      state.selectedScenes[mode] = state.lockedScene;
+    }
     state.sceneKey = `${mode}|renderer`;
-    const plannedScene = state.selectedScenes[mode];
+    const plannedScene = state.backgroundLocked ? state.lockedScene : state.selectedScenes[mode];
     const requestedSceneIsCurrent = state.requestedScene?.mode === mode &&
       state.requestedScene.scene === plannedScene &&
       state.requestedScene.generation === state.overlayGeneration;
@@ -1772,6 +1839,9 @@ function applyRuntime(payload) {
     routeTimers: new Set(),
     backgroundDecks: storedSceneState.decks,
     selectedScenes: storedSceneState.selections,
+    backgroundLocked: previousBackgroundLock !== null || storedSceneState.lock !== null,
+    lockedMode: previousBackgroundLock?.mode || storedSceneState.lock?.mode || null,
+    lockedScene: previousBackgroundLock?.scene ?? storedSceneState.lock?.scene ?? null,
     pendingBackgroundMode: null,
     pendingBackgroundDirection: 1,
     manualBackgroundMode: previous?.manualBackgroundMode === 'battle' || previous?.manualBackgroundMode === 'scenery'
@@ -1810,15 +1880,24 @@ function applyRuntime(payload) {
     nextBackground: null,
     previousBackground: null,
     toggleBackgroundMode: null,
+    toggleBackgroundLock: null,
     toggleLandingQuote: null,
     dispose: null
   };
   root.dataset.forgeLandingQuoteVisible = state.landingQuoteVisible ? 'true' : 'false';
+  root.dataset.forgeBackgroundLocked = state.backgroundLocked ? 'true' : 'false';
   const persistSceneState = () => writeSceneState(state);
+  const updateLockedScene = (mode, scene) => {
+    if (!state.backgroundLocked) return;
+    state.lockedMode = mode;
+    state.lockedScene = scene;
+    persistSceneState();
+  };
   const stepBackground = (requestedMode, direction = 1) => {
     const mode = requestedMode === 'battle' || requestedMode === 'scenery'
       ? requestedMode
       : (
+          (state.backgroundLocked && state.lockedMode) ||
           state.manualBackgroundMode ||
           state.automaticBackgroundMode ||
           (root.dataset.forgeMode === 'scenery' || state.currentMode === 'scenery' ? 'scenery' : 'battle')
@@ -1833,6 +1912,8 @@ function applyRuntime(payload) {
       return false;
     }
     const scene = stepSceneSelection(mode, readSceneChoices(mode), step);
+    updateLockedScene(mode, scene);
+    if (state.backgroundLocked) root.dataset.forgeMode = mode;
     if (root.dataset.forgeMode === mode) requestScene(scene, mode);
     return true;
   };
@@ -1850,8 +1931,69 @@ function applyRuntime(payload) {
     const safeChoices = readSceneChoices(mode);
     ensureSceneSelection(mode, safeChoices);
     state.manualBackgroundMode = mode === state.automaticBackgroundMode ? null : mode;
+    updateLockedScene(mode, state.selectedScenes[mode]);
     root.dataset.forgeMode = mode;
     requestScene(state.selectedScenes[mode], mode);
+    return true;
+  };
+  const toggleBackgroundLock = () => {
+    if (state.backgroundLocked) {
+      /*
+       * A manual F/B/C request may still be decoding under the lock. Invalidate
+       * it before exposing the unlocked state, otherwise that stale locked-mode
+       * image can commit once and flash before the current surface default wins.
+       */
+      if (state.requestedScene || state.preloadRequests.size) {
+        state.sceneRequestToken += 1;
+        state.requestedSceneKey = null;
+        state.requestedScene = null;
+        state.preloadRequests.forEach(request => request.cancel());
+        state.preloadRequests.clear();
+      }
+      state.pendingSceneStyle = null;
+      state.pendingBackgroundMode = null;
+      state.pendingBackgroundDirection = 1;
+      state.backgroundLocked = false;
+      state.lockedMode = null;
+      state.lockedScene = null;
+      state.manualBackgroundMode = null;
+      root.dataset.forgeBackgroundLocked = 'false';
+      persistSceneState();
+      scheduleRefresh(0);
+      return false;
+    }
+    /*
+     * Once a scene has committed, currentScene already points at the incoming
+     * layer even while its fade is still running. Lock that committed target
+     * and let the one in-flight transition finish. Only an uncommitted decode
+     * or queued follow-up intent is cancelled below.
+     */
+    const mode = state.currentMode === 'battle' || state.currentMode === 'scenery'
+      ? state.currentMode
+      : (root.dataset.forgeMode === 'scenery' ? 'scenery' : 'battle');
+    const safeChoices = readSceneChoices(mode);
+    ensureSceneSelection(mode, safeChoices);
+    const scene = Number.isInteger(state.currentScene) && safeChoices.includes(state.currentScene)
+      ? state.currentScene
+      : state.selectedScenes[mode];
+    if (state.requestedScene || state.preloadRequests.size) {
+      state.sceneRequestToken += 1;
+      state.requestedSceneKey = null;
+      state.requestedScene = null;
+      state.preloadRequests.forEach(request => request.cancel());
+      state.preloadRequests.clear();
+    }
+    state.pendingSceneStyle = null;
+    state.pendingBackgroundMode = null;
+    state.pendingBackgroundDirection = 1;
+    state.backgroundLocked = true;
+    state.lockedMode = mode;
+    state.lockedScene = scene;
+    state.manualBackgroundMode = mode === state.automaticBackgroundMode ? null : mode;
+    state.selectedScenes[mode] = scene;
+    root.dataset.forgeMode = mode;
+    root.dataset.forgeBackgroundLocked = 'true';
+    persistSceneState();
     return true;
   };
   const toggleLandingQuote = () => {
@@ -1864,6 +2006,7 @@ function applyRuntime(payload) {
   state.nextBackground = nextBackground;
   state.previousBackground = previousBackground;
   state.toggleBackgroundMode = toggleBackgroundMode;
+  state.toggleBackgroundLock = toggleBackgroundLock;
   state.toggleLandingQuote = toggleLandingQuote;
   const scheduleRefresh = maximumDelay => {
     if (document.hidden) {
@@ -1964,21 +2107,23 @@ function applyRuntime(payload) {
     if (!event.ctrlKey || !event.altKey || event.shiftKey || event.metaKey) return;
     const key = String(event.key || '').toLowerCase();
     const toggleMode = key === 'c' || event.code === 'KeyC';
+    const toggleLock = key === 'k' || event.code === 'KeyK';
     const toggleQuote = key === 't' || event.code === 'KeyT';
     const direction = key === 'f' || event.code === 'KeyF'
       ? 1
       : (key === 'b' || event.code === 'KeyB' ? -1 : 0);
-    if (!direction && !toggleMode && !toggleQuote) return;
+    if (!direction && !toggleMode && !toggleLock && !toggleQuote) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
     if (event.repeat) return;
-    if (toggleQuote) toggleLandingQuote();
+    if (toggleLock) toggleBackgroundLock();
+    else if (toggleQuote) toggleLandingQuote();
     else if (toggleMode) toggleBackgroundMode();
     else if (direction < 0) previousBackground();
     else nextBackground();
   };
-  const routeEventName = 'wukong-forge-route-v13';
+  const routeEventName = 'wukong-codex-theme-route-v13';
   const scheduleRouteRefresh = () => {
     queueRefreshes([160, 720]);
   };
@@ -2049,7 +2194,7 @@ function applyRuntime(payload) {
   };
   const nodeTouchesThemeStructure = node => {
     if (node.nodeType !== Node.ELEMENT_NODE) return false;
-    if (node.id === 'wukong-forge-background') return true;
+    if (node.id === 'wukong-codex-theme-background') return true;
     if (node.matches('[data-forge-owned], [data-forge-owned] *')) return false;
     return node.matches(refreshStructureSelector) || Boolean(node.querySelector(refreshStructureSelector));
   };
@@ -2174,8 +2319,8 @@ function applyRuntime(payload) {
     });
     if (!observedRecords.length) return;
     if (observedRecords.some(record => (
-      record.target?.id === 'wukong-forge-background' ||
-      [...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node.id === 'wukong-forge-background')
+      record.target?.id === 'wukong-codex-theme-background' ||
+      [...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node.id === 'wukong-codex-theme-background')
     ))) delete root.dataset.forgeBackgroundReady;
     const firstPaintStructureMounted = observedRecords.some(recordMountsFirstPaintStructure);
     const composerSignalChanged = observedRecords.some(recordTouchesComposerSignal);
@@ -2257,15 +2402,16 @@ function applyRuntime(payload) {
     state.resolveInitialReady = null;
     state.preloadRequests.forEach(request => request.cancel());
     state.preloadRequests.clear();
-    document.querySelectorAll('#wukong-forge-background > [data-forge-background-layer]').forEach(clearLayer);
+    document.querySelectorAll('#wukong-codex-theme-background > [data-forge-background-layer]').forEach(clearLayer);
     state.routeTimers.forEach(timer => clearTimeout(timer));
     state.routeTimers.clear();
     if (history.pushState === state.patchedPushState) history.pushState = originalPushState;
     if (history.replaceState === state.patchedReplaceState) history.replaceState = originalReplaceState;
     document.getElementById('wukong-forge-pet-overlay')?.remove();
     document.getElementById('wukong-forge-motif-overlay')?.remove();
-    document.getElementById('wukong-forge-background')?.remove();
+    document.getElementById('wukong-codex-theme-background')?.remove();
     delete root.dataset.forgeLandingQuoteVisible;
+    delete root.dataset.forgeBackgroundLocked;
   };
   state.patchedPushState = history.pushState;
   state.patchedReplaceState = history.replaceState;
@@ -2292,7 +2438,7 @@ export function makeApplyExpression({ styleSheet, variables }) {
 }
 
 export const THEME_STATE_EXPRESSION = `(() => {
-  const overlay = document.getElementById('wukong-forge-background');
+  const overlay = document.getElementById('wukong-codex-theme-background');
   const activeLayer = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]') || null;
   const activeImage = activeLayer?.querySelector('[data-forge-background-image]') || null;
   const visible = element => {
@@ -2322,7 +2468,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
   ));
   return {
     documentHidden: document.hidden,
-    stylePresent: Boolean(document.getElementById('wukong-forge-style')),
+    stylePresent: Boolean(document.getElementById('wukong-codex-theme-style')),
     rootClass: document.documentElement.classList.contains('forge-ink-mountain'),
     markedElements: document.querySelectorAll('[data-forge-mark]').length,
     ownedNodeCount: document.querySelectorAll('[data-forge-owned]').length,
@@ -2343,7 +2489,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
     backgroundTransitioning: overlay?.dataset.forgeTransitioning === 'true',
     backgroundReady: document.documentElement.dataset.forgeBackgroundReady === 'true' &&
       overlay?.dataset.forgeReady === 'true',
-    preloadInFlight: window.__wukongCodexForgeRuntimeV13?.preloadRequests?.size || 0,
+    preloadInFlight: window.__wukongCodexThemeRuntimeV13?.preloadRequests?.size || 0,
     motifLayerPresent: Boolean(document.getElementById('wukong-forge-motif-overlay')),
     visibleNativeComposerCount: nativeComposerFrames.length,
     visibleThemedComposerCount: nativeComposerFrames.filter(
@@ -2352,10 +2498,15 @@ export const THEME_STATE_EXPRESSION = `(() => {
     surface: document.documentElement.dataset.forgeSurface || null,
     mode: document.documentElement.dataset.forgeMode || null,
     scene: document.documentElement.dataset.forgeScene || null,
+    backgroundLocked: document.documentElement.dataset.forgeBackgroundLocked === 'true',
+    lockedMode: window.__wukongCodexThemeRuntimeV13?.lockedMode || null,
+    lockedScene: Number.isInteger(window.__wukongCodexThemeRuntimeV13?.lockedScene)
+      ? String(window.__wukongCodexThemeRuntimeV13.lockedScene)
+      : null,
     landingQuoteVisible: document.documentElement.dataset.forgeLandingQuoteVisible === 'true',
-    refreshCount: window.__wukongCodexForgeRuntimeV13?.refreshCount || 0,
-    renderCount: window.__wukongCodexForgeRuntimeV13?.renderCount || 0,
-    runtimeRevision: window.__wukongCodexForgeRuntimeV13?.revision || null,
+    refreshCount: window.__wukongCodexThemeRuntimeV13?.refreshCount || 0,
+    renderCount: window.__wukongCodexThemeRuntimeV13?.renderCount || 0,
+    runtimeRevision: window.__wukongCodexThemeRuntimeV13?.revision || null,
     runtimeV4: Boolean(window.__wukongCodexForgeRuntimeV4),
     runtimeV5: Boolean(window.__wukongCodexForgeRuntimeV5),
     runtimeV6: Boolean(window.__wukongCodexForgeRuntimeV6),
@@ -2365,12 +2516,12 @@ export const THEME_STATE_EXPRESSION = `(() => {
     runtimeV10: Boolean(window.__wukongCodexForgeRuntimeV10),
     runtimeV11: Boolean(window.__wukongCodexForgeRuntimeV11),
     runtimeV12: Boolean(window.__wukongCodexForgeRuntimeV12),
-    runtimeV13: Boolean(window.__wukongCodexForgeRuntimeV13)
+    runtimeV13: Boolean(window.__wukongCodexThemeRuntimeV13)
   };
 })()`;
 
 export const ACTIVE_PROBE_EXPRESSION = `(() => {
-  const overlay = document.getElementById('wukong-forge-background');
+  const overlay = document.getElementById('wukong-codex-theme-background');
   const layers = overlay?.querySelectorAll(':scope > [data-forge-background-layer]') || [];
   const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
   const image = active?.querySelector('[data-forge-background-image]');
@@ -2400,9 +2551,9 @@ export const ACTIVE_PROBE_EXPRESSION = `(() => {
     Boolean(frame.querySelector('.ProseMirror[role="textbox"]'))
   ));
   return Boolean(
-    document.getElementById('wukong-forge-style') &&
+    document.getElementById('wukong-codex-theme-style') &&
     document.documentElement.classList.contains('forge-ink-mountain') &&
-    window.__wukongCodexForgeRuntimeV13 &&
+    window.__wukongCodexThemeRuntimeV13 &&
     document.documentElement.dataset.forgeBackgroundReady === 'true' &&
     overlay?.dataset.forgeReady === 'true' &&
     layers.length === 2 &&
@@ -2481,9 +2632,11 @@ export const RESTORE_EXPRESSION = `(() => {
     if (runtime?.timer) clearTimeout(runtime.timer);
     delete window[runtimeKey];
   }
+  document.getElementById('wukong-codex-theme-style')?.remove();
   document.getElementById('wukong-forge-style')?.remove();
   document.getElementById('wukong-forge-pet-overlay')?.remove();
   document.getElementById('wukong-forge-motif-overlay')?.remove();
+  document.getElementById('wukong-codex-theme-background')?.remove();
   document.getElementById('wukong-forge-background')?.remove();
   document.querySelectorAll('[data-forge-mark]').forEach(element => {
     if (Object.hasOwn(element.dataset, 'forgeOriginalAriaLabel')) {
@@ -2501,6 +2654,7 @@ export const RESTORE_EXPRESSION = `(() => {
   delete document.documentElement.dataset.forgeScene;
   delete document.documentElement.dataset.forgeMode;
   delete document.documentElement.dataset.forgeBackgroundReady;
+  delete document.documentElement.dataset.forgeBackgroundLocked;
   delete document.documentElement.dataset.forgeLandingQuoteVisible;
   delete document.documentElement.dataset.forgeWukongSafe;
   delete document.documentElement.dataset.forgeBajieSafe;

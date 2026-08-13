@@ -18,7 +18,13 @@ import {
   THEME_STATE_EXPRESSION
 } from './injection-plan-v13.mjs';
 
-export const HOST_MARKER = 'WukongCodexForgeEventHostV1';
+const LIFECYCLE_NAMESPACE = 'WukongCodexTheme';
+const RETAINED_THEME_DIRECTORY = 'wukong-codex-theme';
+export const LEGACY_LIFECYCLE_IDS = Object.freeze({
+  namespace: 'WukongCodexForge',
+  retainedThemeDirectory: 'wukong-codex-forge'
+});
+export const HOST_MARKER = 'WukongCodexThemeEventHostV1';
 const CONTROL_TIMEOUT_MS = 12_000;
 const STARTUP_TIMEOUT_MS = 45_000;
 const INITIAL_TARGET_SETTLE_MS = 650;
@@ -90,7 +96,22 @@ export const repositoryStateRoot = ({ root, env = process.env }) => {
     .update(rootPath.toLowerCase())
     .digest('hex')
     .slice(0, 24);
-  return normalizePath(path.join(localAppData, 'WukongCodexForge', 'repository-state', repositoryId));
+  return normalizePath(path.join(localAppData, LIFECYCLE_NAMESPACE, 'repository-state', repositoryId));
+};
+
+export const legacyRepositoryStateRoot = ({ root, env = process.env }) => {
+  const rootPath = normalizePath(root);
+  const localAppData = env.LOCALAPPDATA || path.join(
+    env.USERPROFILE || os.homedir(),
+    'AppData',
+    'Local'
+  );
+  const repositoryId = crypto
+    .createHash('sha256')
+    .update(rootPath.toLowerCase())
+    .digest('hex')
+    .slice(0, 24);
+  return normalizePath(path.join(localAppData, LEGACY_LIFECYCLE_IDS.namespace, 'repository-state', repositoryId));
 };
 
 export const resolveHostPaths = ({
@@ -109,7 +130,7 @@ export const resolveHostPaths = ({
     ? path.join(rootPath, '.wukong-runtime')
     : repository
       ? repositoryStateRoot({ root: rootPath, env })
-      : path.join(env.USERPROFILE || os.homedir(), '.codex', 'themes', 'wukong-codex-forge');
+      : path.join(env.USERPROFILE || os.homedir(), '.codex', 'themes', RETAINED_THEME_DIRECTORY);
   const profilePath = portable
     ? path.join(stateRoot, 'profile')
     : path.join(env.APPDATA || path.join(env.USERPROFILE || os.homedir(), 'AppData', 'Roaming'), 'Codex', 'web', 'Codex');
@@ -121,7 +142,7 @@ export const resolveHostPaths = ({
     eventPath: normalizePath(path.join(stateRoot, 'runtime-events.jsonl')),
     markerPath: normalizePath(path.join(rootPath, 'package.json')),
     themePath: normalizePath(path.join(rootPath, 'themes', 'active.json')),
-    stylePath: normalizePath(path.join(rootPath, 'runtime', 'forge-background-v13.css')),
+    stylePath: normalizePath(path.join(rootPath, 'runtime', 'wukong-codex-theme-background-v13.css')),
     appxActivatorPath: appxActivator ? normalizePath(appxActivator) : null,
     appxAumid: appxAumid ? String(appxAumid) : null,
     appxPackage: appxPackage ? String(appxPackage) : null,
@@ -132,7 +153,40 @@ export const resolveHostPaths = ({
 
 export const controlPipeName = stateRoot => {
   const digest = crypto.createHash('sha256').update(normalizePath(stateRoot).toLowerCase()).digest('hex').slice(0, 24);
-  return `\\\\.\\pipe\\WukongCodexForge-${digest}`;
+  return `\\\\.\\pipe\\${LIFECYCLE_NAMESPACE}-${digest}`;
+};
+
+export const legacyControlPipeName = stateRoot => {
+  const digest = crypto.createHash('sha256').update(normalizePath(stateRoot).toLowerCase()).digest('hex').slice(0, 24);
+  return `\\\\.\\pipe\\${LEGACY_LIFECYCLE_IDS.namespace}-${digest}`;
+};
+
+const retainedStateRoot = ({ env = process.env, legacy = false } = {}) => path.join(
+  env.USERPROFILE || os.homedir(),
+  '.codex',
+  'themes',
+  legacy ? LEGACY_LIFECYCLE_IDS.retainedThemeDirectory : RETAINED_THEME_DIRECTORY
+);
+
+export const disablePipeCandidates = ({ root, portable = false, repository = false, env = process.env }) => {
+  const primaryStateRoot = portable
+    ? path.join(normalizePath(root), '.wukong-runtime')
+    : repository
+      ? repositoryStateRoot({ root, env })
+      : retainedStateRoot({ env });
+  const stateRoots = portable
+    ? [primaryStateRoot]
+    : [
+        primaryStateRoot,
+        repositoryStateRoot({ root, env }),
+        legacyRepositoryStateRoot({ root, env }),
+        retainedStateRoot({ env }),
+        retainedStateRoot({ env, legacy: true })
+      ];
+  return [...new Set(stateRoots.flatMap(stateRoot => [
+    controlPipeName(stateRoot),
+    legacyControlPipeName(stateRoot)
+  ]))];
 };
 
 const encodeLine = value => `${JSON.stringify(value)}\n`;
@@ -891,13 +945,18 @@ export async function runHost({
   });
   const pipeName = controlPipeName(paths.stateRoot);
   if (signalDisable) {
-    try { return await sendControl(pipeName, { type: 'disable' }); }
-    catch (error) {
-      if (/ENOENT|ECONNREFUSED|closed the control channel/.test(error.message)) {
-        return { ok: true, state: 'not-running' };
+    const candidates = disablePipeCandidates({ root, portable, repository });
+    let response = null;
+    for (const candidate of candidates) {
+      try {
+        const candidateResponse = await sendControl(candidate, { type: 'disable' });
+        response ||= candidateResponse;
       }
-      throw error;
+      catch (error) {
+        if (!/ENOENT|ECONNREFUSED|closed the control channel/.test(error.message)) throw error;
+      }
     }
+    return response || { ok: true, state: 'not-running' };
   }
 
   try {

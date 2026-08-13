@@ -153,7 +153,7 @@ test('Wukong style visibly replaces background, navigation and composer without 
     backgroundImage: getComputedStyle(document.body).backgroundImage,
     workspaceBackground: getComputedStyle(document.querySelector('main')).backgroundImage,
     rootClass: document.documentElement.classList.contains('forge-ink-mountain'),
-    stylePresent: Boolean(document.getElementById('wukong-forge-style')),
+    stylePresent: Boolean(document.getElementById('wukong-codex-theme-style')),
     scene: document.documentElement.dataset.forgeScene || null,
     mode: document.documentElement.dataset.forgeMode || null,
     motifLayerPresent: Boolean(document.getElementById('wukong-forge-motif-overlay'))

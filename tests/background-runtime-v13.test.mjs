@@ -20,7 +20,7 @@ import {
   conversationText
 } from './runtime-fixture.mjs';
 
-const styleSheet = fs.readFileSync(new URL('../runtime/forge-background-v13.css', import.meta.url), 'utf8');
+const styleSheet = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const tinySceneSource = index => {
   const palette = ['8b5e3c', '634e3e', '8a703e', '7b2929', '245868', '243c66', '55463c', '30483d', '365641', '55534f', '75463b'];
   const color = palette[index % palette.length];
@@ -122,7 +122,7 @@ const installLanding = page => page.evaluate(() => {
 
 const waitForRuntime = (page, predicate, argument) => page.waitForFunction(
   ({ source, value }) => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     if (!runtime) return false;
     if (source === 'scene') return runtime.currentScene === value && !runtime.transitionInFlight;
     if (source === 'transition') return runtime.currentScene === value && runtime.transitionInFlight;
@@ -134,7 +134,7 @@ const waitForRuntime = (page, predicate, argument) => page.waitForFunction(
 );
 
 const currentBackground = page => page.evaluate(() => {
-  const runtime = window.__wukongCodexForgeRuntimeV13;
+  const runtime = window.__wukongCodexThemeRuntimeV13;
   return {
     scene: String(runtime.currentScene),
     mode: runtime.currentMode,
@@ -146,7 +146,7 @@ const currentBackground = page => page.evaluate(() => {
 
 const activeVeilOpacity = page => page.evaluate(() => {
   const active = document.querySelector(
-    '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+    '#wukong-codex-theme-background [data-forge-background-layer][data-forge-active="true"]'
   );
   const veil = active?.querySelector('[data-forge-background-veil]');
   return Number.parseFloat(getComputedStyle(veil).opacity);
@@ -155,7 +155,7 @@ const activeVeilOpacity = page => page.evaluate(() => {
 const waitForSceneChange = async (page, previousScene, expectedMode) => {
   await page.waitForFunction(
     ({ previous, mode }) => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
+      const runtime = window.__wukongCodexThemeRuntimeV13;
       return runtime?.currentMode === mode &&
         String(runtime.currentScene) !== previous &&
         !runtime.transitionInFlight &&
@@ -172,7 +172,7 @@ const advanceBackground = async (page, mode) => {
   assert.equal(before.mode, mode);
   assert.equal(
     await page.evaluate(requestedMode => (
-      window.__wukongCodexForgeRuntimeV13.nextBackground(requestedMode)
+      window.__wukongCodexThemeRuntimeV13.nextBackground(requestedMode)
     ), mode),
     true
   );
@@ -180,7 +180,7 @@ const advanceBackground = async (page, mode) => {
 };
 
 const backgroundCoverage = page => page.evaluate(() => {
-  const overlay = document.getElementById('wukong-forge-background');
+  const overlay = document.getElementById('wukong-codex-theme-background');
   const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
   const image = active?.querySelector('[data-forge-background-image]');
   const veil = active?.querySelector('[data-forge-background-veil]');
@@ -227,12 +227,65 @@ const assertComposerGeometryContract = (before, after) => {
   }
 };
 
+test('V13 migrates the retired Forge runtime, DOM ids, and scene storage once', async () => {
+  const page = await browser.newPage({ viewport: { width: 1200, height: 760 } });
+  await page.route('http://wukong.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
+  await page.goto('http://wukong.test/');
+  await page.evaluate(() => {
+    window.__wukongCodexForgeRuntimeV13 = {
+      dispose() { window.__legacyForgeRuntimeDisposed = true; }
+    };
+    const legacyStyle = document.createElement('style');
+    legacyStyle.id = 'wukong-forge-style';
+    document.head.append(legacyStyle);
+    const legacyBackground = document.createElement('div');
+    legacyBackground.id = 'wukong-forge-background';
+    document.body.prepend(legacyBackground);
+    localStorage.setItem('wukong-forge-scene-cursors-v13', JSON.stringify({
+      selectedBattle: 1,
+      selectedScenery: 6
+    }));
+    sessionStorage.setItem('wukong-forge-scene-cursors-v13', '{"selectedBattle":2}');
+  });
+
+  await page.evaluate(expression);
+  const migrated = await page.evaluate(() => ({
+    legacyRuntime: Boolean(window.__wukongCodexForgeRuntimeV13),
+    currentRuntime: Boolean(window.__wukongCodexThemeRuntimeV13),
+    disposed: window.__legacyForgeRuntimeDisposed === true,
+    legacyStyle: Boolean(document.getElementById('wukong-forge-style')),
+    legacyBackground: Boolean(document.getElementById('wukong-forge-background')),
+    currentStyle: Boolean(document.getElementById('wukong-codex-theme-style')),
+    currentBackground: Boolean(document.getElementById('wukong-codex-theme-background')),
+    localLegacyStorage: localStorage.getItem('wukong-forge-scene-cursors-v13'),
+    sessionLegacyStorage: sessionStorage.getItem('wukong-forge-scene-cursors-v13'),
+    currentSelectedBattle: JSON.parse(
+      localStorage.getItem('wukong-codex-theme-scene-cursors-v13') || '{}'
+    ).selectedBattle
+  }));
+  assert.deepEqual(migrated, {
+    legacyRuntime: false,
+    currentRuntime: true,
+    disposed: true,
+    legacyStyle: false,
+    legacyBackground: false,
+    currentStyle: true,
+    currentBackground: true,
+    localLegacyStorage: null,
+    sessionLegacyStorage: null,
+    currentSelectedBattle: 1
+  });
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  await page.close();
+});
+
 test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay, and reaches refresh quiescence', async () => {
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
   await page.route('http://wukong.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong.test/');
   await page.evaluate(() => sessionStorage.setItem(
-    'wukong-forge-scene-cursors-v13',
+    'wukong-codex-theme-scene-cursors-v13',
     JSON.stringify({ battle: -6, scenery: 'broken' })
   ));
   await page.evaluate(() => {
@@ -314,7 +367,7 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   );
 
   const background = await page.evaluate(() => {
-    const overlay = document.getElementById('wukong-forge-background');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     const active = overlay.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     const image = active.querySelector('[data-forge-background-image]');
     const veil = active.querySelector('[data-forge-background-veil]');
@@ -420,10 +473,10 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   }
 
   await page.waitForTimeout(900);
-  const settledRefreshCount = await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount);
+  const settledRefreshCount = await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refreshCount);
   await page.waitForTimeout(1300);
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refreshCount),
     settledRefreshCount,
     'ResizeObserver kept refreshing a stable layout'
   );
@@ -519,9 +572,9 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
     '.forge-landing-kicker,.forge-landing-title,.forge-landing-icon,.forge-landing-subtitle,.forge-landing-hero'
   ).count(), 0);
 
-  await page.locator('#wukong-forge-background').evaluate(element => element.remove());
+  await page.locator('#wukong-codex-theme-background').evaluate(element => element.remove());
   await page.waitForFunction(() => {
-    const overlay = document.getElementById('wukong-forge-background');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     return overlay?.querySelectorAll(':scope > [data-forge-background-layer]').length === 2 &&
       Boolean(active?.querySelector('[data-forge-background-image]')?.dataset.forgeBackgroundSource);
@@ -546,7 +599,7 @@ test('V13 keeps native UI intact, crossfades decoded scenes, repairs its overlay
   await page.evaluate(RESTORE_EXPRESSION);
   const nativeState = await page.evaluate(THEME_STATE_EXPRESSION);
   assert.equal(isNativeThemeState(nativeState), true);
-  assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+  assert.equal(await page.locator('#wukong-codex-theme-background').count(), 0);
   assert.deepEqual(await nativeLayoutStyle(page), beforeStyle);
   assert.equal(await page.locator('[data-forge-title-copy],[data-forge-original-aria-label]').count(), 0);
 });
@@ -578,7 +631,7 @@ test('V13 covers the complete viewport on its first commit and after a window re
   assert.deepEqual(resized.veil, resized.viewport);
 
   await page.evaluate(RESTORE_EXPRESSION);
-  assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+  assert.equal(await page.locator('#wukong-codex-theme-background').count(), 0);
 });
 
 test('V54 clears Plugins and Scheduled Tasks search bands without changing native search chrome', async () => {
@@ -779,7 +832,7 @@ test('V54 settles a hidden hot apply as deferred and completes on visibility wit
     // runs, while the hidden renderer retains ownership of initial readiness.
     window.__forgeOriginalDocument = document;
     (0, eval)(detachedExpression);
-    window.__forgeRuntimeBeforeVisibility = window.__wukongCodexForgeRuntimeV13;
+    window.__forgeRuntimeBeforeVisibility = window.__wukongCodexThemeRuntimeV13;
   }, `void ${expression}`);
   const deferredState = await page.evaluate(THEME_STATE_EXPRESSION);
   assert.equal(isDeferredThemeState(deferredState), true);
@@ -795,7 +848,7 @@ test('V54 settles a hidden hot apply as deferred and completes on visibility wit
   assert.equal(await page.evaluate(THEME_STATE_EXPRESSION).then(isActiveThemeState), true);
   assert.equal(await page.evaluate(() => (
     window.__forgeOriginalDocument === document &&
-    window.__wukongCodexForgeRuntimeV13 === window.__forgeRuntimeBeforeVisibility
+    window.__wukongCodexThemeRuntimeV13 === window.__forgeRuntimeBeforeVisibility
   )), true);
   await page.evaluate(RESTORE_EXPRESSION);
 });
@@ -951,7 +1004,7 @@ test('V13 restores native paint while rebuilding an overlay removed during cross
     };
   });
 
-  await page.locator('#wukong-forge-background').evaluate(element => element.remove());
+  await page.locator('#wukong-codex-theme-background').evaluate(element => element.remove());
   await page.waitForFunction(() => (
     document.documentElement.dataset.forgeBackgroundReady !== 'true' &&
     window.__forgeRepairDecodeResolvers?.length === 1
@@ -1021,7 +1074,7 @@ test('V13 skins a delayed animated home hero without waiting for a resize', asyn
       nativeDecorationLine: getComputedStyle(button).textDecorationLine,
       nativeDecorationColor: getComputedStyle(button).textDecorationColor,
       nativeBorderBottomColor: getComputedStyle(button).borderBottomColor,
-      refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount
+      refreshCount: window.__wukongCodexThemeRuntimeV13.refreshCount
     };
   });
   assert.equal(skin.parentOpacity, '0');
@@ -1145,7 +1198,7 @@ test('V13 prefers a visible conversation over an opacity-zero retained home hero
   assert.equal(await page.locator('html').getAttribute('data-forge-mode'), 'scenery');
   await page.waitForFunction(expected => {
     const active = document.querySelector(
-      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+      '#wukong-codex-theme-background [data-forge-background-layer][data-forge-active="true"]'
     );
     const veil = active?.querySelector('[data-forge-background-veil]');
     return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - expected) < .001;
@@ -1169,7 +1222,7 @@ test('V13 bounds rapid navigation follow-up timers to the latest two probes', as
     }
   });
   assert.ok(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.routeTimers.size <= 2)
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.routeTimers.size <= 2)
   );
 
   await page.evaluate(() => {
@@ -1178,11 +1231,11 @@ test('V13 bounds rapid navigation follow-up timers to the latest two probes', as
     }
   });
   assert.ok(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.routeTimers.size <= 2)
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.routeTimers.size <= 2)
   );
   await page.waitForTimeout(1400);
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.routeTimers.size),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.routeTimers.size),
     0
   );
 
@@ -1201,10 +1254,10 @@ test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decod
   assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
 
   const beforeStreaming = await page.evaluate(() => ({
-    refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount,
-    renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
+    refreshCount: window.__wukongCodexThemeRuntimeV13.refreshCount,
+    renderCount: window.__wukongCodexThemeRuntimeV13.renderCount,
     scene: document.documentElement.dataset.forgeScene,
-    decodedSources: window.__wukongCodexForgeRuntimeV13.decodedSources.size
+    decodedSources: window.__wukongCodexThemeRuntimeV13.decodedSources.size
   }));
   await page.evaluate(async () => {
     const paragraph = document.querySelector('[data-local-conversation-final-assistant] p');
@@ -1216,10 +1269,10 @@ test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decod
   await page.waitForTimeout(700);
   assert.deepEqual(
     await page.evaluate(() => ({
-      refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount,
-      renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
+      refreshCount: window.__wukongCodexThemeRuntimeV13.refreshCount,
+      renderCount: window.__wukongCodexThemeRuntimeV13.renderCount,
       scene: document.documentElement.dataset.forgeScene,
-      decodedSources: window.__wukongCodexForgeRuntimeV13.decodedSources.size
+      decodedSources: window.__wukongCodexThemeRuntimeV13.decodedSources.size
     })),
     beforeStreaming,
     'streaming text inside an established turn scheduled theme work'
@@ -1232,10 +1285,10 @@ test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decod
     }
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   });
-  assert.ok(await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.routeTimers.size <= 2));
+  assert.ok(await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.routeTimers.size <= 2));
   await page.waitForTimeout(1100);
   const afterRouting = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return {
       renderCount: runtime.renderCount,
       scene: document.documentElement.dataset.forgeScene,
@@ -1262,7 +1315,7 @@ test('V51.7 merges hidden background requests and resumes with one refresh and o
   await page.waitForTimeout(900);
   const before = await currentBackground(page);
   const beforeRefreshCount = await page.evaluate(() => (
-    window.__wukongCodexForgeRuntimeV13.refreshCount
+    window.__wukongCodexThemeRuntimeV13.refreshCount
   ));
 
   const hiddenRequests = await page.evaluate(() => {
@@ -1275,18 +1328,18 @@ test('V51.7 merges hidden background requests and resumes with one refresh and o
     const submit = document.querySelector('[data-native-slot="composer-submit"]');
     submit.setAttribute('aria-disabled', 'true');
     history.pushState({}, '', '#hidden-route');
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return [runtime.nextBackground(), runtime.nextBackground()];
   });
   assert.deepEqual(hiddenRequests, [false, false]);
   await page.waitForTimeout(1000);
   assert.deepEqual(
     await page.evaluate(() => ({
-      refreshCount: window.__wukongCodexForgeRuntimeV13.refreshCount,
-      renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
-      scene: String(window.__wukongCodexForgeRuntimeV13.currentScene),
-      hiddenDirty: window.__wukongCodexForgeRuntimeV13.hiddenDirty,
-      preloadInFlight: window.__wukongCodexForgeRuntimeV13.preloadRequests.size
+      refreshCount: window.__wukongCodexThemeRuntimeV13.refreshCount,
+      renderCount: window.__wukongCodexThemeRuntimeV13.renderCount,
+      scene: String(window.__wukongCodexThemeRuntimeV13.currentScene),
+      hiddenDirty: window.__wukongCodexThemeRuntimeV13.hiddenDirty,
+      preloadInFlight: window.__wukongCodexThemeRuntimeV13.preloadRequests.size
     })),
     {
       refreshCount: beforeRefreshCount,
@@ -1302,7 +1355,7 @@ test('V51.7 merges hidden background requests and resumes with one refresh and o
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await page.waitForFunction(expected => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return runtime.refreshCount === expected.refreshCount + 1 &&
       runtime.renderCount === expected.renderCount + 1 &&
       String(runtime.currentScene) !== expected.scene &&
@@ -1379,7 +1432,7 @@ test('V53 has no timer rotation and automatically selects battle for New Task an
   assert.equal(threaded.renderCount, initial.renderCount + 1);
   await page.waitForFunction(() => {
     const active = document.querySelector(
-      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+      '#wukong-codex-theme-background [data-forge-background-layer][data-forge-active="true"]'
     );
     const veil = active?.querySelector('[data-forge-background-veil]');
     return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - .25) < .001;
@@ -1401,7 +1454,7 @@ test('V53 follows all 20 numbered assets and keeps per-scene thread veils on bot
   await page.route('http://wukong-background-decks.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
   await page.goto('http://wukong-background-decks.test/');
   await page.evaluate(({ battle, scenery }) => {
-    localStorage.setItem('wukong-forge-scene-cursors-v13', JSON.stringify({
+    localStorage.setItem('wukong-codex-theme-scene-cursors-v13', JSON.stringify({
       version: 2,
       backgroundDecks: {
         battle: { order: [...battle].reverse(), index: battle.length - 1 },
@@ -1421,7 +1474,7 @@ test('V53 follows all 20 numbered assets and keeps per-scene thread veils on bot
   const battleScenes = [initialBattle.scene];
   await page.keyboard.press('Control+Alt+F');
   await page.waitForFunction(previous => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return String(runtime.currentScene) !== previous && runtime.transitionInFlight;
   }, initialBattle.scene);
   const transitionState = await page.evaluate(THEME_STATE_EXPRESSION);
@@ -1486,7 +1539,7 @@ test('V53 follows all 20 numbered assets and keeps per-scene thread veils on bot
   )).scene);
   await page.waitForFunction(expected => {
     const active = document.querySelector(
-      '#wukong-forge-background [data-forge-background-layer][data-forge-active="true"]'
+      '#wukong-codex-theme-background [data-forge-background-layer][data-forge-active="true"]'
     );
     const veil = active?.querySelector('[data-forge-background-veil]');
     return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - expected) < .001;
@@ -1508,9 +1561,9 @@ test('V53 follows all 20 numbered assets and keeps per-scene thread veils on bot
   );
 
   const persisted = await page.evaluate(() => JSON.parse(
-    localStorage.getItem('wukong-forge-scene-cursors-v13')
+    localStorage.getItem('wukong-codex-theme-scene-cursors-v13')
   ));
-  assert.equal(persisted.version, 5);
+  assert.equal(persisted.version, 6);
   assert.equal(Object.hasOwn(persisted, 'backgroundMode'), false);
   assert.equal(persisted.backgroundDecks.battle.strategy, 'ordered-v1');
   assert.equal(persisted.backgroundDecks.scenery.strategy, 'ordered-v1');
@@ -1551,7 +1604,7 @@ test('V53 treats Ctrl+Alt+C as a temporary override cleared by route and page ch
   assert.equal(routeResetBattle.mode, 'battle');
   assert.equal(routeResetBattle.renderCount, landingScenery.renderCount + 1);
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.manualBackgroundMode),
     null
   );
 
@@ -1567,7 +1620,7 @@ test('V53 treats Ctrl+Alt+C as a temporary override cleared by route and page ch
     Math.abs((await activeVeilOpacity(page)) - threadVeilFor(firstScenery)) < .001
   );
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.manualBackgroundMode),
     null
   );
 
@@ -1586,16 +1639,504 @@ test('V53 treats Ctrl+Alt+C as a temporary override cleared by route and page ch
   assert.deepEqual(await currentBackground(page), beforeLanding);
   assert.ok(Math.abs((await activeVeilOpacity(page)) - .1) < .001);
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.manualBackgroundMode),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.manualBackgroundMode),
     null
   );
 
   const persisted = await page.evaluate(() => JSON.parse(
-    localStorage.getItem('wukong-forge-scene-cursors-v13')
+    localStorage.getItem('wukong-codex-theme-scene-cursors-v13')
   ));
-  assert.equal(persisted.version, 5);
+  assert.equal(persisted.version, 6);
   assert.equal(Object.hasOwn(persisted, 'backgroundMode'), false);
 
+  await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V55 locks the exact visible background across surfaces and restores automatic mode on Ctrl+Alt+K', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const battle = sequenceFor('battle').map(Number);
+  const scenery = sequenceFor('scenery').map(Number);
+  await page.route('http://wukong-background-lock.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-background-lock.test/');
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', battle[0]);
+  await page.waitForTimeout(700);
+
+  const baseline = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    window.__forgeBackgroundLockReferences = {
+      document,
+      runtime,
+      style: document.getElementById('wukong-codex-theme-style'),
+      overlay: document.getElementById('wukong-codex-theme-background')
+    };
+    window.__forgeDownstreamBackgroundLockKeys = 0;
+    document.addEventListener('keydown', event => {
+      if (event.ctrlKey && event.altKey && event.code === 'KeyK') {
+        window.__forgeDownstreamBackgroundLockKeys += 1;
+      }
+    });
+    return {
+      scene: runtime.currentScene,
+      mode: runtime.currentMode,
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      ownedNodeCount: document.querySelectorAll('[data-forge-owned]').length
+    };
+  });
+  assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).backgroundLocked, false);
+
+  const repeated = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'k', code: 'KeyK', ctrlKey: true, altKey: true, repeat: true,
+      bubbles: true, cancelable: true
+    });
+    const accepted = document.dispatchEvent(event);
+    return {
+      accepted,
+      defaultPrevented: event.defaultPrevented,
+      locked: window.__wukongCodexThemeRuntimeV13.backgroundLocked,
+      downstream: window.__forgeDownstreamBackgroundLockKeys
+    };
+  });
+  assert.deepEqual(repeated, {
+    accepted: false,
+    defaultPrevented: true,
+    locked: false,
+    downstream: 0
+  });
+
+  const shifted = await page.evaluate(() => {
+    const event = new KeyboardEvent('keydown', {
+      key: 'K', code: 'KeyK', ctrlKey: true, altKey: true, shiftKey: true,
+      bubbles: true, cancelable: true
+    });
+    const accepted = document.dispatchEvent(event);
+    return {
+      accepted,
+      defaultPrevented: event.defaultPrevented,
+      locked: window.__wukongCodexThemeRuntimeV13.backgroundLocked,
+      downstream: window.__forgeDownstreamBackgroundLockKeys
+    };
+  });
+  assert.deepEqual(shifted, {
+    accepted: true,
+    defaultPrevented: false,
+    locked: false,
+    downstream: 1
+  });
+
+  await page.keyboard.press('Control+Alt+K');
+  const locked = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    const refs = window.__forgeBackgroundLockReferences;
+    return {
+      sameDocument: refs.document === document,
+      sameRuntime: refs.runtime === runtime,
+      sameStyle: refs.style === document.getElementById('wukong-codex-theme-style'),
+      sameOverlay: refs.overlay === document.getElementById('wukong-codex-theme-background'),
+      locked: runtime.backgroundLocked,
+      lockedMode: runtime.lockedMode,
+      lockedScene: runtime.lockedScene,
+      root: document.documentElement.dataset.forgeBackgroundLocked,
+      scene: runtime.currentScene,
+      mode: runtime.currentMode,
+      refreshCount: runtime.refreshCount,
+      renderCount: runtime.renderCount,
+      ownedNodeCount: document.querySelectorAll('[data-forge-owned]').length,
+      downstream: window.__forgeDownstreamBackgroundLockKeys,
+      persisted: JSON.parse(localStorage.getItem('wukong-codex-theme-scene-cursors-v13'))
+    };
+  });
+  assert.equal(locked.sameDocument, true);
+  assert.equal(locked.sameRuntime, true);
+  assert.equal(locked.sameStyle, true);
+  assert.equal(locked.sameOverlay, true);
+  assert.equal(locked.locked, true);
+  assert.equal(locked.lockedMode, baseline.mode);
+  assert.equal(locked.lockedScene, baseline.scene);
+  assert.equal(locked.root, 'true');
+  assert.equal(locked.scene, baseline.scene);
+  assert.equal(locked.mode, baseline.mode);
+  assert.equal(locked.refreshCount, baseline.refreshCount);
+  assert.equal(locked.renderCount, baseline.renderCount);
+  assert.equal(locked.ownedNodeCount, baseline.ownedNodeCount);
+  assert.equal(locked.downstream, 1);
+  assert.equal(locked.persisted.version, 6);
+  assert.equal(locked.persisted.backgroundLocked, true);
+  assert.equal(locked.persisted.lockedMode, 'battle');
+  assert.equal(locked.persisted.lockedScene, battle[0]);
+
+  await enterThreadState(page);
+  await waitForRuntime(page, 'surface', 'thread');
+  await page.waitForTimeout(700);
+  const threadLocked = await currentBackground(page);
+  assert.equal(threadLocked.mode, 'battle');
+  assert.equal(threadLocked.scene, String(battle[0]));
+  assert.equal(threadLocked.renderCount, baseline.renderCount);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - threadVeilFor(battle[0])) < .001);
+
+  await page.keyboard.press('Control+Alt+F');
+  await waitForRuntime(page, 'scene', battle[1]);
+  const steppedWhileLocked = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return {
+      mode: runtime.currentMode,
+      scene: runtime.currentScene,
+      lockedMode: runtime.lockedMode,
+      lockedScene: runtime.lockedScene,
+      automaticMode: runtime.automaticBackgroundMode,
+      locked: runtime.backgroundLocked
+    };
+  });
+  assert.deepEqual(steppedWhileLocked, {
+    mode: 'battle',
+    scene: battle[1],
+    lockedMode: 'battle',
+    lockedScene: battle[1],
+    automaticMode: 'scenery',
+    locked: true
+  });
+
+  await page.keyboard.press('Control+Alt+C');
+  await waitForRuntime(page, 'scene', scenery[0]);
+  assert.deepEqual(
+    await page.evaluate(() => {
+      const runtime = window.__wukongCodexThemeRuntimeV13;
+      return {
+        mode: runtime.currentMode,
+        scene: runtime.currentScene,
+        lockedMode: runtime.lockedMode,
+        lockedScene: runtime.lockedScene,
+        locked: runtime.backgroundLocked
+      };
+    }),
+    {
+      mode: 'scenery',
+      scene: scenery[0],
+      lockedMode: 'scenery',
+      lockedScene: scenery[0],
+      locked: true
+    }
+  );
+
+  await installLanding(page);
+  await waitForRuntime(page, 'surface', 'landing');
+  await page.waitForTimeout(700);
+  assert.equal((await currentBackground(page)).mode, 'scenery');
+  assert.equal((await currentBackground(page)).scene, String(scenery[0]));
+  await page.keyboard.press('Control+Alt+F');
+  await waitForRuntime(page, 'scene', scenery[1]);
+  assert.equal((await currentBackground(page)).mode, 'scenery');
+
+  await page.keyboard.press('Control+Alt+K');
+  await page.waitForFunction(expected => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return runtime.backgroundLocked === false &&
+      runtime.manualBackgroundMode === null &&
+      runtime.currentMode === 'battle' &&
+      runtime.currentScene === expected &&
+      !runtime.transitionInFlight;
+  }, battle[1]);
+  const unlocked = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return {
+      locked: runtime.backgroundLocked,
+      lockedMode: runtime.lockedMode,
+      lockedScene: runtime.lockedScene,
+      root: document.documentElement.dataset.forgeBackgroundLocked,
+      mode: runtime.currentMode,
+      scene: runtime.currentScene,
+      manualMode: runtime.manualBackgroundMode,
+      persisted: JSON.parse(localStorage.getItem('wukong-codex-theme-scene-cursors-v13'))
+    };
+  });
+  assert.equal(unlocked.locked, false);
+  assert.equal(unlocked.lockedMode, null);
+  assert.equal(unlocked.lockedScene, null);
+  assert.equal(unlocked.root, 'false');
+  assert.equal(unlocked.mode, 'battle');
+  assert.equal(unlocked.scene, battle[1]);
+  assert.equal(unlocked.manualMode, null);
+  assert.equal(unlocked.persisted.backgroundLocked, false);
+  assert.equal(unlocked.persisted.lockedMode, null);
+  assert.equal(unlocked.persisted.lockedScene, null);
+
+  await page.keyboard.press('Control+Alt+C');
+  await waitForRuntime(page, 'scene', scenery[1]);
+  await page.keyboard.press('Control+Alt+K');
+  assert.deepEqual(
+    await page.evaluate(() => {
+      const runtime = window.__wukongCodexThemeRuntimeV13;
+      return {
+        locked: runtime.backgroundLocked,
+        lockedMode: runtime.lockedMode,
+        lockedScene: runtime.lockedScene
+      };
+    }),
+    { locked: true, lockedMode: 'scenery', lockedScene: scenery[1] }
+  );
+  await page.reload();
+  await page.evaluate(orderedExpression);
+  await page.waitForFunction(expected => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return runtime?.backgroundLocked === true &&
+      runtime.currentMode === 'scenery' &&
+      runtime.currentScene === expected &&
+      !runtime.transitionInFlight;
+  }, scenery[1]);
+  assert.deepEqual(
+    await page.evaluate(() => {
+      const runtime = window.__wukongCodexThemeRuntimeV13;
+      return {
+        surface: document.documentElement.dataset.forgeSurface,
+        locked: runtime.backgroundLocked,
+        lockedMode: runtime.lockedMode,
+        lockedScene: runtime.lockedScene,
+        mode: runtime.currentMode,
+        scene: runtime.currentScene
+      };
+    }),
+    {
+      surface: 'landing',
+      locked: true,
+      lockedMode: 'scenery',
+      lockedScene: scenery[1],
+      mode: 'scenery',
+      scene: scenery[1]
+    },
+    'a fresh renderer should restore the persisted exact lock instead of the landing battle default'
+  );
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.hasAttribute('data-forge-background-locked')),
+    false
+  );
+  assert.equal(isNativeThemeState(await page.evaluate(THEME_STATE_EXPRESSION)), true);
+});
+
+test('V55 persists a lock through hot apply and cancels a stale decode before it can replace the visible scene', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const battle = sequenceFor('battle').map(Number);
+  await page.route('http://wukong-background-lock-race.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-background-lock-race.test/');
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', battle[0]);
+  const baseline = await currentBackground(page);
+  await page.evaluate(() => {
+    window.__forgeLockDecodes = [];
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => window.__forgeLockDecodes.push({ image: this, resolve }));
+    };
+  });
+
+  await page.keyboard.press('Control+Alt+F');
+  await page.waitForFunction(() => window.__forgeLockDecodes.length === 1);
+  await page.keyboard.press('Control+Alt+K');
+  await page.waitForFunction(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return runtime.backgroundLocked && runtime.preloadRequests.size === 0;
+  });
+  await page.evaluate(() => window.__forgeLockDecodes[0].resolve());
+  await page.waitForTimeout(120);
+  const cancelled = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
+    return {
+      scene: runtime.currentScene,
+      mode: runtime.currentMode,
+      lockedScene: runtime.lockedScene,
+      lockedMode: runtime.lockedMode,
+      renderCount: runtime.renderCount,
+      requested: runtime.requestedScene,
+      pending: runtime.pendingSceneStyle,
+      inactiveSource: inactive.querySelector('[data-forge-background-image]').getAttribute('src')
+    };
+  });
+  assert.deepEqual(cancelled, {
+    scene: Number(baseline.scene),
+    mode: baseline.mode,
+    lockedScene: Number(baseline.scene),
+    lockedMode: baseline.mode,
+    renderCount: baseline.renderCount,
+    requested: null,
+    pending: null,
+    inactiveSource: null
+  });
+
+  await page.evaluate(() => {
+    HTMLImageElement.prototype.decode = function () { return Promise.resolve(); };
+    window.__forgeLockedRuntimeBeforeApply = window.__wukongCodexThemeRuntimeV13;
+  });
+  await page.evaluate(orderedExpression);
+  await page.waitForFunction(expected => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return runtime !== window.__forgeLockedRuntimeBeforeApply &&
+      runtime.backgroundLocked &&
+      runtime.currentMode === expected.mode &&
+      runtime.currentScene === expected.scene &&
+      document.documentElement.dataset.forgeBackgroundReady === 'true';
+  }, { mode: baseline.mode, scene: Number(baseline.scene) });
+  const reapplied = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(reapplied.runtimeRevision, 'v61-visible-wordmark');
+  assert.equal(reapplied.backgroundLocked, true);
+  assert.equal(reapplied.lockedMode, baseline.mode);
+  assert.equal(reapplied.lockedScene, baseline.scene);
+  assert.equal(reapplied.mode, baseline.mode);
+  assert.equal(reapplied.scene, baseline.scene);
+  assert.equal(reapplied.backgroundLoadedLayerCount, 1);
+  assert.equal(reapplied.preloadInFlight, 0);
+
+  await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V55 locks an already committed incoming scene without interrupting its crossfade', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const battle = sequenceFor('battle').map(Number);
+  await page.route('http://wukong-background-lock-transition.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-background-lock-transition.test/');
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', battle[0]);
+  const baseline = await currentBackground(page);
+
+  await page.keyboard.press('Control+Alt+F');
+  await waitForRuntime(page, 'transition', battle[1]);
+  const transitionBeforeLock = await page.evaluate(() => ({
+    scene: window.__wukongCodexThemeRuntimeV13.currentScene,
+    mode: window.__wukongCodexThemeRuntimeV13.currentMode,
+    transitioning: window.__wukongCodexThemeRuntimeV13.transitionInFlight,
+    renderCount: window.__wukongCodexThemeRuntimeV13.renderCount,
+    loaded: [...document.querySelectorAll('[data-forge-background-image]')].filter(image => (
+      image.dataset.forgeDecoded === 'true' && image.getAttribute('src')
+    )).length
+  }));
+  assert.deepEqual(transitionBeforeLock, {
+    scene: battle[1],
+    mode: 'battle',
+    transitioning: true,
+    renderCount: baseline.renderCount + 1,
+    loaded: 2
+  });
+
+  await page.keyboard.press('Control+Alt+K');
+  const lockedDuringTransition = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return {
+      locked: runtime.backgroundLocked,
+      lockedMode: runtime.lockedMode,
+      lockedScene: runtime.lockedScene,
+      scene: runtime.currentScene,
+      transitioning: runtime.transitionInFlight,
+      renderCount: runtime.renderCount
+    };
+  });
+  assert.deepEqual(lockedDuringTransition, {
+    locked: true,
+    lockedMode: 'battle',
+    lockedScene: battle[1],
+    scene: battle[1],
+    transitioning: true,
+    renderCount: baseline.renderCount + 1
+  });
+
+  await page.waitForFunction(() => !window.__wukongCodexThemeRuntimeV13.transitionInFlight);
+  const settled = await page.evaluate(THEME_STATE_EXPRESSION);
+  assert.equal(settled.backgroundLocked, true);
+  assert.equal(settled.lockedScene, String(battle[1]));
+  assert.equal(settled.scene, String(battle[1]));
+  assert.equal(settled.backgroundLoadedLayerCount, 1);
+  assert.equal(settled.preloadInFlight, 0);
+  await page.evaluate(RESTORE_EXPRESSION);
+});
+
+test('V55 cancels a locked manual decode before unlock can request the surface default', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
+  const battle = sequenceFor('battle').map(Number);
+  const scenery = sequenceFor('scenery').map(Number);
+  await page.route('http://wukong-background-unlock-race.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-background-unlock-race.test/');
+  await page.evaluate(orderedExpression);
+  await waitForRuntime(page, 'scene', battle[0]);
+
+  await page.keyboard.press('Control+Alt+C');
+  await waitForRuntime(page, 'scene', scenery[0]);
+  await page.keyboard.press('Control+Alt+K');
+  const lockedBaseline = await currentBackground(page);
+  await page.evaluate(() => {
+    window.__forgeUnlockRaceDecodes = [];
+    HTMLImageElement.prototype.decode = function () {
+      return new Promise(resolve => window.__forgeUnlockRaceDecodes.push({ image: this, resolve }));
+    };
+  });
+
+  await page.keyboard.press('Control+Alt+F');
+  await page.waitForFunction(() => window.__forgeUnlockRaceDecodes.length === 1);
+  await page.keyboard.press('Control+Alt+K');
+  const immediatelyUnlocked = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return {
+      locked: runtime.backgroundLocked,
+      requested: runtime.requestedScene,
+      pending: runtime.pendingSceneStyle,
+      preload: runtime.preloadRequests.size,
+      mode: runtime.currentMode,
+      scene: runtime.currentScene,
+      renderCount: runtime.renderCount
+    };
+  });
+  assert.deepEqual(immediatelyUnlocked, {
+    locked: false,
+    requested: null,
+    pending: null,
+    preload: 0,
+    mode: 'scenery',
+    scene: scenery[0],
+    renderCount: lockedBaseline.renderCount
+  });
+
+  await page.evaluate(() => window.__forgeUnlockRaceDecodes[0].resolve());
+  await page.waitForTimeout(60);
+  const afterStaleResolve = await page.evaluate(() => {
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    return {
+      locked: runtime.backgroundLocked,
+      mode: runtime.currentMode,
+      scene: runtime.currentScene,
+      renderCount: runtime.renderCount,
+      requestedMode: runtime.requestedScene?.mode || null,
+      requestedScene: runtime.requestedScene?.scene ?? null
+    };
+  });
+  assert.equal(afterStaleResolve.locked, false);
+  assert.equal(afterStaleResolve.mode, 'scenery');
+  assert.equal(afterStaleResolve.scene, scenery[0]);
+  assert.equal(afterStaleResolve.renderCount, lockedBaseline.renderCount);
+  if (afterStaleResolve.requestedMode !== null) {
+    assert.equal(afterStaleResolve.requestedMode, 'battle');
+    assert.equal(afterStaleResolve.requestedScene, battle[0]);
+  }
+
+  await page.waitForFunction(() => window.__forgeUnlockRaceDecodes.length === 2);
+  await page.evaluate(() => window.__forgeUnlockRaceDecodes[1].resolve());
+  await waitForRuntime(page, 'scene', battle[0]);
+  const settled = await currentBackground(page);
+  assert.equal(settled.mode, 'battle');
+  assert.equal(settled.scene, String(battle[0]));
+  assert.equal(settled.renderCount, lockedBaseline.renderCount + 1);
+  assert.equal(settled.preloadInFlight, 0);
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
@@ -1619,15 +2160,15 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
     const title = document.querySelector('[data-feature="game-source"]');
     const icon = document.querySelector('[data-testid="home-icon"]');
     const composer = document.querySelector('.composer-surface-chrome');
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const rect = title.getBoundingClientRect();
     const iconRect = icon.getBoundingClientRect();
     const composerRect = composer.getBoundingClientRect();
     window.__forgeQuoteReferences = {
       document,
       runtime,
-      style: document.getElementById('wukong-forge-style'),
-      overlay: document.getElementById('wukong-forge-background'),
+      style: document.getElementById('wukong-codex-theme-style'),
+      overlay: document.getElementById('wukong-codex-theme-background'),
       url: location.href,
       historyLength: history.length,
       timeOrigin: performance.timeOrigin
@@ -1687,7 +2228,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
   assert.equal(baseline.aria, '此去，欲破何局？');
   assert.match(baseline.pseudoContent, /此去，欲破何局/);
   assert.equal(baseline.pseudoDisplay, 'flex');
-  assert.equal(baseline.pseudoOpacity, '1');
+  assert.equal(baseline.pseudoOpacity, '0.95');
   assert.equal(baseline.pseudoVisibility, 'visible');
   assert.match(baseline.iconPseudoImage, /data:image\/svg\+xml/);
   assert.equal(baseline.iconPseudoOpacity, '1');
@@ -1711,7 +2252,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
     return {
       accepted,
       defaultPrevented: event.defaultPrevented,
-      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      quoteVisible: window.__wukongCodexThemeRuntimeV13.landingQuoteVisible,
       downstream: window.__forgeDownstreamQuoteKeys
     };
   });
@@ -1729,7 +2270,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
   await page.waitForTimeout(650);
   const hidden = await page.evaluate(() => {
     const references = window.__forgeQuoteReferences;
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const title = document.querySelector('[data-feature="game-source"]');
     const icon = document.querySelector('[data-testid="home-icon"]');
     const composer = document.querySelector('.composer-surface-chrome');
@@ -1739,8 +2280,8 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
-      sameStyle: references.style === document.getElementById('wukong-forge-style'),
-      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameStyle: references.style === document.getElementById('wukong-codex-theme-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-codex-theme-background'),
       sameUrl: references.url === location.href,
       sameHistoryLength: references.historyLength === history.length,
       sameTimeOrigin: references.timeOrigin === performance.timeOrigin,
@@ -1824,7 +2365,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
     return {
       accepted,
       defaultPrevented: event.defaultPrevented,
-      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible
+      quoteVisible: window.__wukongCodexThemeRuntimeV13.landingQuoteVisible
     };
   });
   assert.deepEqual(shifted, { accepted: true, defaultPrevented: false, quoteVisible: false });
@@ -1833,7 +2374,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
   await waitForRuntime(page, 'surface', 'thread');
   assert.deepEqual(
     await page.evaluate(() => ({
-      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      quoteVisible: window.__wukongCodexThemeRuntimeV13.landingQuoteVisible,
       rootState: document.documentElement.dataset.forgeLandingQuoteVisible
     })),
     { quoteVisible: false, rootState: 'false' }
@@ -1858,17 +2399,17 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
   );
 
   await page.evaluate(() => {
-    window.__forgeQuoteRuntimeBeforeReapply = window.__wukongCodexForgeRuntimeV13;
+    window.__forgeQuoteRuntimeBeforeReapply = window.__wukongCodexThemeRuntimeV13;
   });
   await page.evaluate(expression);
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13 !== window.__forgeQuoteRuntimeBeforeReapply &&
+    window.__wukongCodexThemeRuntimeV13 !== window.__forgeQuoteRuntimeBeforeReapply &&
     document.documentElement.dataset.forgeBackgroundReady === 'true' &&
     document.documentElement.dataset.forgeLandingQuoteVisible === 'false'
   ));
   assert.deepEqual(
     await page.evaluate(() => ({
-      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      quoteVisible: window.__wukongCodexThemeRuntimeV13.landingQuoteVisible,
       titleOpacity: getComputedStyle(
         document.querySelector('[data-feature="game-source"]'),
         '::after'
@@ -1914,7 +2455,7 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
     const title = document.querySelector('[data-feature="game-source"]');
     const icon = document.querySelector('[data-testid="home-icon"]');
     return {
-      quoteVisible: window.__wukongCodexForgeRuntimeV13.landingQuoteVisible,
+      quoteVisible: window.__wukongCodexThemeRuntimeV13.landingQuoteVisible,
       aria: title.getAttribute('aria-label'),
       nativeText: title.textContent,
       pseudoContent: getComputedStyle(title, '::after').content,
@@ -1927,8 +2468,8 @@ test('V54 toggles both landing quote and Wukong mark on Ctrl+Alt+T without hidin
   assert.equal(visibleAgain.aria, '此去，欲破何局？');
   assert.match(visibleAgain.pseudoContent, /此去，欲破何局/);
   assert.equal(visibleAgain.pseudoDisplay, 'flex');
-  assert.equal(visibleAgain.pseudoOpacity, '1');
-  assert.equal(visibleAgain.iconPseudoOpacity, '1');
+  assert.equal(visibleAgain.pseudoOpacity, baseline.pseudoOpacity);
+  assert.equal(visibleAgain.iconPseudoOpacity, baseline.iconPseudoOpacity);
 
   await page.evaluate(RESTORE_EXPRESSION);
   const native = await page.evaluate(() => {
@@ -1974,9 +2515,9 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
   await page.waitForTimeout(900);
 
   const baseline = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
-    const style = document.getElementById('wukong-forge-style');
-    const overlay = document.getElementById('wukong-forge-background');
+    const runtime = window.__wukongCodexThemeRuntimeV13;
+    const style = document.getElementById('wukong-codex-theme-style');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     const marks = [...document.querySelectorAll('[data-forge-mark]')];
     window.__forgeSwitchReferences = {
       document,
@@ -2030,8 +2571,8 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
     return {
       accepted,
       defaultPrevented: event.defaultPrevented,
-      scene: String(window.__wukongCodexForgeRuntimeV13.currentScene),
-      renderCount: window.__wukongCodexForgeRuntimeV13.renderCount,
+      scene: String(window.__wukongCodexThemeRuntimeV13.currentScene),
+      renderCount: window.__wukongCodexThemeRuntimeV13.renderCount,
       downstream: window.__forgeDownstreamBackgroundKeys
     };
   });
@@ -2048,7 +2589,7 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
   await page.waitForFunction(() => window.__forgeDelayedDecodes.length === 1);
   const waiting = await page.evaluate(() => {
     const references = window.__forgeSwitchReferences;
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const layers = [...document.querySelectorAll('[data-forge-background-layer]')].map(layer => {
       const image = layer.querySelector('[data-forge-background-image]');
       return {
@@ -2063,8 +2604,8 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
-      sameStyle: references.style === document.getElementById('wukong-forge-style'),
-      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameStyle: references.style === document.getElementById('wukong-codex-theme-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-codex-theme-background'),
       sameMarks: references.marks.length === document.querySelectorAll('[data-forge-mark]').length &&
         references.marks.every((mark, index) => mark === document.querySelectorAll('[data-forge-mark]')[index]),
       sameStyleText: references.styleText === references.style.textContent,
@@ -2112,7 +2653,7 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
   const armedBeforePaint = await page.evaluate(async () => {
     window.__forgeDelayedDecodes[0].resolve();
     for (let index = 0; index < 6; index += 1) await Promise.resolve();
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const incoming = document.querySelector('[data-forge-background-layer][data-forge-active="true"]');
     return {
       transitionInFlight: runtime.transitionInFlight,
@@ -2128,13 +2669,13 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
     incomingOpacity: 0
   }, 'a decoded incoming layer must remain hidden until the first painted frame');
   await page.waitForFunction(previous => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return String(runtime.currentScene) !== previous && runtime.transitionInFlight;
   }, baseline.scene);
   await page.waitForTimeout(90);
   const transitioning = await page.evaluate(() => {
     const references = window.__forgeSwitchReferences;
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const layers = [...document.querySelectorAll('[data-forge-background-layer]')].map(layer => ({
       active: layer.dataset.forgeActive === 'true',
       opacity: Number.parseFloat(getComputedStyle(layer).opacity),
@@ -2145,8 +2686,8 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
-      sameStyle: references.style === document.getElementById('wukong-forge-style'),
-      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameStyle: references.style === document.getElementById('wukong-codex-theme-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-codex-theme-background'),
       sameStyleText: references.styleText === references.style.textContent,
       lifecycle: { ...window.__forgeSwitchLifecycle },
       refreshCount: runtime.refreshCount,
@@ -2178,14 +2719,14 @@ test('V52.0 switches the decoded image in place on Ctrl+Alt+F without reloading 
   await page.waitForTimeout(800);
   const settled = await page.evaluate(() => {
     const references = window.__forgeSwitchReferences;
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
     const inactiveImage = inactive.querySelector('[data-forge-background-image]');
     return {
       sameDocument: references.document === document,
       sameRuntime: references.runtime === runtime,
-      sameStyle: references.style === document.getElementById('wukong-forge-style'),
-      sameOverlay: references.overlay === document.getElementById('wukong-forge-background'),
+      sameStyle: references.style === document.getElementById('wukong-codex-theme-style'),
+      sameOverlay: references.overlay === document.getElementById('wukong-codex-theme-background'),
       sameMarks: references.marks.length === document.querySelectorAll('[data-forge-mark]').length &&
         references.marks.every((mark, index) => mark === document.querySelectorAll('[data-forge-mark]')[index]),
       sameStyleText: references.styleText === references.style.textContent,
@@ -2243,22 +2784,22 @@ test('V52.0 coalesces rapid manual intent and always reuses a settled layer from
 
   await page.keyboard.press('Control+Alt+F');
   await page.waitForFunction(previous => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return runtime.transitionInFlight && String(runtime.currentScene) !== previous;
   }, baseline.scene);
   await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     runtime.nextBackground('battle');
     runtime.previousBackground('battle');
   });
   await page.waitForFunction(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return !runtime.transitionInFlight && runtime.preloadRequests.size === 0;
   });
   await page.waitForTimeout(700);
 
   const coalesced = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
     return {
       scene: String(runtime.currentScene),
@@ -2280,7 +2821,7 @@ test('V52.0 coalesces rapid manual intent and always reuses a settled layer from
 
   await page.keyboard.press('Control+Alt+F');
   await page.waitForFunction(previous => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return runtime.transitionInFlight && String(runtime.currentScene) !== previous;
   }, coalesced.scene);
   await page.waitForTimeout(140);
@@ -2295,7 +2836,7 @@ test('V52.0 coalesces rapid manual intent and always reuses a settled layer from
   });
   assert.ok(reused.incoming > .02 && reused.incoming < .98, `invalid reused opacity ${reused.incoming}`);
   assert.equal(reused.outgoing, 1);
-  await page.waitForFunction(() => !window.__wukongCodexForgeRuntimeV13.transitionInFlight);
+  await page.waitForFunction(() => !window.__wukongCodexThemeRuntimeV13.transitionInFlight);
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).backgroundLoadedLayerCount, 1);
   await page.evaluate(RESTORE_EXPRESSION);
 });
@@ -2318,18 +2859,18 @@ test('V52.0 cancels a stale decode when manual intent returns to the visible sce
   });
 
   assert.equal(await page.evaluate(() => (
-    window.__wukongCodexForgeRuntimeV13.nextBackground('battle')
+    window.__wukongCodexThemeRuntimeV13.nextBackground('battle')
   )), true);
   await page.waitForFunction(() => window.__forgeIntentDecodes.length === 1);
   assert.equal(await page.evaluate(() => (
-    window.__wukongCodexForgeRuntimeV13.previousBackground('battle')
+    window.__wukongCodexThemeRuntimeV13.previousBackground('battle')
   )), true);
-  await page.waitForFunction(() => window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 0);
+  await page.waitForFunction(() => window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 0);
   await page.evaluate(() => window.__forgeIntentDecodes[0].resolve());
   await page.waitForTimeout(120);
 
   const settled = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
     const image = inactive.querySelector('[data-forge-background-image]');
     return {
@@ -2367,12 +2908,12 @@ test('V52.0 keeps the visible scene when image decode rejects', async () => {
   });
   await page.keyboard.press('Control+Alt+F');
   await page.waitForFunction(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return runtime.preloadRequests.size === 0 && runtime.requestedScene === null;
   });
   await page.waitForTimeout(100);
   const settled = await page.evaluate(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const inactive = document.querySelector('[data-forge-background-layer][data-forge-active="false"]');
     const image = inactive.querySelector('[data-forge-background-image]');
     return {
@@ -2410,7 +2951,7 @@ test('V13 bounds pending background decoding to one request and cancels it on re
   await enterThreadState(page);
   await waitForRuntime(page, 'surface', 'thread');
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+    window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 1
   ));
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
@@ -2418,7 +2959,7 @@ test('V13 bounds pending background decoding to one request and cancels it on re
   await installLanding(page);
   await waitForRuntime(page, 'surface', 'landing');
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 0
+    window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 0
   ));
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 0);
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 2);
@@ -2426,25 +2967,25 @@ test('V13 bounds pending background decoding to one request and cancels it on re
 
   await enterThreadState(page);
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+    window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 1
   ));
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 3);
 
   await page.keyboard.press('Control+Alt+C');
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 0
+    window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 0
   ));
   assert.equal(await page.evaluate(() => Boolean(window.__forgeDecodeControls[2].image.getAttribute('src'))), false);
 
   await page.keyboard.press('Control+Alt+C');
   await page.waitForFunction(() => (
-    window.__wukongCodexForgeRuntimeV13.preloadRequests.size === 1
+    window.__wukongCodexThemeRuntimeV13.preloadRequests.size === 1
   ));
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).preloadInFlight, 1);
   assert.equal(await page.evaluate(() => window.__forgeDecodeControls.length), 4);
 
   await page.evaluate(() => {
-    window.__retiredForgeRuntime = window.__wukongCodexForgeRuntimeV13;
+    window.__retiredForgeRuntime = window.__wukongCodexThemeRuntimeV13;
   });
   await page.evaluate(RESTORE_EXPRESSION);
   assert.deepEqual(
@@ -2479,7 +3020,7 @@ test('V51.7 keeps its background inert in forced-colors mode and accepts generat
   assert.match(veil, /rgba\(12,14,13,(?:0)?\.3\)/);
   await page.emulateMedia({ forcedColors: 'active' });
   assert.equal(
-    await page.locator('#wukong-forge-background').evaluate(element => getComputedStyle(element).display),
+    await page.locator('#wukong-codex-theme-background').evaluate(element => getComputedStyle(element).display),
     'none'
   );
 });

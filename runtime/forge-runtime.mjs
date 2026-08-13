@@ -183,7 +183,8 @@ export function resolveThemeAssets(themePath, theme) {
       tone: entry.tone,
       veil: entry.veil,
       threadVeil: entry.threadVeil,
-      mark: entry.mark
+      mark: entry.mark,
+      heroProfile: entry.heroProfile
     };
   });
   const transitionPixels = uniquePixels.sort((left, right) => right - left).slice(0, 2)

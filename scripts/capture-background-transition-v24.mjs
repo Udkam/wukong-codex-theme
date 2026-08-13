@@ -28,7 +28,7 @@ if (fs.existsSync(outputDirectory)) {
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 const styleSheet = fs.readFileSync(
-  path.join(root, 'runtime', 'forge-background-v13.css'),
+  path.join(root, 'runtime', 'wukong-codex-theme-background-v13.css'),
   'utf8'
 );
 const payload = payloadFromThemeFile(path.join(root, 'themes', 'active.json'));
@@ -57,7 +57,7 @@ const installLanding = page => page.evaluate(() => {
 
 const readEvidence = page => page.evaluate(stateExpression => {
   const state = (0, eval)(stateExpression);
-  const overlay = document.getElementById('wukong-forge-background');
+  const overlay = document.getElementById('wukong-codex-theme-background');
   const active = overlay?.querySelector(
     '[data-forge-background-layer][data-forge-active="true"]'
   );
@@ -97,8 +97,8 @@ const assertCoverage = (label, evidence) => {
 const waitForStable = async (page, surface, mode) => {
   await page.waitForFunction(
     ({ surface, mode }) => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      const overlay = document.getElementById('wukong-forge-background');
+      const runtime = window.__wukongCodexThemeRuntimeV13;
+      const overlay = document.getElementById('wukong-codex-theme-background');
       return document.documentElement.dataset.forgeSurface === surface &&
         document.documentElement.dataset.forgeMode === mode &&
         document.documentElement.dataset.forgeBackgroundReady === 'true' &&
@@ -113,7 +113,7 @@ const waitForStable = async (page, surface, mode) => {
 const waitForTransition = async (page, surface, mode) => {
   await page.waitForFunction(
     ({ surface, mode }) => {
-      const overlay = document.getElementById('wukong-forge-background');
+      const overlay = document.getElementById('wukong-codex-theme-background');
       return document.documentElement.dataset.forgeSurface === surface &&
         document.documentElement.dataset.forgeMode === mode &&
         overlay?.dataset.forgeTransitioning === 'true';
@@ -185,7 +185,7 @@ try {
   await page.evaluate(RESTORE_EXPRESSION);
   assert.equal(await page.locator('[data-forge-owned]').count(), 0);
   assert.equal(await page.locator('[data-forge-mark]').count(), 0);
-  assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+  assert.equal(await page.locator('#wukong-codex-theme-background').count(), 0);
 
   fs.writeFileSync(
     path.join(outputDirectory, 'capture.json'),

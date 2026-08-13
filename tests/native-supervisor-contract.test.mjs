@@ -80,7 +80,7 @@ test('supervisor lifecycle uses named Ready, Stop, and Instance primitives', () 
 });
 
 test('native AppX activation and supervisor share one fail-safe ManagedLaunch AutoReset signal', () => {
-  const eventName = /Local\\WukongCodexForge\.NativeEntrySupervisor\.ManagedLaunch/;
+  const eventName = /Local\\WukongCodexTheme\.NativeEntrySupervisor\.ManagedLaunch/;
   assert.match(appxActivator, eventName);
   assert.match(supervisor, eventName);
   assert.match(
@@ -166,8 +166,27 @@ test('repository marker loss removes only the exact per-user Run value', () => {
   assert.match(supervisor, /Registry\.CurrentUser\.OpenSubKey\(RunKeyPath, true\)/);
   assert.match(supervisor, /runKey\.DeleteValue\(runValueName, false\)/);
   assert.doesNotMatch(supervisor, /DeleteSubKey|DeleteSubKeyTree/);
-  assert.match(installer, /\$runValueName = 'WukongCodexForgeNativeEntrySupervisor'/);
+  assert.match(installer, /\$runValueName = 'WukongCodexThemeNativeEntrySupervisor'/);
   assert.match(installer, /'--run-value', \$runValueName/);
+});
+
+test('legacy supervisor retirement is ownership-gated and runs only after the new ready event', () => {
+  assert.match(installer, /\$legacyLifecycleIds = \[ordered\]@\{/);
+  assert.match(installer, /function Test-LegacyRunCommandOwned/);
+  assert.match(installer, /native-entry-supervisor-\[0-9a-f\]\+\\\.exe/);
+  assert.match(installer, /function Retire-LegacySupervisor/);
+  assert.match(installer, /foreign-preserved/);
+  assert.match(installer, /changed-preserved/);
+  assert.match(installer, /orphan-unowned-preserved/);
+  assert.match(installer, /orphan-retired/);
+  assert.match(installer, /legacyState\.repositoryRoot/);
+  assert.match(installer, /\$legacyStopEvent\.Set\(\)/);
+  assert.match(installer, /\$legacyMutex\.WaitOne\(7000\)/);
+  assert.match(installer, /Remove-ItemProperty -Path \$RunKeyPath -Name \$LegacyRunValueName/);
+  assert.doesNotMatch(installer, /Remove-Item[^\r\n]*(?:WukongCodexForge|\$legacyLifecycleIds)/);
+  const readyCheck = installer.indexOf('$ready = $readyEvent.WaitOne(7000)');
+  const retirement = installer.lastIndexOf('$legacyRetirement = Retire-LegacySupervisor');
+  assert.ok(retirement > readyCheck, 'legacy supervisor was retired before the new supervisor published ready');
 });
 
 test('supervisor has no WMI, CIM, timer, steady polling, or name-only kill path', () => {

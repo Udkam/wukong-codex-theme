@@ -58,7 +58,8 @@ test('public install links the live repository without copying a retained theme 
   assert.match(hook, /Copy-Item -LiteralPath \$Path -Destination \$backupPath/);
   assert.match(hook, /entryPolicy = 'native-chatgpt-only'/);
   assert.match(hook, /function Remove-LegacyManagedShortcut/);
-  assert.match(hook, /legacyBridgePath\.StartsWith\(\$bridgeRoot/);
+  assert.match(hook, /legacyBridgeRoots/);
+  assert.match(hook, /ownedPowerShellBridge/);
   assert.match(hook, /Copy-Item -LiteralPath \$Path -Destination \$retiredBackup/);
   assert.match(hook, /\[IO\.File\]::Delete\(\$Path\)/);
   assert.doesNotMatch(hook, /Install-PreservedShortcut[\s\S]{0,100}-Path \$themeShortcutPath/);

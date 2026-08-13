@@ -11,7 +11,7 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_ROOT = ROOT / "themes" / "ui" / "v15"
-CSS_PATH = ROOT / "runtime" / "forge-background-v13.css"
+CSS_PATH = ROOT / "runtime" / "wukong-codex-theme-background-v13.css"
 ACTIVE_THEME_PATH = ROOT / "themes" / "active.json"
 
 PAPER_ASSETS = {

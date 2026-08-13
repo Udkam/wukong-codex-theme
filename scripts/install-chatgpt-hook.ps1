@@ -87,7 +87,11 @@ $shortcutPath = Join-Path $programs 'ChatGPT.lnk'
 $themeShortcutPath = Join-Path $programs 'ChatGPT - Wukong Theme.lnk'
 $wukongShortcutPath = Join-Path $programs 'Wukong Codex.lnk'
 $desktopShortcutPath = Join-Path $desktop 'Wukong Codex.lnk'
-$adapterRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge'))
+$adapterRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexTheme'))
+$legacyMigrationIds = [ordered]@{
+    adapterRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge'))
+    retainedThemeRoot = [IO.Path]::GetFullPath((Join-Path $env:USERPROFILE '.codex\themes\wukong-codex-forge'))
+}
 $nativeToolRoot = Join-Path $adapterRoot 'native-supervisor'
 $repositoryId = (Get-TextSha256 $rootPath.ToLowerInvariant()).Substring(0, 16).ToLowerInvariant()
 $nativeActivatorPath = Join-Path $nativeToolRoot "appx-activator-$repositoryId.exe"
@@ -130,7 +134,7 @@ const activationPackage = $packageFullNameLiteral;
 const activationVersion = $packageVersionLiteral;
 const activationExecutable = $chatGptLiteral;
 const theme = path.join(themeRoot, 'themes', 'active.json');
-const style = path.join(themeRoot, 'runtime', 'forge-background-v13.css');
+const style = path.join(themeRoot, 'runtime', 'wukong-codex-theme-background-v13.css');
 const appRoot = path.resolve(path.dirname(process.execPath), '..', '..', '..');
 const official = path.join(appRoot, 'ChatGPT.exe');
 const themeAvailable = [marker, host, theme, style, ...(portable ? [] : [activator])]
@@ -170,7 +174,7 @@ const hasReusableCodexChannel = async () => {
 };
 
 const showBlockedLaunch = () => {
-  const noticeRoot = path.join(process.env.LOCALAPPDATA, 'WukongCodexForge', 'launch-notices');
+  const noticeRoot = path.join(process.env.LOCALAPPDATA, 'WukongCodexTheme', 'launch-notices');
   fs.mkdirSync(noticeRoot, { recursive: true });
   const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
   const noticePath = path.join(noticeRoot, 'blocked-' + stamp + '.txt');
@@ -283,17 +287,40 @@ function Remove-LegacyManagedShortcut([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $false }
     Assert-DirectManagedPath -Path $Path -Label 'legacy Wukong shortcut'
     $legacy = $shell.CreateShortcut($Path)
-    $legacyBridgeMatch = [regex]::Match([string]$legacy.Arguments, '^"([^"]+\\launcher-bridges\\chatgpt-entry-[^"]+\.mjs)"$')
+    $legacyArguments = [string]$legacy.Arguments
+    $legacyBridgeMatch = [regex]::Match($legacyArguments, '^"([^"]+\\launcher-bridges\\chatgpt-entry-[^"]+\.mjs)"$')
+    $legacyPowerShellMatch = [regex]::Match(
+        $legacyArguments,
+        '(?i)(?:^|\s)-(?:File|f)\s+"([^"\r\n]+\\scripts\\launch\.ps1)"(?:\s|$)'
+    )
     $legacyTargetPath = [string]$legacy.TargetPath
-    if (
-        [string]::IsNullOrWhiteSpace($legacyTargetPath) -or
-        -not $legacyTargetPath.EndsWith('\app\resources\cua_node\bin\node.exe', [StringComparison]::OrdinalIgnoreCase) -or
-        -not $legacyBridgeMatch.Success
-    ) {
-        return $false
+    $ownedNodeBridge = $false
+    if (-not [string]::IsNullOrWhiteSpace($legacyTargetPath) -and
+        $legacyTargetPath.EndsWith('\app\resources\cua_node\bin\node.exe', [StringComparison]::OrdinalIgnoreCase) -and
+        $legacyBridgeMatch.Success) {
+        $legacyBridgePath = [IO.Path]::GetFullPath($legacyBridgeMatch.Groups[1].Value)
+        $legacyBridgeRoots = @($bridgeRoot, (Join-Path $legacyMigrationIds.adapterRoot 'launcher-bridges'))
+        $ownedNodeBridge = @($legacyBridgeRoots | Where-Object {
+            $legacyBridgePath.StartsWith(
+                [IO.Path]::GetFullPath($_) + [IO.Path]::DirectorySeparatorChar,
+                [StringComparison]::OrdinalIgnoreCase
+            )
+        }).Count -gt 0
     }
-    $legacyBridgePath = [IO.Path]::GetFullPath($legacyBridgeMatch.Groups[1].Value)
-    if (-not $legacyBridgePath.StartsWith($bridgeRoot + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+    $ownedPowerShellBridge = $false
+    if (-not [string]::IsNullOrWhiteSpace($legacyTargetPath) -and
+        $legacyTargetPath.EndsWith('\powershell.exe', [StringComparison]::OrdinalIgnoreCase) -and
+        $legacyPowerShellMatch.Success) {
+        $legacyLaunchPath = [IO.Path]::GetFullPath($legacyPowerShellMatch.Groups[1].Value)
+        $ownedPowerShellBridge = $legacyLaunchPath.StartsWith(
+            [IO.Path]::GetFullPath($legacyMigrationIds.adapterRoot) + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase
+        ) -or $legacyLaunchPath.StartsWith(
+            [IO.Path]::GetFullPath($legacyMigrationIds.retainedThemeRoot) + [IO.Path]::DirectorySeparatorChar,
+            [StringComparison]::OrdinalIgnoreCase
+        )
+    }
+    if (-not $ownedNodeBridge -and -not $ownedPowerShellBridge) {
         return $false
     }
     $retiredLeaf = [IO.Path]::GetFileNameWithoutExtension($Path) -replace '[^A-Za-z0-9-]', '-'
@@ -308,15 +335,20 @@ $defaultShortcut = Install-PreservedShortcut `
     -Path $shortcutPath `
     -BackupPrefix 'ChatGPT-before-wukong' `
     -Description 'ChatGPT (official executable with repository-backed Wukong renderer theme)'
+$versionedCodexThemeShortcutPaths = @(
+    Get-ChildItem -LiteralPath $programs -Filter 'Codex - Wukong Theme*.lnk' -File -Force -ErrorAction SilentlyContinue |
+        ForEach-Object { [IO.Path]::GetFullPath($_.FullName) }
+)
 $removedLegacyShortcuts = @(
+    $versionedCodexThemeShortcutPaths
     $themeShortcutPath,
     $wukongShortcutPath,
     $desktopShortcutPath
-) | Where-Object { Remove-LegacyManagedShortcut -Path $_ }
+) | Select-Object -Unique | Where-Object { Remove-LegacyManagedShortcut -Path $_ }
 
 $event = [ordered]@{
     at = (Get-Date).ToString('o')
-    managedBy = 'WukongCodexForgeLaunchAdapter'
+    managedBy = 'WukongCodexThemeLaunchAdapter'
     shortcutPath = $shortcutPath
     entryPolicy = 'native-chatgpt-only'
     themeRoot = $rootPath

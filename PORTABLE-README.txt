@@ -1,6 +1,6 @@
-Wukong Codex Theme 0.14.7
+Wukong Codex Theme 0.15.0
 
-CURRENT V53 ORDERED 20-BACKGROUND GALLERY
+CURRENT V61 VISIBLE WORDMARK WITH ORDERED 20-BACKGROUND GALLERY
 
 This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
 
@@ -19,11 +19,13 @@ The runtime keeps a 20-image gallery (13 battle + 7 scenery) in two explicit pla
 B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16
 S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10
 
-Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. New Task pages automatically use the battle sequence; project/thread pages automatically use the scenery sequence. Ctrl+Alt+C temporarily overrides that choice on the current page only. Entering another task, thread, or page restores its automatic default without advancing the sequence. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. There is no automatic or timer-based image rotation, steady poll, WMI/CIM query, service, or scheduled task.
+Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. New Task pages automatically use the battle sequence; project/thread pages automatically use the scenery sequence. Ctrl+Alt+C temporarily overrides that choice on the current page only. Entering another task, thread, or page restores its automatic default without advancing the sequence. Ctrl+Alt+K locks the exact visible image and battle/scenery sequence across projects, tasks, threads, and application restarts. F/B/C remain active while locked and make the manually selected background the new locked target; press K again to resume the current page's automatic sequence. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. There is no automatic or timer-based image rotation, steady poll, WMI/CIM query, service, or scheduled task; K suppresses page-driven group changes, not a timer.
 
 Background images are not filtered. New Task pages apply a fixed 10% full-screen veil (90% of the original image remains visible). Project/thread pages use a separately calibrated per-image threadVeil so bright and dark assets remain readable without one global value flattening every image. The calibration follows the image and page type, not the battle/scenery sequence. The composer, content surface, persistent sidebar, and the temporary flyout shown from a collapsed sidebar all retain the translucent theme treatment.
 
 Ctrl+Alt+T hides or shows both the New Task quote “此去，欲破何局？” and the “悟空” wordmark in place. The preference survives background, task and thread changes in the current window and a no-reload hot apply; a new application process starts with both visible. It does not change the native title node, geometry, background selection or decode state.
+
+The wordmark uses four reviewed static profiles for light/dark and flat/complex landing backgrounds. All four keep the 168px paint layer fully opaque, calibrate brightness/saturation/contrast, and add tight opposite-tone edge separation: dark ink gains a light edge on bright scenes, while bone paint gains a dark edge on dark scenes. The native 56x56 anchor and hit target remain unchanged.
 
 The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
 

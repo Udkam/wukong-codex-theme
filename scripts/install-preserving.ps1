@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Destination = (Join-Path $env:USERPROFILE '.codex\themes\wukong-codex-forge'),
+    [string]$Destination = (Join-Path $env:USERPROFILE '.codex\themes\wukong-codex-theme'),
     [switch]$NoShortcut
 )
 

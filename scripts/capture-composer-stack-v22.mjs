@@ -27,7 +27,7 @@ if (fs.existsSync(outputDirectory)) {
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 const styleSheet = fs.readFileSync(
-  path.join(root, 'runtime', 'forge-background-v13.css'),
+  path.join(root, 'runtime', 'wukong-codex-theme-background-v13.css'),
   'utf8'
 );
 const payload = payloadFromThemeFile(path.join(root, 'themes', 'active.json'));
@@ -65,7 +65,16 @@ const geometrySnapshot = page => page.evaluate(() => {
   const read = element => {
     if (!element) return null;
     const rect = element.getBoundingClientRect();
-    return [rect.width, rect.height];
+    return {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      top: rect.top,
+      right: rect.right,
+      bottom: rect.bottom,
+      left: rect.left
+    };
   };
   return {
     queued: read(document.querySelector('[data-fixture-surface="queued-panel"]')),
@@ -98,6 +107,7 @@ const assertGeometryPreserved = (state, before, after) => {
 
 const paintSnapshot = page => page.evaluate(() => {
   const stack = document.querySelector('.forge-composer-panel-stack');
+  const stackPaper = stack ? getComputedStyle(stack, '::before') : null;
   const panels = stack
     ? [...stack.querySelectorAll(':scope > .forge-composer-panel')]
     : [];
@@ -106,15 +116,28 @@ const paintSnapshot = page => page.evaluate(() => {
     : [];
   const progressFades = [...document.querySelectorAll('.forge-composer-progress-fade')];
   return {
+    stackPaper: stackPaper
+      ? {
+          content: stackPaper.content,
+          backgroundImage: stackPaper.backgroundImage,
+          backgroundSize: stackPaper.backgroundSize,
+          clipPath: stackPaper.clipPath,
+          pointerEvents: stackPaper.pointerEvents
+        }
+      : null,
     panelCount: panels.length,
     queueItemCount: queueItems.length,
     panels: panels.map(panel => {
       const rect = panel.getBoundingClientRect();
+      const style = getComputedStyle(panel);
       const field = getComputedStyle(panel, '::before');
       const cap = getComputedStyle(panel, '::after');
       return {
         y: rect.y,
         height: rect.height,
+        borderTopWidth: style.borderTopWidth,
+        borderTopColor: style.borderTopColor,
+        beforeTop: field.top,
         fieldContent: field.content,
         fieldClipPath: field.clipPath,
         fieldBackgroundSize: field.backgroundSize,
@@ -146,6 +169,36 @@ const paintSnapshot = page => page.evaluate(() => {
     })
   };
 });
+
+const assertQueueGoalSeamCovered = (state, geometry, paint) => {
+  const gap = geometry.goal.top - geometry.queued.bottom;
+  assert.ok(
+    Math.abs(gap) <= .25,
+    `${state}: queue and goal panels are not geometrically continuous (${gap}px)`
+  );
+
+  const adjacentGoal = paint.panels[1];
+  const borderTopWidth = Number.parseFloat(adjacentGoal.borderTopWidth);
+  const beforeTop = Number.parseFloat(adjacentGoal.beforeTop);
+  assert.ok(
+    Number.isFinite(borderTopWidth) && Number.isFinite(beforeTop),
+    `${state}: adjacent goal seam paint geometry is not measurable`
+  );
+  assert.ok(
+    -beforeTop >= borderTopWidth,
+    `${state}: adjacent goal paper does not cover its ${borderTopWidth}px top border ` +
+      `(before top ${beforeTop}px)`
+  );
+  assert.equal(
+    adjacentGoal.borderTopColor,
+    'rgba(75, 51, 27, 0.5)',
+    `${state}: retained native goal border must remain an intentional separator`
+  );
+  assert.equal(paint.stackPaper?.content, '""', `${state}: stack underpaint is missing`);
+  assert.notEqual(paint.stackPaper?.backgroundImage, 'none');
+  assert.equal(paint.stackPaper?.backgroundSize, '512px 220px');
+  assert.equal(paint.stackPaper?.pointerEvents, 'none');
+};
 
 const browser = await chromium.launch({ headless: true });
 const results = [];
@@ -183,6 +236,9 @@ try {
       assert.equal(paint.panelCount, contract.panels);
       assert.equal(paint.queueItemCount, contract.queueItems);
       assert.equal(paint.progressFades.length, contract.progressFades);
+      if (contract.state === 'guided' || contract.state === 'multi-guided') {
+        assertQueueGoalSeamCovered(contract.state, after, paint);
+      }
       paint.progressFades.forEach(fade => {
         assert.equal(fade.backgroundColor, 'rgba(0, 0, 0, 0)');
         assert.equal(fade.backgroundImage, 'none');

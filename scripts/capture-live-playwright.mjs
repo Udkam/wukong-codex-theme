@@ -194,8 +194,8 @@ const cleanupTransientDebug = async reason => {
     try {
       await page.waitForFunction(
         () => (
-          !document.getElementById('wukong-forge-style') &&
-          !window.__wukongCodexForgeRuntimeV13 &&
+          !document.getElementById('wukong-codex-theme-style') &&
+          !window.__wukongCodexThemeRuntimeV13 &&
           !document.documentElement.classList.contains('forge-ink-mountain')
         ),
         null,
@@ -283,9 +283,9 @@ try {
   await page.waitForFunction(
     () => {
       const root = document.documentElement;
-      const overlay = document.getElementById('wukong-forge-background');
+      const overlay = document.getElementById('wukong-codex-theme-background');
       return Boolean(
-        window.__wukongCodexForgeRuntimeV13 &&
+        window.__wukongCodexThemeRuntimeV13 &&
         root.classList.contains('forge-ink-mountain') &&
         root.dataset.forgeBackgroundReady === 'true' &&
         overlay?.dataset.forgeReady === 'true'
@@ -313,7 +313,7 @@ try {
       return;
     }
     await page.waitForFunction(
-      () => Boolean(window.__wukongCodexForgeRuntimeV13?.transitionInFlight),
+      () => Boolean(window.__wukongCodexThemeRuntimeV13?.transitionInFlight),
       null,
       { timeout: 7000 }
     );
@@ -322,7 +322,7 @@ try {
       surface: document.documentElement.dataset.forgeSurface || null,
       mode: document.documentElement.dataset.forgeMode || null,
       scene: document.documentElement.dataset.forgeScene || null,
-      inFlight: Boolean(window.__wukongCodexForgeRuntimeV13?.transitionInFlight),
+      inFlight: Boolean(window.__wukongCodexThemeRuntimeV13?.transitionInFlight),
       layers: [...document.querySelectorAll('[data-forge-background-layer]')].map(layer => ({
         index: layer.dataset.forgeBackgroundLayer || null,
         scene: layer.dataset.forgeScene || null,
@@ -332,7 +332,7 @@ try {
       }))
     }));
     await page.waitForFunction(
-      () => !window.__wukongCodexForgeRuntimeV13?.transitionInFlight,
+      () => !window.__wukongCodexThemeRuntimeV13?.transitionInFlight,
       null,
       { timeout: 7000 }
     );
@@ -904,7 +904,7 @@ try {
         pointerEvents: getComputedStyle(element).pointerEvents
       } : null;
     };
-    const overlay = document.getElementById('wukong-forge-background');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     const backgroundLayers = [...(overlay?.querySelectorAll(':scope > [data-forge-background-layer]') || [])];
     const activeBackgroundLayer = backgroundLayers.find(layer => layer.dataset.forgeActive === 'true') || null;
     const activeBackgroundImage = activeBackgroundLayer?.querySelector('[data-forge-background-image]') || null;
@@ -918,14 +918,14 @@ try {
         runtimeV10: Boolean(window.__wukongCodexForgeRuntimeV10),
         runtimeV11: Boolean(window.__wukongCodexForgeRuntimeV11),
         runtimeV12: Boolean(window.__wukongCodexForgeRuntimeV12),
-        runtimeV13: Boolean(window.__wukongCodexForgeRuntimeV13),
+        runtimeV13: Boolean(window.__wukongCodexThemeRuntimeV13),
         mode: document.documentElement.dataset.forgeMode || null,
         scene: document.documentElement.dataset.forgeScene || null,
         surface: document.documentElement.dataset.forgeSurface || null,
-        styleLength: document.getElementById('wukong-forge-style')?.textContent?.length || 0,
-        refreshCount: window.__wukongCodexForgeRuntimeV13?.refreshCount || 0,
-        renderCount: window.__wukongCodexForgeRuntimeV13?.renderCount || 0,
-        transitionInFlight: Boolean(window.__wukongCodexForgeRuntimeV13?.transitionInFlight)
+        styleLength: document.getElementById('wukong-codex-theme-style')?.textContent?.length || 0,
+        refreshCount: window.__wukongCodexThemeRuntimeV13?.refreshCount || 0,
+        renderCount: window.__wukongCodexThemeRuntimeV13?.renderCount || 0,
+        transitionInFlight: Boolean(window.__wukongCodexThemeRuntimeV13?.transitionInFlight)
       },
       geometry: {
         sidebar: rect(document.querySelector('.forge-sidebar, aside.app-shell-left-panel')),

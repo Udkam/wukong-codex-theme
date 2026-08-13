@@ -265,16 +265,23 @@ test('public entries route to repository-backed injection and verified disable',
   assert.match(publicScripts.hook, /Copy-Item -LiteralPath \$Path -Destination \$backupPath/);
   assert.match(publicScripts.hook, /CreateShortcut\(\$Path\)/);
   assert.match(publicScripts.hook, /launcher-bridges/);
-  assert.match(publicScripts.hook, /LOCALAPPDATA[^\r\n]*WukongCodexForge/);
+  assert.match(publicScripts.hook, /LOCALAPPDATA[^\r\n]*WukongCodexTheme/);
+  assert.match(publicScripts.hook, /\$legacyMigrationIds = \[ordered\]@\{/);
   assert.match(publicScripts.hook, /Assert-DirectManagedPath/);
   assert.match(publicScripts.hook, /Start Menu Programs directory/);
   assert.match(publicScripts.hook, /ChatGPT Start Menu shortcut/);
   assert.match(publicScripts.hook, /entryPolicy = 'native-chatgpt-only'/);
   assert.match(publicScripts.hook, /function Remove-LegacyManagedShortcut/);
-  assert.match(publicScripts.hook, /legacyBridgePath\.StartsWith\(\$bridgeRoot/);
+  assert.match(publicScripts.hook, /legacyBridgeRoots/);
+  assert.match(publicScripts.hook, /legacyPowerShellMatch/);
+  assert.match(publicScripts.hook, /ownedPowerShellBridge/);
+  assert.match(publicScripts.hook, /Codex - Wukong Theme\*\.lnk/);
+  assert.match(publicScripts.hook, /Get-ChildItem -LiteralPath \$programs/);
   assert.match(publicScripts.hook, /Copy-Item -LiteralPath \$Path -Destination \$retiredBackup/);
   assert.match(publicScripts.hook, /\[IO\.File\]::Delete\(\$Path\)/);
   assert.match(publicScripts.hook, /launch adapter root/);
+  assert.match(publicScripts.hook, /managedBy = 'WukongCodexThemeLaunchAdapter'/);
+  assert.match(publicScripts.verifyAdapter, /WukongCodexThemeLaunchAdapter/);
   assert.match(publicScripts.hook, /shortcut backup directory/);
   assert.match(publicScripts.hook, /launcher bridge directory/);
   assert.match(publicScripts.hook, /ReparsePoint/);
@@ -405,7 +412,7 @@ test('hidden renderer apply settles as an explicit deferred state', () => {
     visibleThemedComposerCount: 1,
     runtimeV12: false,
     runtimeV13: true,
-    runtimeRevision: 'v54-native-pages-and-toggle'
+    runtimeRevision: 'v61-visible-wordmark'
   };
   assert.equal(isDeferredThemeState(deferredState), true);
   assert.equal(isDeferredThemeState({ ...deferredState, documentHidden: false }), false);
@@ -467,7 +474,7 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameA\)/);
   assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameB\)/);
 
-  const style = read('runtime/forge-background-v13.css');
+  const style = read('runtime/wukong-codex-theme-background-v13.css');
   assert.match(style, /\[data-codex-composer-root\] \.composer-surface-chrome/);
   assert.doesNotMatch(
     style,

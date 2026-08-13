@@ -8,7 +8,7 @@ import { loadNativePetReleasePolicy } from './native-pet-release-policy.mjs';
 const runtimeFiles = [
   'runtime/cdp-client.mjs',
   'runtime/forge-runtime.mjs',
-  'runtime/forge-background-v13.css',
+  'runtime/wukong-codex-theme-background-v13.css',
   'runtime/injection-plan-v13.mjs',
   'runtime/injector.mjs',
   'runtime/host.mjs',

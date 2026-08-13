@@ -1,6 +1,6 @@
 # 大圣归来 Codex 样式层 — 需求与验收
 
-> **V52.1 现行发布合同。** 下表延续 V15 的视觉/几何编号；旧版本证据作为历史保留，冲突处以 `CURRENT_GOAL.md`、V15-01、V15-04、V15-17、V15-40 至 V15-52 和本表为准。
+> **V61 / 0.15.0 现行发布合同。** 下表延续 V15 的视觉/几何编号；旧版本证据作为历史保留，冲突处以 `CURRENT_GOAL.md`、V15-01、V15-04、V15-17、V15-40 至 V15-54 和本表为准。
 
 | ID | V15 需求 | 验收方法 |
 | --- | --- | --- |
@@ -8,10 +8,10 @@
 | V15-02 | 用户最终三张输入器参考允许直接实现；主输入器及所有相邻纸面统一使用第一张参考图的底纹、角纹、云纹和色阶，文本与控件仍由原生 DOM 绘制 | 1×/125% 宽窄与多行 fixture、像素对照、文本/ARIA/按钮尺寸深比较 |
 | V15-03 | 一级侧栏条目映射项目条和无项目对话；二级条目映射项目下对话。默认、hover、focus、selected、expanded、disabled、unread/running 必须各有明确且一致的目录状态 | 结构优先选择器测试、动态状态矩阵、真实 sidebar 截图 |
 | V15-04 | “新建任务 / 拉取请求 / 站点 / 已安排 / 插件”可按既有 renderer 映射只换材质与状态；“文件 / 编辑 / 视图 / 帮助”四个应用菜单触发器及菜单内容完全保留官方 paint。两类都不得改变文字、图标、DOM 顺序、原生尺寸或菜单行为 | 官方 topbar class/ARIA 锚点、open/close/hover/focus 测试、官方菜单 paint 断言与几何前后对照 |
-| V15-05 | 新建页保留原生 56×56 槽位；卡通短棍、微缩武器和生成物均已否决，当前使用官方“悟空”书法与朱印的深/浅双资产；视觉层至少为旧版三倍、可见约 141×96 px，且不得遮挡杨戬头部或其他画面焦点 | 官方源 SHA、336×336 双资产像素/体积/边界合同、168×168 绘制层、场景 0/1/2/3 构图审查、槽位 DOMRect/原节点/restore 合同与用户实机验收 |
+| V15-05 | 新建页保留原生 56×56 槽位；卡通短棍、微缩武器和生成物均已否决，当前使用官方“悟空”书法与朱印的深/浅双资产；视觉层至少为旧版三倍、可见约 141×96 px，并按浅色/深色、平坦/复杂四档背景保持满不透明度，分别校准亮度、饱和度、对比度和相反明暗的紧边缘分离，且不得遮挡人物焦点 | 官方源 SHA、336×336 双资产像素/体积/边界合同、168×168 绘制层、四档 profile 变量与 20 场景构图审查、槽位 DOMRect/原节点/restore 合同与用户实机验收 |
 | V15-06 | 不实现葫芦；活动主题定义、运行包、注入器和后续视觉提案均不得引用葫芦。含退役葫芦/旧宠物引用的 `themes/ink-mountain.json` 只作历史保留，不得进入最小运行包 | active theme 深比较、package 白名单/反向排除断言与 DOM 标记清单 |
 | V15-07 | 助手回答保持无框；提示词、回答、placeholder、项目名、菜单名和按钮可访问名称逐字不改 | 注入前后文本/ARIA 深比较 |
-| V15-08 | UI 材质使用静态 WebP/nine-slice；无网络请求、无逐帧动画、无 filter/will-change 常驻、无布局 JS；forced-colors 回退系统原生面 | 网络/计时器/动画计数、computed style 与强制高对比测试 |
+| V15-08 | UI 材质使用静态 WebP/nine-slice；无网络请求、无逐帧动画、无全屏或持续动画 filter/will-change、无布局 JS；只允许 168px “悟空”字标按四档背景使用有界静态 filter，forced-colors 回退系统原生面 | 网络/计时器/动画计数、字标 filter 白名单、computed style 与强制高对比测试 |
 | V15-09 | 本轮属于多轮验收，不以 fixture 通过代替实机视觉通过；每个独立里程碑针对性测试后精确 commit/push，保留可回退 SHA | cached path 审计、测试记录、远端 SHA 与用户验收记录 |
 | V15-10 | 不删除、移动或覆盖本地文件；不修改 `ChatGPT.exe`、`app.asar`、WindowsApps 或官方配置；临时调试窗口截图后立即关闭并核验资源释放 | 文件/进程/父子树/端口前后审计 |
 | V15-11 | 所有输入相关纸面统一到最新参考的暖灰黄赭综合色阶，当前重建目标 `RGB(135,117,93)`、实际四类产物中位色 `RGB(131–135,111–117,86–93)`；主框、strip、pill 和 tile 必须同源重建，不能靠运行时 filter 变色 | 产物尺寸/median/std/暗纹理对比度测试，CSS fallback/filter 审计与四状态无头截图 |
@@ -57,6 +57,7 @@
 | V15-51 | 公开 `backgrounds.cmd` 必须提供交互模式以及 `list/add/replace/move/remove`：Target 支持稳定 slot 或 scene id；move 只重排 order，add 分配未使用物理 slot，remove 只退出轮播并保留资产。战斗/风景必须各保留至少一张；清单以 UTF-8 无 BOM 原子替换，清单和覆盖前图片备份到仓库本地状态目录，replace/remove 需要显式确认 | 隔离仓库端到端 manager 测试、真实清单 SHA 不变、两组最小保留、稳定 slot/order、备份/原子写/assetRetained、reparse/path confinement、包白名单与无 WMI/CIM/进程控制扫描 |
 | V15-52 | 当前用户路径中的历史 `scripts/launch.ps1` 兼容入口不得继续执行旧 WMI/CIM 或重复启动逻辑；它只能验证仓库 marker 后委托公开 `scripts/start.ps1`。正式运行仍保持事件驱动 host，不新增周期性进程/renderer 扫描 | PowerShell AST/静态禁词、launch wrapper 精确委托、生命周期与最小包合同 |
 | V15-53 | `Ctrl+Alt+T` 必须在同一 document/runtime/style/overlay 上原位隐藏或显示新建任务页“此去，欲破何局？”；不得改变原生标题文本、DOMRect、背景 scene/mode、refresh/render/decode 或 lifecycle。隐藏时恢复原生 ARIA，显示时恢复题字 ARIA；选择跨背景、task/thread surface、React 重挂载和无重载热应用保持，新进程默认显示。重复键只消费不切换，Shift/Meta 组合不接管，停用必须清除控制 dataset 并完整恢复原生标题 | 真实 T 键、repeat/Shift 排除、伪元素 display/ARIA、节点与几何全等、计数零变化、surface 往返、热应用继承、RESTORE 原生状态合同 |
+| V15-54 | `Ctrl+Alt+K` 必须锁定当前已经可见并解码完成的 exact scene 与 battle/scenery mode，跨 project/task/thread 路由、landing/thread surface、热应用和应用重启均不得自动换组或换图。锁定不新增 UI、timer、轮询或背景工作；F/B/C 仍可手动切换并把新目标更新为锁定锚点。再次按 K 时同步解除锁定并恢复当前 surface 的自动组。锁定瞬间必须取消未提交 decode、排队 scene 和隐藏页待处理切图，防止旧请求在锁定后提交；停用清除控制 dataset | K 真实键盘事件、repeat/Shift/Meta 排除、root/THEME_STATE/storage 状态、跨 surface/route 保持、锁定后 F/B/C、解锁自动组、pending decode 取消、无重载热应用、持久恢复、RESTORE 原生状态合同 |
 
 V50 当前证据边界：保留式 release `0.13.0-20260808-121354` 已新建并通过双入口 verifier；仓库与安装副本的 CSS/注入计划 SHA-256 一致，旧 `0.13.0-20260803-191843` 中曾用于验收同步的两份文件已按其安装时 Git 检查点恢复原始 SHA。同一个真实 `2050×1106 @ 125%` 任务中已同时出现 queue/goal、300px 环境卡与四角长方形输入器；原生/主题 surface 均为 `736×98px`，完整比较最大 DOMRect 差为 `0`，四角 paint 保留。核心联合合同 45/45、非宠物增量 19/19、UI 材质 4/4 通过。不包含两只延期宠物或已取消葫芦。
 

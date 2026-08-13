@@ -23,7 +23,7 @@ if (fs.existsSync(outputDirectory)) {
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 const styleSheet = fs.readFileSync(
-  path.join(root, 'runtime', 'forge-background-v13.css'),
+  path.join(root, 'runtime', 'wukong-codex-theme-background-v13.css'),
   'utf8'
 );
 const payload = payloadFromThemeFile(path.join(root, 'themes', 'active.json'));
@@ -45,7 +45,7 @@ try {
   await page.goto('http://wukong-v16-capture.test/');
   await page.evaluate(expression);
   await page.waitForFunction(() => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     return Boolean(
       runtime &&
       !runtime.transitionInFlight &&
@@ -59,66 +59,106 @@ try {
 
   const records = [];
   const seenScenes = new Set();
-  for (let index = 0; index < 12; index += 1) {
-    const record = await page.evaluate(() => {
-      const rootElement = document.documentElement;
-      const icon = document.querySelector('.forge-landing-icon');
-      const title = document.querySelector('.forge-landing-title');
-      const kicker = document.querySelector('.forge-landing-kicker');
-      const subtitle = document.querySelector('.forge-landing-subtitle');
-      const rect = element => {
-        const box = element.getBoundingClientRect();
-        return {
-          x: box.x,
-          y: box.y,
-          width: box.width,
-          height: box.height
+  const sceneGroups = [
+    { mode: 'battle', count: payload.theme.background.gallery.filter(scene => scene.mode.startsWith('battle')).length },
+    { mode: 'scenery', count: payload.theme.background.gallery.filter(scene => scene.mode === 'scenery').length }
+  ];
+  let captureIndex = 0;
+  for (const group of sceneGroups) {
+    if (await page.locator('html').getAttribute('data-forge-mode') !== group.mode) {
+      await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.toggleBackgroundMode());
+      await page.waitForFunction(expectedMode => {
+        const runtime = window.__wukongCodexThemeRuntimeV13;
+        return Boolean(
+          runtime &&
+          document.documentElement.dataset.forgeMode === expectedMode &&
+          !runtime.transitionInFlight &&
+          !runtime.requestedScene
+        );
+      }, group.mode);
+    }
+    for (let groupIndex = 0; groupIndex < group.count; groupIndex += 1) {
+      const record = await page.evaluate(() => {
+        const rootElement = document.documentElement;
+        const icon = document.querySelector('.forge-landing-icon');
+        const title = document.querySelector('.forge-landing-title');
+        const kicker = document.querySelector('.forge-landing-kicker');
+        const subtitle = document.querySelector('.forge-landing-subtitle');
+        const rect = element => {
+          const box = element.getBoundingClientRect();
+          return {
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height
+          };
         };
-      };
-      const iconPaint = getComputedStyle(icon, '::before');
-      const titlePaint = getComputedStyle(title, '::after');
-      return {
-        scene: Number.parseInt(rootElement.dataset.forgeScene, 10),
-        iconHost: rect(icon),
-        iconPaint: {
-          width: iconPaint.width,
-          height: iconPaint.height,
-          left: iconPaint.left,
-          top: iconPaint.top,
-          transform: iconPaint.transform,
-          backgroundImage: iconPaint.backgroundImage.slice(0, 64)
-        },
-        title: {
-          ...rect(title),
-          fontSize: titlePaint.fontSize,
-          letterSpacing: titlePaint.letterSpacing
-        },
-        hiddenNativeLines: {
-          kickerOpacity: getComputedStyle(kicker).opacity,
-          subtitleOpacity: getComputedStyle(subtitle).opacity
-        }
-      };
-    });
-    if (seenScenes.has(record.scene)) break;
-    seenScenes.add(record.scene);
-    const fileName = `${String(index).padStart(2, '0')}-scene-${record.scene}.png`;
-    await page.screenshot({
-      path: path.join(outputDirectory, fileName),
-      fullPage: true
-    });
-    records.push({ ...record, file: fileName });
+        const iconPaint = getComputedStyle(icon, '::before');
+        const titlePaint = getComputedStyle(title, '::after');
+        return {
+          scene: Number.parseInt(rootElement.dataset.forgeScene, 10),
+          mode: rootElement.dataset.forgeMode,
+          slot: getComputedStyle(rootElement).getPropertyValue('--forge-scene-slot').trim(),
+          heroProfile: getComputedStyle(rootElement).getPropertyValue('--forge-landing-hero-profile').trim(),
+          iconHost: rect(icon),
+          iconPaint: {
+            width: iconPaint.width,
+            height: iconPaint.height,
+            left: iconPaint.left,
+            top: iconPaint.top,
+            transform: iconPaint.transform,
+            backgroundImage: iconPaint.backgroundImage.slice(0, 96),
+            opacity: iconPaint.opacity,
+            filter: iconPaint.filter,
+            mixBlendMode: iconPaint.mixBlendMode
+          },
+          title: {
+            ...rect(title),
+            fontSize: titlePaint.fontSize,
+            letterSpacing: titlePaint.letterSpacing,
+            color: titlePaint.color,
+            opacity: titlePaint.opacity,
+            textShadow: titlePaint.textShadow,
+            content: titlePaint.content,
+            ariaLabel: title.getAttribute('aria-label')
+          },
+          hiddenNativeLines: {
+            kickerOpacity: getComputedStyle(kicker).opacity,
+            subtitleOpacity: getComputedStyle(subtitle).opacity
+          }
+        };
+      });
+      if (seenScenes.has(record.scene)) {
+        throw new Error(`Scene ${record.scene} repeated before the 20-scene capture matrix completed`);
+      }
+      seenScenes.add(record.scene);
+      const scene = payload.theme.background.gallery[record.scene];
+      const fileName = `${String(captureIndex).padStart(2, '0')}-${scene.slot}-${scene.id}.png`;
+      await page.screenshot({
+        path: path.join(outputDirectory, fileName),
+        fullPage: true
+      });
+      records.push({ ...record, file: fileName });
 
-    const priorScene = record.scene;
-    await page.locator('[data-native-slot="new-task"]').click();
-    await page.waitForFunction(previous => {
-      const runtime = window.__wukongCodexForgeRuntimeV13;
-      return Boolean(
-        runtime &&
-        runtime.currentScene !== previous &&
-        !runtime.transitionInFlight &&
-        !runtime.requestedScene
-      );
-    }, priorScene);
+      captureIndex += 1;
+      if (groupIndex + 1 < group.count) {
+        const priorScene = record.scene;
+        await page.evaluate(mode => window.__wukongCodexThemeRuntimeV13.nextBackground(mode), group.mode);
+        await page.waitForFunction(previous => {
+          const runtime = window.__wukongCodexThemeRuntimeV13;
+          return Boolean(
+            runtime &&
+            runtime.currentScene !== previous &&
+            !runtime.transitionInFlight &&
+            !runtime.requestedScene
+          );
+        }, priorScene);
+      }
+    }
+  }
+
+  if (records.length !== payload.theme.background.gallery.length) {
+    throw new Error(`Captured ${records.length} scenes; expected ${payload.theme.background.gallery.length}`);
   }
 
   fs.writeFileSync(

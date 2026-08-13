@@ -3,7 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-const MANAGED_BY = 'WukongCodexForgeNativeTheme';
+const MANAGED_BY = 'WukongCodexThemeNativeTheme';
+const LEGACY_MANAGED_BY = 'WukongCodexForgeNativeTheme';
 
 const escapeRegExp = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -182,7 +183,9 @@ function writeUtf8(file, text) {
 }
 
 function validateManagedState(state, { config, destination }) {
-  if (state.managedBy !== MANAGED_BY) throw new Error('Refusing native theme operation: state marker is invalid.');
+  if (state.managedBy !== MANAGED_BY && state.managedBy !== LEGACY_MANAGED_BY) {
+    throw new Error('Refusing native theme operation: state marker is invalid.');
+  }
   if (path.resolve(config).toLowerCase() !== path.resolve(state.configPath).toLowerCase()) {
     throw new Error('Refusing native theme operation: config path does not match the state marker.');
   }

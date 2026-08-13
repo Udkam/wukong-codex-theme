@@ -865,6 +865,7 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
     const abovePortal = root.querySelector('[data-above-composer-portal]');
     const stackSlot = root.querySelector('[data-native-above-stack-slot]');
     const utilitySlot = root.querySelector('[data-native-composer-utility-slot]');
+    const composerSurface = root.querySelector('.composer-surface-chrome');
     const footerActions = root.querySelector('.composer-footer-actions');
     const model = root.querySelector('[data-native-slot="composer-model"]');
     const submit = root.querySelector('[data-native-slot="composer-submit"]');
@@ -873,6 +874,7 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
     stackSlot.replaceChildren();
     utilitySlot.replaceChildren();
     utilitySlot.className = '';
+    composerSurface.before(utilitySlot);
     footerActions.querySelector('[data-fixture-control="goal"]')?.remove();
     model.childNodes[0].nodeValue = '5.6 Terra 极高';
     submit.removeAttribute('aria-label');
@@ -913,6 +915,25 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
         class="horizontal-scroll-fade-mask hide-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden native-home-composer-scroll-area"
         role="group" aria-label="Composer utility bar">
         <div class="flex w-max min-w-full items-center gap-1 native-home-composer-scroll-inner">
+          <button data-composer-navigation-target="workspace-project">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M2 4.5h4l1.2 1.5H14v6.5H2z"/>
+            </svg>
+            <span>选择项目</span>
+          </button>
+          <button data-composer-navigation-target="plugins">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M5.5 2.5v3M10.5 2.5v3M4 5.5h8v3a4 4 0 0 1-8 0zM8 12.5v1.5"/>
+            </svg>
+            <span>插件</span>
+          </button>
+        </div>
+      </div>`;
+    const codexHomeContextMarkup = `
+      <div data-composer-utility-bar-scroll-area
+        class="horizontal-scroll-fade-mask hide-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden native-home-composer-scroll-area"
+        role="group" aria-label="Composer utility bar">
+        <div class="flex w-max min-w-full items-center gap-1 native-home-composer-scroll-inner">
           ${contextButtons}
         </div>
       </div>`;
@@ -922,13 +943,20 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
         'native-composer-utility flex flex-wrap items-center gap-2 overflow-visible pr-2 pl-2';
       utilitySlot.innerHTML = contextMarkup;
     }
-    if (selectedState === 'home-context') {
+    if (selectedState === 'home-context' || selectedState === 'codex-home-context') {
       utilitySlot.className =
         '-mx-px flex flex-nowrap items-center gap-2 overflow-hidden bg-token-side-bar-background px-2 ' +
         '-mb-4.5 rounded-t-2xl pt-2 pb-[27px] electron:relative ' +
         'electron:mx-[var(--home-composer-inline-inset)] electron:px-1.5 ' +
         'native-home-composer-utility';
-      utilitySlot.innerHTML = homeContextMarkup;
+      utilitySlot.innerHTML = selectedState === 'codex-home-context'
+        ? codexHomeContextMarkup
+        : homeContextMarkup;
+      if (selectedState === 'home-context') {
+        composerSurface.after(utilitySlot);
+      } else {
+        composerSurface.before(utilitySlot);
+      }
     }
 
     if (
@@ -1015,8 +1043,8 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
                     <path d="M8 2.75A5.25 5.25 0 0 1 13.25 8"/>
                   </svg>
                   <span>第 5 / 6 步 · 19 个文件已更改…</span>
-                  <span style="color:#198b35">+1073</span>
-                  <span style="color:#b52e27">-83</span>
+                  <span class="text-token-git-decoration-added-resource-foreground" style="color:#198b35">+1073</span>
+                  <span class="text-token-git-decoration-deleted-resource-foreground" style="color:#b52e27">-83</span>
                 </div>
               </div>
             </div>

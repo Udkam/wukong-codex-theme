@@ -88,12 +88,12 @@ try {
         throw "The manifest executable does not exist: $executable"
     }
 
-    if (-not ('WukongCodexForge.AppxActivation' -as [type])) {
+    if (-not ('WukongCodexTheme.AppxActivation' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 
-namespace WukongCodexForge {
+namespace WukongCodexTheme {
     [Flags]
     internal enum ActivateOptions {
         None = 0x00000000,
@@ -149,7 +149,7 @@ namespace WukongCodexForge {
 '@
     }
 
-    $processId = [WukongCodexForge.AppxActivation]::Activate($aumid, $argumentLine)
+    $processId = [WukongCodexTheme.AppxActivation]::Activate($aumid, $argumentLine)
     $result = [ordered]@{
         pid = $processId
         aumid = $aumid

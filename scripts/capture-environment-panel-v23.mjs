@@ -27,7 +27,7 @@ if (fs.existsSync(outputDirectory)) {
 fs.mkdirSync(outputDirectory, { recursive: true });
 
 const styleSheet = fs.readFileSync(
-  path.join(root, 'runtime', 'forge-background-v13.css'),
+  path.join(root, 'runtime', 'wukong-codex-theme-background-v13.css'),
   'utf8'
 );
 const payload = payloadFromThemeFile(path.join(root, 'themes', 'active.json'));

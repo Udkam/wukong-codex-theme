@@ -65,7 +65,7 @@ if ([string]$marker.name -ne 'wukong-codex-theme') {
 
 $programs = [Environment]::GetFolderPath('Programs')
 $shortcutPath = Join-Path $programs 'ChatGPT.lnk'
-$adapterRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge'))
+$adapterRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexTheme'))
 $repositoryId = (Get-TextSha256 $rootPath.ToLowerInvariant()).Substring(0, 16).ToLowerInvariant()
 $nativeActivatorPath = Join-Path $adapterRoot "native-supervisor\appx-activator-$repositoryId.exe"
 $eventPath = Join-Path $adapterRoot 'shortcut-hook-events.jsonl'
@@ -192,6 +192,7 @@ if ([bool]$latestEvent.portable -ne [bool]$Portable -or [bool]$latestEvent.repos
 }
 if (
     -not [string]::Equals([string]$latestEvent.shortcutPath, $shortcutPath, [StringComparison]::OrdinalIgnoreCase) -or
+    -not [string]::Equals([string]$latestEvent.managedBy, 'WukongCodexThemeLaunchAdapter', [StringComparison]::Ordinal) -or
     -not [string]::Equals([string]$latestEvent.entryPolicy, 'native-chatgpt-only', [StringComparison]::Ordinal) -or
     -not [string]::Equals([IO.Path]::GetFullPath([string]$latestEvent.activationHelper), $nativeActivatorPath, [StringComparison]::OrdinalIgnoreCase) -or
     -not [string]::Equals([string]$latestEvent.activationHelperSource, 'runtime\activate-appx.cs', [StringComparison]::Ordinal) -or

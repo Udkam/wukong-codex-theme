@@ -75,6 +75,112 @@ function Quote-NativeArgument([string]$Value) {
     return $builder.ToString()
 }
 
+function Test-LegacyRunCommandOwned(
+    [string]$Command,
+    [string]$ExpectedInstallRoot
+) {
+    if ([string]::IsNullOrWhiteSpace($Command)) { return $false }
+    $match = [regex]::Match($Command, '^\s*(?:"([^"]+)"|(\S+))')
+    if (-not $match.Success) { return $false }
+    $executableText = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+    try {
+        $executablePath = [IO.Path]::GetFullPath($executableText)
+        $ownedRoot = [IO.Path]::GetFullPath($ExpectedInstallRoot) + [IO.Path]::DirectorySeparatorChar
+    }
+    catch {
+        return $false
+    }
+    return (
+        $executablePath.StartsWith($ownedRoot, [StringComparison]::OrdinalIgnoreCase) -and
+        [IO.Path]::GetFileName($executablePath) -match '^native-entry-supervisor-[0-9a-f]+\.exe$'
+    )
+}
+
+function Retire-LegacySupervisor(
+    [string]$RunKeyPath,
+    [string]$LegacyRunValueName,
+    [string]$LegacyInstallRoot,
+    [string]$LegacyStatePath,
+    [string]$ExpectedRepositoryRoot,
+    [string]$LegacyStopEventName,
+    [string]$LegacyInstanceMutexName
+) {
+    $runValues = Get-ItemProperty -Path $RunKeyPath -ErrorAction SilentlyContinue
+    $legacyRunCommand = if ($runValues) { [string]$runValues.$LegacyRunValueName } else { '' }
+    $runValuePresent = -not [string]::IsNullOrWhiteSpace($legacyRunCommand)
+    if ([string]::IsNullOrWhiteSpace($legacyRunCommand)) {
+        $legacyStateItem = Get-Item -LiteralPath $LegacyStatePath -Force -ErrorAction SilentlyContinue
+        if (-not $legacyStateItem -or $legacyStateItem.PSIsContainer -or ($legacyStateItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            return [pscustomobject]@{ status = 'not-present'; retired = $false }
+        }
+        try {
+            $legacyState = Get-Content -LiteralPath $LegacyStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $legacyRunCommand = [string]$legacyState.runCommand
+            $stateOwned = (
+                [int]$legacyState.schema -eq 2 -and
+                (Test-LegacyRunCommandOwned $legacyRunCommand $LegacyInstallRoot) -and
+                [string]::Equals(
+                    [IO.Path]::GetFullPath([string]$legacyState.repositoryRoot),
+                    [IO.Path]::GetFullPath($ExpectedRepositoryRoot),
+                    [StringComparison]::OrdinalIgnoreCase
+                )
+            )
+        }
+        catch {
+            $stateOwned = $false
+        }
+        if (-not $stateOwned) {
+            return [pscustomobject]@{ status = 'orphan-unowned-preserved'; retired = $false }
+        }
+    }
+    if (-not (Test-LegacyRunCommandOwned $legacyRunCommand $LegacyInstallRoot)) {
+        return [pscustomobject]@{ status = 'foreign-preserved'; retired = $false }
+    }
+
+    $legacyPrimitiveObserved = $false
+    try {
+        $legacyStopEvent = [Threading.EventWaitHandle]::OpenExisting($LegacyStopEventName)
+        try {
+            $legacyPrimitiveObserved = $true
+            $legacyStopEvent.Set() | Out-Null
+        }
+        finally { $legacyStopEvent.Dispose() }
+    }
+    catch [Threading.WaitHandleCannotBeOpenedException] {
+    }
+
+    try {
+        $legacyMutex = [Threading.Mutex]::OpenExisting($LegacyInstanceMutexName)
+        try {
+            $legacyPrimitiveObserved = $true
+            $legacyMutexOwned = $false
+            try { $legacyMutexOwned = $legacyMutex.WaitOne(7000) }
+            catch [Threading.AbandonedMutexException] { $legacyMutexOwned = $true }
+            if (-not $legacyMutexOwned) {
+                throw 'The owned legacy native entry supervisor did not stop within seven seconds.'
+            }
+            $legacyMutex.ReleaseMutex()
+        }
+        finally { $legacyMutex.Dispose() }
+    }
+    catch [Threading.WaitHandleCannotBeOpenedException] {
+    }
+
+    if (-not $runValuePresent) {
+        return [pscustomobject]@{
+            status = if ($legacyPrimitiveObserved) { 'orphan-retired' } else { 'owned-state-not-running' }
+            retired = [bool]$legacyPrimitiveObserved
+        }
+    }
+    $currentValues = Get-ItemProperty -Path $RunKeyPath -ErrorAction SilentlyContinue
+    $currentLegacyCommand = if ($currentValues) { [string]$currentValues.$LegacyRunValueName } else { '' }
+    if (-not [string]::Equals($currentLegacyCommand, $legacyRunCommand, [StringComparison]::Ordinal)) {
+        return [pscustomobject]@{ status = 'changed-preserved'; retired = $false }
+    }
+    Remove-ItemProperty -Path $RunKeyPath -Name $LegacyRunValueName -ErrorAction Stop
+    return [pscustomobject]@{ status = 'retired'; retired = $true }
+}
+
 $rootPath = [IO.Path]::GetFullPath($Root)
 $markerPath = Join-Path $rootPath 'package.json'
 $sourcePath = Join-Path $rootPath 'runtime\native-entry-supervisor.cs'
@@ -143,7 +249,7 @@ if (-not (Test-Path -LiteralPath $bridgePath)) {
     throw "The verified launch bridge is missing: $bridgePath"
 }
 Assert-DirectPath -Path $bridgePath -Label 'verified Node bridge'
-$expectedBridgeRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge\launcher-bridges')) + [IO.Path]::DirectorySeparatorChar
+$expectedBridgeRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexTheme\launcher-bridges')) + [IO.Path]::DirectorySeparatorChar
 if (-not $bridgePath.StartsWith($expectedBridgeRoot, [StringComparison]::OrdinalIgnoreCase)) {
     throw 'The Node bridge is outside the managed LocalAppData bridge directory.'
 }
@@ -169,7 +275,7 @@ if (-not (Test-Path -LiteralPath $profilePath)) {
 }
 Assert-DirectPath -Path $profilePath -Label 'native Codex profile'
 
-$installRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge\native-supervisor'))
+$installRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexTheme\native-supervisor'))
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 Assert-DirectPath -Path $installRoot -Label 'native supervisor install root'
 $repositoryId = (Get-TextSha256 $rootPath.ToLowerInvariant()).Substring(0, 16).ToLowerInvariant()
@@ -178,11 +284,18 @@ $temporaryExePath = Join-Path $installRoot "native-entry-supervisor-$repositoryI
 $activatorExePath = Join-Path $installRoot "appx-activator-$repositoryId.exe"
 $temporaryActivatorExePath = Join-Path $installRoot "appx-activator-$repositoryId.new.exe"
 $statePath = Join-Path $installRoot 'install-state.json'
-$runValueName = 'WukongCodexForgeNativeEntrySupervisor'
+$runValueName = 'WukongCodexThemeNativeEntrySupervisor'
 $runKeyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-$stopEventName = 'Local\WukongCodexForge.NativeEntrySupervisor.Stop'
-$readyEventName = 'Local\WukongCodexForge.NativeEntrySupervisor.Ready'
-$instanceMutexName = 'Local\WukongCodexForge.NativeEntrySupervisor.Instance'
+$stopEventName = 'Local\WukongCodexTheme.NativeEntrySupervisor.Stop'
+$readyEventName = 'Local\WukongCodexTheme.NativeEntrySupervisor.Ready'
+$instanceMutexName = 'Local\WukongCodexTheme.NativeEntrySupervisor.Instance'
+$legacyLifecycleIds = [ordered]@{
+    installRoot = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge\native-supervisor'))
+    statePath = [IO.Path]::GetFullPath((Join-Path $env:LOCALAPPDATA 'WukongCodexForge\native-supervisor\install-state.json'))
+    runValueName = 'WukongCodexForgeNativeEntrySupervisor'
+    stopEventName = 'Local\WukongCodexForge.NativeEntrySupervisor.Stop'
+    instanceMutexName = 'Local\WukongCodexForge.NativeEntrySupervisor.Instance'
+}
 $argumentValues = @(
     '--repo', $rootPath,
     '--chatgpt', $chatGptPath,
@@ -281,6 +394,14 @@ if ((Test-Path -LiteralPath $statePath) -and (Test-Path -LiteralPath $exePath) -
 }
 
 if ($reused) {
+    $legacyRetirement = Retire-LegacySupervisor `
+        -RunKeyPath $runKeyPath `
+        -LegacyRunValueName $legacyLifecycleIds.runValueName `
+        -LegacyInstallRoot $legacyLifecycleIds.installRoot `
+        -LegacyStatePath $legacyLifecycleIds.statePath `
+        -ExpectedRepositoryRoot $rootPath `
+        -LegacyStopEventName $legacyLifecycleIds.stopEventName `
+        -LegacyInstanceMutexName $legacyLifecycleIds.instanceMutexName
     $reuseResult = [ordered]@{
         installed = $true
         started = $true
@@ -309,6 +430,7 @@ if ($reused) {
         currentChatGptUntouched = $true
         activationRuntime = 'native-dotnet-framework'
         powerShellOnLaunch = $false
+        legacySupervisorRetirement = $legacyRetirement
     }
     $reuseResult | ConvertTo-Json -Compress
     return
@@ -420,6 +542,14 @@ finally {
     $readyEvent.Dispose()
 }
 $started.Refresh()
+$legacyRetirement = Retire-LegacySupervisor `
+    -RunKeyPath $runKeyPath `
+    -LegacyRunValueName $legacyLifecycleIds.runValueName `
+    -LegacyInstallRoot $legacyLifecycleIds.installRoot `
+    -LegacyStatePath $legacyLifecycleIds.statePath `
+    -ExpectedRepositoryRoot $rootPath `
+    -LegacyStopEventName $legacyLifecycleIds.stopEventName `
+    -LegacyInstanceMutexName $legacyLifecycleIds.instanceMutexName
 $installedState = [ordered]@{
     schema = 2
     installedAt = [DateTime]::UtcNow.ToString('o')
@@ -441,6 +571,7 @@ $installedState = [ordered]@{
     runCommand = $runCommand
     supervisorPid = $started.Id
     processStartTimeUtcTicks = $started.StartTime.ToUniversalTime().Ticks
+    legacySupervisorRetirement = $legacyRetirement
 }
 $stateJson = $installedState | ConvertTo-Json -Compress
 [IO.File]::WriteAllText($statePath, $stateJson + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
@@ -476,5 +607,6 @@ $result = [ordered]@{
     currentChatGptUntouched = $true
     activationRuntime = 'native-dotnet-framework'
     powerShellOnLaunch = $false
+    legacySupervisorRetirement = $legacyRetirement
 }
 $result | ConvertTo-Json -Compress

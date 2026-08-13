@@ -10,7 +10,10 @@ import {
   controlPipeName,
   createHostSignals,
   deriveOfficialPaths,
+  disablePipeCandidates,
   findReusableDevToolsPort,
+  legacyControlPipeName,
+  legacyRepositoryStateRoot,
   parseHostArgs,
   repositoryStateRoot,
   resolveHostPaths,
@@ -194,15 +197,42 @@ test('event host arguments, official path derivation and pipe ownership are dete
       env: { USERPROFILE: 'C:\\Users\\Test', LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' }
     })
   );
-  assert.match(repositoryResolved.stateRoot, /WukongCodexForge[\\/]repository-state[\\/][0-9a-f]{24}$/);
+  assert.match(repositoryResolved.stateRoot, /WukongCodexTheme[\\/]repository-state[\\/][0-9a-f]{24}$/);
   assert.equal(repositoryResolved.stateRoot.startsWith(path.resolve('C:\\checkout')), false);
   assert.equal(controlPipeName(resolved.stateRoot), controlPipeName(resolved.stateRoot.toUpperCase()));
-  assert.match(controlPipeName(resolved.stateRoot), /^\\\\\.\\pipe\\WukongCodexForge-[0-9a-f]{24}$/);
+  assert.match(controlPipeName(resolved.stateRoot), /^\\\\\.\\pipe\\WukongCodexTheme-[0-9a-f]{24}$/);
+  const legacyState = legacyRepositoryStateRoot({
+    root: 'C:\\checkout\\wukong-codex-theme',
+    env: { USERPROFILE: 'C:\\Users\\Test', LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local' }
+  });
+  assert.match(legacyState, /WukongCodexForge[\\/]repository-state[\\/][0-9a-f]{24}$/);
+  assert.match(legacyControlPipeName(legacyState), /^\\\\\.\\pipe\\WukongCodexForge-[0-9a-f]{24}$/);
+  const retainedResolved = resolveHostPaths({
+    root: 'C:\\retained\\app',
+    env: { USERPROFILE: 'C:\\Users\\Test', APPDATA: 'C:\\Users\\Test\\AppData\\Roaming' }
+  });
+  assert.match(retainedResolved.stateRoot, /[\\/]\.codex[\\/]themes[\\/]wukong-codex-theme$/);
   assert.match(browserIdentity({
     Browser: 'Codex/test',
     webSocketDebuggerUrl: 'ws://127.0.0.1:17777/devtools/browser/stable'
   }), /Codex\/test/);
   assert.throws(() => browserIdentity({ webSocketDebuggerUrl: 'ws://example.com/devtools/browser/a' }), /non-loopback/);
+});
+
+test('signal-disable tries deduplicated new and legacy repository/retained lifecycle pipes', () => {
+  const host = read('runtime/host.mjs');
+  const candidates = disablePipeCandidates({
+    root: 'C:\\checkout\\wukong-codex-theme',
+    env: {
+      USERPROFILE: 'C:\\Users\\Test',
+      LOCALAPPDATA: 'C:\\Users\\Test\\AppData\\Local'
+    }
+  });
+  assert.equal(candidates.length, new Set(candidates).size);
+  assert.ok(candidates.some(candidate => candidate.includes('WukongCodexTheme-')));
+  assert.ok(candidates.some(candidate => candidate.includes('WukongCodexForge-')));
+  assert.match(host, /disablePipeCandidates\(\{ root, portable, repository \}\)/);
+  assert.match(host, /for \(const candidate of candidates\)[\s\S]*?sendControl\(candidate, \{ type: 'disable' \}\)/);
 });
 
 test('startup follows the managed DevTools channel after the short-lived Store relay exits', async () => {

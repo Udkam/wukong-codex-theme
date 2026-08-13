@@ -17,7 +17,7 @@ test('minimal managed package imports independently and omits development surfac
     assert.equal(fs.existsSync(path.join(target, omitted)), false, `development-only path copied: ${omitted}`);
   }
   for (const required of [
-    'runtime/forge-background-v13.css',
+    'runtime/wukong-codex-theme-background-v13.css',
     'runtime/injection-plan-v13.mjs',
     'runtime/host.mjs',
     'runtime/activate-appx.cs',
@@ -47,6 +47,11 @@ test('minimal managed package imports independently and omits development surfac
   ]) {
     assert.equal(fs.existsSync(path.join(target, required)), true, `managed file missing: ${required}`);
   }
+  assert.equal(
+    fs.existsSync(path.join(target, 'runtime', 'forge-background-v13.css')),
+    false,
+    'retired Forge-branded V13 stylesheet was packaged'
+  );
   const prepareBackground = fs.readFileSync(
     path.join(target, 'scripts', 'prepare-background.ps1'),
     'utf8'
@@ -123,7 +128,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'ws-client.mjs')), false, 'superseded ws bundle was packaged');
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'ws-client-node.mjs')), false, 'diagnostic ws bundle was packaged');
   const packagedManifest = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
-  assert.equal(packagedManifest.version, '0.14.7');
+  assert.equal(packagedManifest.version, '0.15.0');
   assert.deepEqual(packagedManifest.dependencies, {});
   for (const rejected of [
     'themes/assets/erlang-meishan.jpg',
@@ -150,7 +155,7 @@ test('minimal managed package imports independently and omits development surfac
   ]) assert.equal(fs.existsSync(path.join(target, rejected)), false, `rejected asset packaged: ${rejected}`);
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'capture-live.mjs')), false);
   const portableReadme = fs.readFileSync(path.join(target, 'PORTABLE-README.txt'), 'utf8');
-  assert.match(portableReadme, /CURRENT V53 ORDERED 20-BACKGROUND GALLERY/);
+  assert.match(portableReadme, /CURRENT V61 VISIBLE WORDMARK WITH ORDERED 20-BACKGROUND GALLERY/);
   assert.match(portableReadme, /20-image gallery \(13 battle \+ 7 scenery\) in two explicit playback sequences/);
   assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16/);
   assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10/);
@@ -160,6 +165,9 @@ test('minimal managed package imports independently and omits development surfac
   assert.match(portableReadme, /Ctrl\+Alt\+F/);
   assert.match(portableReadme, /Ctrl\+Alt\+B/);
   assert.match(portableReadme, /Ctrl\+Alt\+C/);
+  assert.match(portableReadme, /Ctrl\+Alt\+K locks the exact visible image and battle\/scenery sequence/);
+  assert.match(portableReadme, /F\/B\/C remain active while locked and make the manually selected background the new locked target/);
+  assert.match(portableReadme, /press K again to resume the current page's automatic sequence/i);
   assert.match(portableReadme, /Ctrl\+Alt\+T hides or shows both the New Task quote/);
   assert.match(portableReadme, /New Task pages automatically use the battle sequence; project\/thread pages automatically use the scenery sequence/);
   assert.doesNotMatch(portableReadme, /Ctrl\+Alt\+Shift\+B/);
@@ -235,6 +243,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.deepEqual(payload.assets.map(asset => asset.slot), payload.theme.background.gallery.map(scene => scene.slot));
   assert.deepEqual(payload.assets.map(asset => asset.order), payload.theme.background.gallery.map(scene => scene.order));
   assert.deepEqual(payload.assets.map(asset => asset.threadVeil), payload.theme.background.gallery.map(scene => scene.threadVeil));
+  assert.deepEqual(payload.assets.map(asset => asset.heroProfile), payload.theme.background.gallery.map(scene => scene.heroProfile));
   const client = await import(pathToFileURL(path.join(target, 'runtime', 'cdp-client.mjs')));
   assert.equal(typeof client.getTargets, 'function');
   assert.equal(typeof client.commandTarget, 'function');

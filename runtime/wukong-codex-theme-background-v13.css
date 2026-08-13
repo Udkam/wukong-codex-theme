@@ -42,7 +42,7 @@
   position: relative;
 }
 
-:root.forge-ink-mountain #wukong-forge-background {
+:root.forge-ink-mountain #wukong-codex-theme-background {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -53,22 +53,22 @@
   background: var(--forge-paper);
 }
 
-:root.forge-ink-mountain #wukong-forge-background > [data-forge-background-layer] {
+:root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer] {
   position: absolute;
   inset: 0;
   opacity: 0;
   transition: opacity var(--forge-background-transition) cubic-bezier(.4, 0, .6, 1);
 }
 
-:root.forge-ink-mountain #wukong-forge-background:not([data-forge-transitioning="true"]) > [data-forge-background-layer][data-forge-active="false"] {
+:root.forge-ink-mountain #wukong-codex-theme-background:not([data-forge-transitioning="true"]) > [data-forge-background-layer][data-forge-active="false"] {
   transition: none;
 }
 
-:root.forge-ink-mountain #wukong-forge-background[data-forge-transitioning="true"] > [data-forge-background-layer][data-forge-active="true"] {
+:root.forge-ink-mountain #wukong-codex-theme-background[data-forge-transitioning="true"] > [data-forge-background-layer][data-forge-active="true"] {
   will-change: opacity;
 }
 
-:root.forge-ink-mountain #wukong-forge-background > [data-forge-background-layer][data-forge-active="true"] {
+:root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer][data-forge-active="true"] {
   opacity: 1;
 }
 
@@ -181,10 +181,13 @@
  * New-task hero: preserve the official 56×56 icon and title footprints while
  * replacing only their paint. The motif is the official 悟空 brush wordmark
  * and seal, painted at three times the native icon size from a 2× raster.
- * Light and dark variants follow each manifest slot without filters or extra
- * surfaces. The native kicker and descriptive subtitle keep their layout boxes
- * but become visually transparent so the hero contains only the mark and themed
- * title.
+ * Light and dark variants follow each manifest slot. Four reviewed background
+ * profiles apply a static brightness/saturation/contrast treatment with tight
+ * opposite-tone edge separation to the 168 px paint layer. This keeps every
+ * profile visibly distinct while preserving the brush texture, avoiding a
+ * diffuse glow surface, and leaving native geometry unchanged. The native
+ * kicker and descriptive subtitle keep their layout boxes but become visually
+ * transparent so the hero contains only the mark and themed title.
  */
 :root.forge-ink-mountain [data-forge-title-copy] {
   position: relative !important;
@@ -218,7 +221,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #e7dcc4;
+  color: var(--forge-landing-quote-color, #e0d3ba);
   font-family: "STKaiti", "KaiTi", "Microsoft YaHei UI", serif;
   font-size: .9em;
   font-weight: 500;
@@ -226,9 +229,11 @@
   line-height: inherit;
   text-align: center;
   white-space: nowrap;
-  text-shadow:
-    0 1px 0 rgba(12, 13, 12, .72),
-    0 0 18px rgba(202, 164, 92, .22);
+  opacity: var(--forge-landing-quote-opacity, .95);
+  text-shadow: var(
+    --forge-landing-quote-shadow,
+    0 1px 1px rgba(4, 3, 2, .9), 0 0 5px rgba(4, 3, 2, .3)
+  );
   pointer-events: none;
 }
 
@@ -262,6 +267,9 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: contain;
+  opacity: var(--forge-landing-mark-opacity, 1);
+  filter: var(--forge-landing-mark-filter, none);
+  mix-blend-mode: normal;
   pointer-events: none;
 }
 
@@ -424,7 +432,7 @@
     -1px 0 0 rgba(75, 51, 27, .42) inset;
 }
 
-:root.forge-ink-mountain .forge-composer-context::before,
+:root.forge-ink-mountain .forge-composer-context-above::before,
 :root.forge-ink-mountain
   .forge-composer-panel-stack
   > .forge-composer-panel:first-child::before {
@@ -438,6 +446,42 @@
   );
 }
 
+/*
+ * Adjacent outer rows already share an exact native edge. Only the first row
+ * owns the two-pixel top engraving; repeating it on the goal row reads as a
+ * physical gap between the queue and the active goal. Keep an intentional
+ * brown separator on the retained native border, extend the goal paper one
+ * pixel upward, and place a continuous paper field behind the whole stack.
+ * The shared underpaint prevents Chromium's fractional-DPI antialiasing from
+ * sampling the scene while the separator still preserves the row boundary.
+ */
+:root.forge-ink-mountain
+  .forge-composer-panel
+  + .forge-composer-panel {
+  border-top-color: rgba(75, 51, 27, .5) !important;
+}
+
+:root.forge-ink-mountain
+  .forge-composer-panel
+  + .forge-composer-panel::before {
+  top: -1px;
+  background-image: var(--forge-ui-paper-tile);
+  background-position: center;
+  background-repeat: repeat;
+  background-size: 512px 220px !important;
+}
+
+:root.forge-ink-mountain .forge-composer-context-below::before {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px)
+  );
+}
+
 :root.forge-ink-mountain .forge-composer-context::after,
 :root.forge-ink-mountain
   .forge-composer-panel-stack
@@ -445,15 +489,21 @@
   content: "";
   position: absolute;
   inset-inline: 0;
-  top: 0;
   height: 29px;
   z-index: -1;
   pointer-events: none;
   background-color: transparent;
   background-image: var(--forge-ui-composer-strip);
-  background-position: center top;
   background-repeat: no-repeat;
   background-size: 100% 58px !important;
+}
+
+:root.forge-ink-mountain .forge-composer-context-above::after,
+:root.forge-ink-mountain
+  .forge-composer-panel-stack
+  > .forge-composer-panel:first-child::after {
+  top: 0;
+  background-position: center top;
   clip-path: polygon(
     8px 0,
     calc(100% - 8px) 0,
@@ -461,6 +511,24 @@
     100% 100%,
     0 100%,
     0 8px
+  );
+}
+
+/*
+ * Work places the project/plugin utility strip below the main composer. Use
+ * the lower half of the two-ended strip asset and close the lower corners;
+ * thread project/environment/branch controls keep the independent upper half.
+ */
+:root.forge-ink-mountain .forge-composer-context-below::after {
+  bottom: 0;
+  background-position: center bottom;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    8px 100%,
+    0 calc(100% - 8px)
   );
 }
 
@@ -481,7 +549,25 @@
 }
 
 :root.forge-ink-mountain .forge-composer-panel-stack::before {
-  content: none !important;
+  content: "" !important;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #87755d;
+  background-image: var(--forge-ui-paper-tile);
+  background-position: center;
+  background-repeat: repeat;
+  background-size: 512px 220px !important;
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% 100%,
+    0 100%,
+    0 8px
+  );
+  box-shadow: none;
 }
 
 :root.forge-ink-mountain .forge-composer-panel + .forge-composer-panel {
@@ -549,6 +635,8 @@
   --color-token-description-foreground: #332619;
   --color-token-icon-foreground: #080604;
   color: #080604 !important;
+  position: relative !important;
+  isolation: isolate;
   background-color: transparent !important;
   background-image: none !important;
   border-color: transparent !important;
@@ -557,6 +645,40 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
+}
+
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *):has(
+    > .relative.min-w-0.overflow-clip.text-token-foreground
+  )::before {
+  content: "" !important;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #87755d;
+  background-image: var(--forge-ui-paper-tile);
+  background-position: center;
+  background-repeat: repeat;
+  background-size: 512px 220px !important;
+  clip-path: polygon(
+    8px 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% 100%,
+    0 100%,
+    0 8px
+  );
+  box-shadow: none;
+}
+
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
+  > .relative.min-w-0.overflow-clip.text-token-foreground
+  + .relative.min-w-0.overflow-clip.text-token-foreground {
+  border-top-color: rgba(75, 51, 27, .5) !important;
 }
 
 :root.forge-ink-mountain
@@ -603,6 +725,18 @@
   box-shadow:
     1px 0 0 rgba(75, 51, 27, .42) inset,
     -1px 0 0 rgba(75, 51, 27, .42) inset;
+}
+
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
+  > .relative.min-w-0.overflow-clip.text-token-foreground
+  + .relative.min-w-0.overflow-clip.text-token-foreground::before {
+  top: -1px;
+  background-image: var(--forge-ui-paper-tile);
+  background-position: center;
+  background-repeat: repeat;
+  background-size: 512px 220px !important;
 }
 
 :root.forge-ink-mountain
@@ -765,7 +899,12 @@
 
 :root.forge-ink-mountain .forge-composer-progress-pill,
 :root.forge-ink-mountain .forge-plan-pill,
-:root.forge-ink-mountain .forge-diff-summary {
+:root.forge-ink-mountain .forge-diff-summary,
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  [data-above-composer-portal]
+  .relative.col-start-1.row-start-1.h-8.self-end
+  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5 {
   --color-token-foreground: #080604;
   --color-token-text-primary: #080604;
   --color-token-text-secondary: #2a1f14;
@@ -788,12 +927,24 @@
     0 4px 11px rgba(5, 4, 3, .24) !important;
 }
 
-:root.forge-ink-mountain .forge-progress-status-icon {
+:root.forge-ink-mountain .forge-progress-status-icon,
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  [data-above-composer-portal]
+  .relative.col-start-1.row-start-1.h-8.self-end
+  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
+  svg {
   color: #063f61 !important;
   opacity: 1 !important;
 }
 
-:root.forge-ink-mountain .forge-progress-status-icon :is(circle, path) {
+:root.forge-ink-mountain .forge-progress-status-icon :is(circle, path),
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  [data-above-composer-portal]
+  .relative.col-start-1.row-start-1.h-8.self-end
+  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
+  svg :is(circle, path) {
   stroke: currentColor !important;
   stroke-opacity: 1 !important;
   stroke-width: 1.65px !important;
@@ -805,11 +956,21 @@
   text-shadow: 0 .35px .35px rgba(17, 11, 6, .34);
 }
 
-:root.forge-ink-mountain .forge-diff-added {
+:root.forge-ink-mountain .forge-diff-added,
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  [data-above-composer-portal]
+  .relative.col-start-1.row-start-1.h-8.self-end
+  .text-token-git-decoration-added-resource-foreground {
   color: #064521 !important;
 }
 
-:root.forge-ink-mountain .forge-diff-removed {
+:root.forge-ink-mountain .forge-diff-removed,
+:root.forge-ink-mountain
+  :is([data-codex-composer-root], [data-thread-find-composer="true"])
+  [data-above-composer-portal]
+  .relative.col-start-1.row-start-1.h-8.self-end
+  .text-token-git-decoration-deleted-resource-foreground {
   color: #781718 !important;
 }
 
@@ -1299,13 +1460,13 @@
 @media (prefers-reduced-motion: reduce) {
   :root.forge-ink-mountain { --forge-background-transition: 0ms; }
 
-  :root.forge-ink-mountain #wukong-forge-background > [data-forge-background-layer] {
+  :root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer] {
     transition: none !important;
   }
 }
 
 @media (forced-colors: active) {
-  :root.forge-ink-mountain #wukong-forge-background { display: none !important; }
+  :root.forge-ink-mountain #wukong-codex-theme-background { display: none !important; }
 
   :root.forge-ink-mountain body,
   :root.forge-ink-mountain #root,
@@ -1341,6 +1502,11 @@
   :root.forge-ink-mountain #root .forge-diff-removed,
   :root.forge-ink-mountain #root .forge-plan-pill,
   :root.forge-ink-mountain #root .forge-diff-summary,
+  :root.forge-ink-mountain #root
+    :is([data-codex-composer-root], [data-thread-find-composer="true"])
+    [data-above-composer-portal]
+    .relative.col-start-1.row-start-1.h-8.self-end
+    .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5,
   :root.forge-ink-mountain #root .forge-composer-submit,
   :root.forge-ink-mountain #root .forge-topbar-menu-item,
   :root.forge-ink-mountain #root .forge-sidebar-shell,
@@ -1418,8 +1584,22 @@
   }
 
   :root.forge-ink-mountain #root .forge-progress-status-icon,
+  :root.forge-ink-mountain #root
+    :is([data-codex-composer-root], [data-thread-find-composer="true"])
+    [data-above-composer-portal]
+    .relative.col-start-1.row-start-1.h-8.self-end
+    .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
+    svg,
   :root.forge-ink-mountain #root .forge-diff-added,
-  :root.forge-ink-mountain #root .forge-diff-removed {
+  :root.forge-ink-mountain #root .forge-diff-removed,
+  :root.forge-ink-mountain #root
+    :is([data-codex-composer-root], [data-thread-find-composer="true"])
+    [data-above-composer-portal]
+    .relative.col-start-1.row-start-1.h-8.self-end
+    :is(
+      .text-token-git-decoration-added-resource-foreground,
+      .text-token-git-decoration-deleted-resource-foreground
+    ) {
     color: CanvasText !important;
     -webkit-text-stroke: 0 !important;
     text-shadow: none !important;

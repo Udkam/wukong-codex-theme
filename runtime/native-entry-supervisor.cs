@@ -25,10 +25,10 @@ internal static class NativeEntrySupervisor
     private const int NativeKillSettleMs = 1200;
     private const int RestartWindowMinutes = 10;
     private const int RestartLimit = 3;
-    private const string StopEventName = @"Local\WukongCodexForge.NativeEntrySupervisor.Stop";
-    private const string ReadyEventName = @"Local\WukongCodexForge.NativeEntrySupervisor.Ready";
-    private const string ManagedLaunchEventName = @"Local\WukongCodexForge.NativeEntrySupervisor.ManagedLaunch";
-    private const string InstanceMutexName = @"Local\WukongCodexForge.NativeEntrySupervisor.Instance";
+    private const string StopEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.Stop";
+    private const string ReadyEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.Ready";
+    private const string ManagedLaunchEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.ManagedLaunch";
+    private const string InstanceMutexName = @"Local\WukongCodexTheme.NativeEntrySupervisor.Instance";
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
     private static readonly object StateLock = new object();
@@ -83,7 +83,7 @@ internal static class NativeEntrySupervisor
             runValueName = Required(options, "run-value");
 
             string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string stateDirectory = Path.Combine(localAppData, "WukongCodexForge", "native-supervisor");
+            string stateDirectory = Path.Combine(localAppData, "WukongCodexTheme", "native-supervisor");
             Directory.CreateDirectory(stateDirectory);
             eventLogPath = Path.Combine(stateDirectory, "events.jsonl");
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from '@playwright/test';
+import { PNG } from 'pngjs';
 import {
   makeApplyExpression,
   RESTORE_EXPRESSION
@@ -13,7 +14,7 @@ import {
 } from './runtime-fixture.mjs';
 
 const styleSheet = fs.readFileSync(
-  new URL('../runtime/forge-background-v13.css', import.meta.url),
+  new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url),
   'utf8'
 );
 
@@ -577,7 +578,7 @@ test('V50 maps composer paper without changing native geometry or content coordi
   await page.evaluate(RESTORE_EXPRESSION);
   await page.waitForFunction(() => !document.querySelector('[data-forge-mark]'));
   assert.equal(await page.locator('[data-forge-mark]').count(), 0);
-  assert.equal(await page.locator('#wukong-forge-background').count(), 0);
+  assert.equal(await page.locator('#wukong-codex-theme-background').count(), 0);
   assertRectsEqual(await snapshot(page), before);
   await page.close();
 });
@@ -1254,6 +1255,7 @@ test('V16 maps the native guided stack once and remaps context without a resize 
           ],
           panelBackdropFilter: panelStyle.backdropFilter,
           paintContent: paintStyle.content,
+          paintBackgroundImage: paintStyle.backgroundImage,
           paintClipPath: paintStyle.clipPath,
           paintBackgroundSize: paintStyle.backgroundSize,
           paintBackgroundPosition: paintStyle.backgroundPosition,
@@ -1307,6 +1309,10 @@ test('V16 maps the native guided stack once and remaps context without a resize 
       ],
       stackBackdropFilter: stackStyle.backdropFilter,
       stackPaintContent: stackPaintStyle.content,
+      stackPaintBackgroundImage: stackPaintStyle.backgroundImage,
+      stackPaintBackgroundSize: stackPaintStyle.backgroundSize,
+      stackPaintClipPath: stackPaintStyle.clipPath,
+      stackPaintPointerEvents: stackPaintStyle.pointerEvents,
       stackBorderRadius: stackStyle.borderRadius,
       panelPaint,
       queueItemPaint,
@@ -1338,16 +1344,28 @@ test('V16 maps the native guided stack once and remaps context without a resize 
   assert.equal(guidedPaint.stackBackdropFilter, 'none');
   assert.equal(
     guidedPaint.stackPaintContent,
-    'none',
-    'the stack must not stretch one paper image over multiple native rows'
+    '""',
+    'the joined rows need one continuous paper underpaint behind their own surfaces'
   );
+  assert.notEqual(guidedPaint.stackPaintBackgroundImage, 'none');
+  assert.equal(guidedPaint.stackPaintBackgroundSize, '512px 220px');
+  assert.equal(
+    guidedPaint.stackPaintClipPath,
+    'polygon(8px 0px, calc(100% - 8px) 0px, 100% 8px, 100% 100%, 0px 100%, 0px 8px)'
+  );
+  assert.equal(guidedPaint.stackPaintPointerEvents, 'none');
   assert.equal(guidedPaint.stackBorderRadius, '0px');
   assert.equal(guidedPaint.panelPaint.length, 2);
   guidedPaint.panelPaint.forEach((row, index) => {
     assert.equal(row.panelClipPath, 'none');
     assert.equal(row.panelBackgroundImage, 'none');
     assert.equal(row.panelBorderRadius, '0px');
-    assert.deepEqual(row.panelBorderColors, Array(4).fill('rgba(0, 0, 0, 0)'));
+    assert.deepEqual(
+      row.panelBorderColors,
+      index === 0
+        ? Array(4).fill('rgba(0, 0, 0, 0)')
+        : ['rgba(75, 51, 27, 0.5)', ...Array(3).fill('rgba(0, 0, 0, 0)')]
+    );
     assert.equal(row.panelBackdropFilter, 'none');
     assert.equal(row.paintContent, '""');
     assert.equal(
@@ -1359,9 +1377,19 @@ test('V16 maps the native guided stack once and remaps context without a resize 
     );
     assert.equal(
       row.paintBackgroundSize,
-      '100% 100%, 512px 220px',
-      'every outer panel must retain an independent non-stretched paper field'
+      index === 0 ? '100% 100%, 512px 220px' : '512px 220px',
+      'the first row owns the engraved edge while later rows keep only their paper field'
     );
+    if (index === 0) {
+      assert.match(row.paintBackgroundImage, /linear-gradient/);
+    } else {
+      assert.doesNotMatch(
+        row.paintBackgroundImage,
+        /linear-gradient/,
+        'a contiguous goal row must not repeat the queue top engraving as a visible gap'
+      );
+      assert.notEqual(row.paintBackgroundImage, 'none');
+    }
     assert.match(
       row.paintBackgroundPosition,
       /^50% 50%/,
@@ -1422,7 +1450,7 @@ test('V16 maps the native guided stack once and remaps context without a resize 
       'forge-composer-progress-fade'
     );
     delete fade.dataset.forgeMark;
-    window.__wukongCodexForgeRuntimeV13.refresh();
+    window.__wukongCodexThemeRuntimeV13.refresh();
     const after = fade.getBoundingClientRect();
     const hostAfter = host.getBoundingClientRect();
     const style = getComputedStyle(fade);
@@ -1510,6 +1538,9 @@ test('V16 maps the native guided stack once and remaps context without a resize 
     const queueItems = [...stack.querySelectorAll('.forge-composer-queue-item')];
     return {
       stackPaintContent: getComputedStyle(stack, '::before').content,
+      stackPaintBackgroundImage: getComputedStyle(stack, '::before').backgroundImage,
+      stackPaintBackgroundSize: getComputedStyle(stack, '::before').backgroundSize,
+      stackPaintClipPath: getComputedStyle(stack, '::before').clipPath,
       rows: rows.map(row => {
         const rect = row.getBoundingClientRect();
         const paint = getComputedStyle(row, '::before');
@@ -1518,6 +1549,7 @@ test('V16 maps the native guided stack once and remaps context without a resize 
           y: rect.y,
           height: rect.height,
           content: paint.content,
+          backgroundImage: paint.backgroundImage,
           backgroundSize: paint.backgroundSize,
           clipPath: paint.clipPath,
           capContent: cap.content
@@ -1537,11 +1569,26 @@ test('V16 maps the native guided stack once and remaps context without a resize 
       })
     };
   });
-  assert.equal(multiRowPaint.stackPaintContent, 'none');
+  assert.equal(multiRowPaint.stackPaintContent, '""');
+  assert.notEqual(multiRowPaint.stackPaintBackgroundImage, 'none');
+  assert.equal(multiRowPaint.stackPaintBackgroundSize, '512px 220px');
+  assert.equal(
+    multiRowPaint.stackPaintClipPath,
+    'polygon(8px 0px, calc(100% - 8px) 0px, 100% 8px, 100% 100%, 0px 100%, 0px 8px)'
+  );
   assert.equal(multiRowPaint.rows.length, 2);
   multiRowPaint.rows.forEach((row, index) => {
     assert.equal(row.content, '""', `outer row ${index + 1} must own a paper field`);
-    assert.equal(row.backgroundSize, '100% 100%, 512px 220px');
+    assert.equal(
+      row.backgroundSize,
+      index === 0 ? '100% 100%, 512px 220px' : '512px 220px'
+    );
+    if (index === 0) {
+      assert.match(row.backgroundImage, /linear-gradient/);
+    } else {
+      assert.doesNotMatch(row.backgroundImage, /linear-gradient/);
+      assert.notEqual(row.backgroundImage, 'none');
+    }
     assert.equal(
       row.clipPath,
       index === 0
@@ -1603,8 +1650,12 @@ test('V16 maps the native guided stack once and remaps context without a resize 
     ));
     const utilityRect = utility.getBoundingClientRect();
     const composerRect = composer.getBoundingClientRect();
+    const utilityStyle = getComputedStyle(utility);
+    const utilityField = getComputedStyle(utility, '::before');
+    const utilityPaint = getComputedStyle(utility, '::after');
     return {
       utilityIsInsideComponent: component.contains(utility) && !portal.contains(utility),
+      utilityIsAboveComposer: utility.nextElementSibling === composer,
       utilitySignature: [
         'flex',
         'flex-wrap',
@@ -1621,14 +1672,34 @@ test('V16 maps the native guided stack once and remaps context without a resize 
       ).length,
       footerReasoningInsideUtility: Boolean(
         utility.querySelector('[data-composer-navigation-target="reasoning"]')
-      )
+      ),
+      aboveMarker: utility.classList.contains('forge-composer-context-above'),
+      belowMarker: utility.classList.contains('forge-composer-context-below'),
+      utilityTransform: utilityStyle.transform,
+      utilityFieldClipPath: utilityField.clipPath,
+      utilityPaintTop: utilityPaint.top,
+      utilityPaintBottom: utilityPaint.bottom,
+      utilityPaintPosition: utilityPaint.backgroundPosition,
+      utilityPaintTransform: utilityPaint.transform
     };
   });
   assert.equal(contextContract.utilityIsInsideComponent, true);
+  assert.equal(contextContract.utilityIsAboveComposer, true);
   assert.equal(contextContract.utilitySignature, true);
   assert.equal(contextContract.utilityWidth, contextContract.composerWidth);
   assert.equal(contextContract.runLocationCount, 1);
   assert.equal(contextContract.footerReasoningInsideUtility, false);
+  assert.equal(contextContract.aboveMarker, true);
+  assert.equal(contextContract.belowMarker, false);
+  assert.equal(contextContract.utilityTransform, 'none');
+  assert.equal(
+    contextContract.utilityFieldClipPath,
+    'polygon(8px 0px, calc(100% - 8px) 0px, 100% 8px, 100% 100%, 0px 100%, 0px 8px)'
+  );
+  assert.equal(contextContract.utilityPaintTop, '0px');
+  assert.notEqual(contextContract.utilityPaintBottom, '0px');
+  assert.equal(contextContract.utilityPaintPosition, '50% 0%');
+  assert.equal(contextContract.utilityPaintTransform, 'none');
 
   const homeContextGeometry = await installComposerState(page, 'home-context');
   await page.waitForFunction(() => (
@@ -1646,9 +1717,13 @@ test('V16 maps the native guided stack once and remaps context without a resize 
     ));
     const scrollArea = utility.querySelector('[data-composer-utility-bar-scroll-area]');
     const rect = utility.getBoundingClientRect();
+    const utilityStyle = getComputedStyle(utility);
+    const utilityField = getComputedStyle(utility, '::before');
+    const utilityPaint = getComputedStyle(utility, '::after');
     return {
       insideComponent: component.contains(utility),
       outsidePortal: !portal.contains(utility),
+      utilityIsBelowComposer: composer.nextElementSibling === utility,
       componentSignature: [
         'relative',
         'flex',
@@ -1664,15 +1739,100 @@ test('V16 maps the native guided stack once and remaps context without a resize 
         'gap-2',
         'overflow-hidden'
       ].every(token => utility.classList.contains(token)),
-      rect: [rect.x, rect.y, rect.width, rect.height]
+      rect: [rect.x, rect.y, rect.width, rect.height],
+      aboveMarker: utility.classList.contains('forge-composer-context-above'),
+      belowMarker: utility.classList.contains('forge-composer-context-below'),
+      utilityTransform: utilityStyle.transform,
+      utilityFieldClipPath: utilityField.clipPath,
+      utilityPaintTop: utilityPaint.top,
+      utilityPaintBottom: utilityPaint.bottom,
+      utilityPaintPosition: utilityPaint.backgroundPosition,
+      utilityPaintTransform: utilityPaint.transform
     };
   });
   assert.equal(homeContextContract.insideComponent, true);
   assert.equal(homeContextContract.outsidePortal, true);
+  assert.equal(homeContextContract.utilityIsBelowComposer, true);
   assert.equal(homeContextContract.componentSignature, true);
   assert.equal(homeContextContract.scrollAreaDirect, true);
   assert.equal(homeContextContract.signature, true);
   assert.deepEqual(homeContextContract.rect, homeContextGeometry.context);
+  assert.equal(homeContextContract.aboveMarker, false);
+  assert.equal(homeContextContract.belowMarker, true);
+  assert.equal(homeContextContract.utilityTransform, 'none');
+  assert.equal(
+    homeContextContract.utilityFieldClipPath,
+    'polygon(0px 0px, 100% 0px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0px calc(100% - 8px))'
+  );
+  assert.notEqual(homeContextContract.utilityPaintTop, '0px');
+  assert.equal(homeContextContract.utilityPaintBottom, '0px');
+  assert.equal(homeContextContract.utilityPaintPosition, '50% 100%');
+  assert.equal(homeContextContract.utilityPaintTransform, 'none');
+
+  const codexHomeContextGeometry = await installComposerState(page, 'codex-home-context');
+  await page.waitForFunction(() => {
+    const utility = document.querySelector('[data-fixture-surface="composer-context"]');
+    const composer = document.querySelector('.composer-surface-chrome');
+    return (
+      utility?.classList.contains('forge-composer-context-above') &&
+      !utility.classList.contains('forge-composer-context-below') &&
+      utility.nextElementSibling === composer
+    );
+  });
+  const codexHomeContextContract = await page.evaluate(() => {
+    const utility = document.querySelector('[data-fixture-surface="composer-context"]');
+    const composer = document.querySelector('.composer-surface-chrome');
+    const utilityRect = utility.getBoundingClientRect();
+    const composerRect = composer.getBoundingClientRect();
+    const field = getComputedStyle(utility, '::before');
+    const paint = getComputedStyle(utility, '::after');
+    return {
+      contextCenterY: utilityRect.top + utilityRect.height / 2,
+      composerCenterY: composerRect.top + composerRect.height / 2,
+      fieldClipPath: field.clipPath,
+      fieldContent: field.content,
+      fieldBackgroundImage: field.backgroundImage,
+      fieldPointerEvents: field.pointerEvents,
+      paintTop: paint.top,
+      paintBottom: paint.bottom,
+      paintPosition: paint.backgroundPosition,
+      paintContent: paint.content,
+      paintBackgroundImage: paint.backgroundImage,
+      paintPointerEvents: paint.pointerEvents,
+      paintTransform: paint.transform,
+      rect: [utilityRect.x, utilityRect.y, utilityRect.width, utilityRect.height]
+    };
+  });
+  assert.deepEqual(codexHomeContextContract.rect, codexHomeContextGeometry.context);
+  assert.ok(
+    codexHomeContextContract.contextCenterY < codexHomeContextContract.composerCenterY,
+    'Codex new-task utility must be classified by its painted position above the composer'
+  );
+  assert.equal(
+    codexHomeContextContract.fieldClipPath,
+    'polygon(8px 0px, calc(100% - 8px) 0px, 100% 8px, 100% 100%, 0px 100%, 0px 8px)'
+  );
+  assert.equal(codexHomeContextContract.fieldContent, '""');
+  assert.notEqual(codexHomeContextContract.fieldBackgroundImage, 'none');
+  assert.equal(codexHomeContextContract.fieldPointerEvents, 'none');
+  assert.equal(codexHomeContextContract.paintTop, '0px');
+  assert.notEqual(codexHomeContextContract.paintBottom, '0px');
+  assert.equal(codexHomeContextContract.paintPosition, '50% 0%');
+  assert.equal(codexHomeContextContract.paintContent, '""');
+  assert.notEqual(codexHomeContextContract.paintBackgroundImage, 'none');
+  assert.equal(codexHomeContextContract.paintPointerEvents, 'none');
+  assert.equal(codexHomeContextContract.paintTransform, 'none');
+
+  await installComposerState(page, 'context');
+  await page.waitForFunction(() => {
+    const utility = document.querySelector('[data-native-composer-utility-slot]');
+    const composer = document.querySelector('.composer-surface-chrome');
+    return (
+      utility?.classList.contains('forge-composer-context-above') &&
+      !utility.classList.contains('forge-composer-context-below') &&
+      utility.nextElementSibling === composer
+    );
+  });
 
   const transitionStates = [
     {
@@ -1720,6 +1880,9 @@ test('V16 maps the native guided stack once and remaps context without a resize 
       const submit = document.querySelector('[data-native-slot="composer-submit"]');
       return (
         document.querySelectorAll('.forge-composer-context').length === state.context &&
+        document.querySelectorAll(
+          '.forge-composer-context-above, .forge-composer-context-below'
+        ).length === state.context &&
         document.querySelectorAll('.forge-composer-progress-pill').length === state.progress &&
         document.querySelectorAll('.forge-composer-progress-fade').length === state.fades &&
         document.querySelectorAll('.forge-composer-panel-stack').length === state.stacks &&
@@ -1965,6 +2128,119 @@ test('V16 maps the native guided stack once and remaps context without a resize 
   await page.close();
 });
 
+test('V55 keeps the queue-to-goal boundary while sealing fractional-DPI underpaint', async () => {
+  for (const state of ['guided', 'multi-guided']) {
+    const page = await browser.newPage({
+      viewport: { width: 1280, height: 820 },
+      deviceScaleFactor: nativeUiBaseline.rendererDeviceScaleFactor
+    });
+    await page.route(`http://wukong-v54-panel-seam.test/${state}/**`, route => route.fulfill({
+      body: runtimeFixtureHtml,
+      contentType: 'text/html; charset=utf-8'
+    }));
+    await page.goto(`http://wukong-v54-panel-seam.test/${state}/`);
+    await installComposerState(page, state);
+
+    const readRects = () => {
+      const read = selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return {
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          right: rect.right,
+          bottom: rect.bottom,
+          left: rect.left
+        };
+      };
+      return {
+        stack: read('[data-fixture-surface="composer-stack"]'),
+        queued: read('[data-fixture-surface="queued-panel"]'),
+        goal: read('[data-fixture-surface="goal-panel"]'),
+        composer: read('.composer-surface-chrome')
+      };
+    };
+
+    await page.evaluate(() => {
+      document.querySelector('[data-fixture-surface="composer-stack"]')
+        .style.setProperty('background-color', 'rgb(255, 0, 255)', 'important');
+    });
+    const before = await page.evaluate(readRects);
+
+    await page.evaluate(expression);
+    await page.waitForFunction(() => (
+      document.querySelector('[data-fixture-surface="composer-stack"]')
+        ?.classList.contains('forge-composer-panel-stack') &&
+      document.querySelector('[data-fixture-surface="goal-panel"]')
+        ?.classList.contains('forge-composer-panel')
+    ));
+
+    const after = await page.evaluate(readRects);
+    assert.deepEqual(after, before, `${state}: seam repair changed native geometry`);
+    assert.ok(
+      Math.abs(after.goal.top - after.queued.bottom) <= .25,
+      `${state}: queue and goal must remain geometrically contiguous`
+    );
+
+    const coverage = await page.evaluate(() => {
+      const stack = document.querySelector('[data-fixture-surface="composer-stack"]');
+      const goal = document.querySelector('[data-fixture-surface="goal-panel"]');
+      const stackPaper = getComputedStyle(stack, '::before');
+      return {
+        borderTopWidth: Number.parseFloat(getComputedStyle(goal).borderTopWidth),
+        borderTopColor: getComputedStyle(goal).borderTopColor,
+        paperTop: Number.parseFloat(getComputedStyle(goal, '::before').top),
+        stackPaperContent: stackPaper.content,
+        stackPaperImage: stackPaper.backgroundImage,
+        stackPaperPointerEvents: stackPaper.pointerEvents
+      };
+    });
+    assert.ok(
+      -coverage.paperTop >= coverage.borderTopWidth,
+      `${state}: goal paper must cover its transparent native top border`
+    );
+    assert.equal(
+      coverage.borderTopColor,
+      'rgba(75, 51, 27, 0.5)',
+      `${state}: the retained native goal border must remain an intentional separator`
+    );
+    assert.equal(coverage.stackPaperContent, '""');
+    assert.notEqual(coverage.stackPaperImage, 'none');
+    assert.equal(coverage.stackPaperPointerEvents, 'none');
+
+    const screenshot = await page.locator(
+      '[data-fixture-surface="composer-stack"]'
+    ).screenshot({ animations: 'disabled' });
+    const png = PNG.sync.read(screenshot);
+    const scale = png.width / after.stack.width;
+    const seamY = (after.goal.top - after.stack.top) * scale;
+    const minX = Math.max(0, Math.floor(png.width * .1));
+    const maxX = Math.min(png.width - 1, Math.ceil(png.width * .9));
+    const minY = Math.max(0, Math.floor(seamY) - 2);
+    const maxY = Math.min(png.height - 1, Math.ceil(seamY) + 2);
+    let exposedSentinelPixels = 0;
+    for (let y = minY; y <= maxY; y += 1) {
+      for (let x = minX; x <= maxX; x += 1) {
+        const offset = (y * png.width + x) * 4;
+        const [red, green, blue, alpha] = png.data.subarray(offset, offset + 4);
+        if (red > 245 && green < 10 && blue > 245 && alpha > 240) {
+          exposedSentinelPixels += 1;
+        }
+      }
+    }
+    assert.equal(
+      exposedSentinelPixels,
+      0,
+      `${state}: queue-to-goal seam exposed the high-contrast stack underpaint`
+    );
+
+    await page.evaluate(RESTORE_EXPRESSION);
+    await page.close();
+  }
+});
+
 test('V51.7 strengthens progress status contrast without moving native content', async () => {
   const page = await browser.newPage({
     viewport: { width: 1280, height: 820 },
@@ -2035,6 +2311,149 @@ test('V51.7 strengthens progress status contrast without moving native content',
   assert.equal(paint.removedColor, 'rgb(120, 23, 24)');
   assert.equal(paint.addedStrokeWidth, '0.18px');
   assert.equal(paint.removedStrokeWidth, '0.18px');
+
+  await page.evaluate(RESTORE_EXPRESSION);
+  assert.equal(await page.locator('[data-forge-mark]').count(), 0);
+  await page.close();
+});
+
+test('V56 keeps a replaced progress status themed before runtime markers return', async () => {
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 820 },
+    deviceScaleFactor: nativeUiBaseline.rendererDeviceScaleFactor
+  });
+  await page.route('http://wukong-v56-progress-first-paint.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-v56-progress-first-paint.test/');
+  await installComposerState(page, 'guided');
+  await page.evaluate(expression);
+  await page.waitForFunction(() => (
+    document.querySelector('[data-fixture-control="plan"]')
+      ?.classList.contains('forge-composer-progress-pill')
+  ));
+
+  const result = await page.evaluate(() => new Promise(resolve => {
+    const previous = document.querySelector('[data-fixture-control="plan"]');
+    const replacement = previous.cloneNode(true);
+    for (const node of [replacement, ...replacement.querySelectorAll('*')]) {
+      for (const className of [...node.classList]) {
+        if (className.startsWith('forge-')) node.classList.remove(className);
+      }
+      node.removeAttribute('data-forge-mark');
+    }
+    previous.replaceWith(replacement);
+
+    const read = () => {
+      const pill = document.querySelector('[data-fixture-control="plan"]');
+      const icon = pill.querySelector('svg');
+      const spans = [...pill.querySelectorAll('span')];
+      const added = spans.find(element => /^[+\uFF0B]\s*\d/u.test(element.textContent.trim()));
+      const removed = spans.find(element => /^[-\u2212\uFF0D]\s*\d/u.test(element.textContent.trim()));
+      const style = getComputedStyle(pill);
+      const rect = pill.getBoundingClientRect();
+      return {
+        marked: pill.classList.contains('forge-composer-progress-pill'),
+        rect: [rect.x, rect.y, rect.width, rect.height],
+        color: style.color,
+        backgroundColor: style.backgroundColor,
+        backgroundImage: style.backgroundImage,
+        backgroundSize: style.backgroundSize,
+        borderColor: style.borderTopColor,
+        borderRadius: style.borderRadius,
+        backdropFilter: style.backdropFilter,
+        iconColor: getComputedStyle(icon).color,
+        addedColor: getComputedStyle(added).color,
+        removedColor: getComputedStyle(removed).color
+      };
+    };
+
+    const immediate = read();
+    requestAnimationFrame(() => resolve({ immediate, firstFrame: read() }));
+  }));
+
+  assert.equal(result.immediate.marked, false, 'the synchronous sample must precede mapper marks');
+  assert.equal(result.immediate.backgroundColor, 'rgba(0, 0, 0, 0)');
+  assert.notEqual(result.immediate.backgroundImage, 'none');
+  assert.equal(result.immediate.backgroundSize, '100% 100%, 512px 220px');
+  assert.equal(result.immediate.borderColor, 'rgba(0, 0, 0, 0)');
+  assert.equal(result.immediate.borderRadius, '999px');
+  assert.equal(result.immediate.backdropFilter, 'none');
+  assert.equal(result.immediate.color, 'rgb(8, 6, 4)');
+  assert.equal(result.immediate.iconColor, 'rgb(6, 63, 97)');
+  assert.equal(result.immediate.addedColor, 'rgb(6, 69, 33)');
+  assert.equal(result.immediate.removedColor, 'rgb(120, 23, 24)');
+  assert.deepEqual(result.firstFrame.rect, result.immediate.rect);
+  assert.equal(result.firstFrame.marked, true);
+  assert.deepEqual(
+    {
+      color: result.firstFrame.color,
+      backgroundColor: result.firstFrame.backgroundColor,
+      backgroundImage: result.firstFrame.backgroundImage,
+      backgroundSize: result.firstFrame.backgroundSize,
+      borderColor: result.firstFrame.borderColor,
+      borderRadius: result.firstFrame.borderRadius,
+      backdropFilter: result.firstFrame.backdropFilter,
+      iconColor: result.firstFrame.iconColor,
+      addedColor: result.firstFrame.addedColor,
+      removedColor: result.firstFrame.removedColor
+    },
+    {
+      color: result.immediate.color,
+      backgroundColor: result.immediate.backgroundColor,
+      backgroundImage: result.immediate.backgroundImage,
+      backgroundSize: result.immediate.backgroundSize,
+      borderColor: result.immediate.borderColor,
+      borderRadius: result.immediate.borderRadius,
+      backdropFilter: result.immediate.backdropFilter,
+      iconColor: result.immediate.iconColor,
+      addedColor: result.immediate.addedColor,
+      removedColor: result.immediate.removedColor
+    },
+    'marker recovery must not create a visible paint transition'
+  );
+
+  const classNameRewrite = await page.evaluate(() => new Promise(resolve => {
+    const pill = document.querySelector('[data-fixture-control="plan"]');
+    const rectBefore = pill.getBoundingClientRect();
+    pill.className = [
+      'flex',
+      'w-max',
+      'max-w-full',
+      'min-w-0',
+      'items-center',
+      'gap-2',
+      'rounded-3xl',
+      'border',
+      'px-3',
+      'py-1.5',
+      'native-progress-pill'
+    ].join(' ');
+    const read = () => {
+      const style = getComputedStyle(pill);
+      const rect = pill.getBoundingClientRect();
+      return {
+        marked: pill.classList.contains('forge-composer-progress-pill'),
+        rect: [rect.x, rect.y, rect.width, rect.height],
+        backgroundImage: style.backgroundImage,
+        borderColor: style.borderTopColor,
+        borderRadius: style.borderRadius
+      };
+    };
+    const immediate = read();
+    requestAnimationFrame(() => resolve({
+      rectBefore: [rectBefore.x, rectBefore.y, rectBefore.width, rectBefore.height],
+      immediate,
+      firstFrame: read()
+    }));
+  }));
+  assert.equal(classNameRewrite.immediate.marked, false);
+  assert.notEqual(classNameRewrite.immediate.backgroundImage, 'none');
+  assert.equal(classNameRewrite.immediate.borderColor, 'rgba(0, 0, 0, 0)');
+  assert.equal(classNameRewrite.immediate.borderRadius, '999px');
+  assert.deepEqual(classNameRewrite.immediate.rect, classNameRewrite.rectBefore);
+  assert.deepEqual(classNameRewrite.firstFrame, classNameRewrite.immediate);
 
   await page.evaluate(RESTORE_EXPRESSION);
   assert.equal(await page.locator('[data-forge-mark]').count(), 0);
@@ -2249,7 +2668,10 @@ test('V35 maps a motion-mounted active goal before its first visible frame', asy
   });
   assert.deepEqual(firstFrame.rect, before);
   assert.equal(firstFrame.backgroundImage, 'none');
-  assert.deepEqual(firstFrame.borderColors, Array(4).fill('rgba(0, 0, 0, 0)'));
+  assert.deepEqual(
+    firstFrame.borderColors,
+    ['rgba(75, 51, 27, 0.5)', ...Array(3).fill('rgba(0, 0, 0, 0)')]
+  );
   assert.equal(firstFrame.backdropFilter, 'none');
   assert.equal(firstFrame.paintContent, '""');
 
@@ -2302,6 +2724,8 @@ test('V35 maps a motion-mounted active goal before its first visible frame', asy
       queuedPaperContent: getComputedStyle(queued, '::before').content,
       queueTopCapContent: getComputedStyle(queued, '::after').content,
       goalPaperContent: getComputedStyle(goal, '::before').content,
+      goalPaperBackgroundImage: getComputedStyle(goal, '::before').backgroundImage,
+      goalPaperBackgroundSize: getComputedStyle(goal, '::before').backgroundSize,
       queueItemPaperContent: getComputedStyle(queueItem, '::before').content
     };
   });
@@ -2315,11 +2739,14 @@ test('V35 maps a motion-mounted active goal before its first visible frame', asy
   assert.equal(immediatePersistentStack.goalBackgroundImage, 'none');
   assert.deepEqual(
     immediatePersistentStack.goalBorderColors,
-    Array(4).fill('rgba(0, 0, 0, 0)')
+    ['rgba(75, 51, 27, 0.5)', ...Array(3).fill('rgba(0, 0, 0, 0)')]
   );
   assert.equal(immediatePersistentStack.queuedPaperContent, '""');
   assert.equal(immediatePersistentStack.queueTopCapContent, '""');
   assert.equal(immediatePersistentStack.goalPaperContent, '""');
+  assert.doesNotMatch(immediatePersistentStack.goalPaperBackgroundImage, /linear-gradient/);
+  assert.notEqual(immediatePersistentStack.goalPaperBackgroundImage, 'none');
+  assert.equal(immediatePersistentStack.goalPaperBackgroundSize, '512px 220px');
   assert.equal(immediatePersistentStack.queueItemPaperContent, '""');
   await page.waitForTimeout(80);
   assert.equal(
@@ -2833,7 +3260,7 @@ test('V14 re-maps a delayed React shell without resize or zoom assistance', asyn
   await page.waitForTimeout(700);
   const firstPaint = await page.evaluate(() => new Promise(resolve => {
     const insertedAt = performance.now();
-    const refreshCountBefore = window.__wukongCodexForgeRuntimeV13.refreshCount;
+    const refreshCountBefore = window.__wukongCodexThemeRuntimeV13.refreshCount;
     document.querySelector('#root').append(window.__delayedAppWindow);
     requestAnimationFrame(() => {
       const composer = document.querySelector('.composer-surface-chrome');
@@ -2857,7 +3284,7 @@ test('V14 re-maps a delayed React shell without resize or zoom assistance', asyn
         goalPanelMarked: document.querySelector('[data-fixture-surface="goal-panel"]')
           ?.classList.contains('forge-composer-panel') || false,
         refreshCountDelta:
-          window.__wukongCodexForgeRuntimeV13.refreshCount - refreshCountBefore
+          window.__wukongCodexThemeRuntimeV13.refreshCount - refreshCountBefore
       });
     });
   }));
@@ -2918,7 +3345,7 @@ test('V52.1 themes persistent-shell replacements before their first visible fram
   await page.waitForTimeout(700);
 
   const firstPaint = await page.evaluate(() => new Promise(resolve => {
-    const runtime = window.__wukongCodexForgeRuntimeV13;
+    const runtime = window.__wukongCodexThemeRuntimeV13;
     const refreshCountBefore = runtime.refreshCount;
     const stripThemeMarks = element => {
       for (const node of [element, ...element.querySelectorAll('*')]) {
@@ -2991,13 +3418,13 @@ test('V52.1 themes persistent-shell replacements before their first visible fram
     goalPanelMarked: true
   });
 
-  const beforeStreamingText = await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount);
+  const beforeStreamingText = await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refreshCount);
   await page.evaluate(() => {
     document.querySelector('[data-virtualized-turn-content]').append(document.createTextNode(' · 流式增量'));
   });
   await page.waitForTimeout(700);
   assert.equal(
-    await page.evaluate(() => window.__wukongCodexForgeRuntimeV13.refreshCount),
+    await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refreshCount),
     beforeStreamingText,
     'ordinary streaming text must not trigger a first-paint or delayed refresh'
   );

@@ -1,7 +1,8 @@
 import { DEFAULT_THEME, makeTheme, validateTheme } from '../shared/theme-model.mjs';
 
 const $ = id => document.getElementById(id);
-const storage = 'wukong-codex-forge.theme.v2';
+const storage = 'wukong-codex-theme.theme.v2';
+const legacyStorage = 'wukong-codex-forge.theme.v2';
 const bundledArt = '../themes/assets/great-sage-return.jpg';
 const clone = value => JSON.parse(JSON.stringify(value));
 
@@ -12,7 +13,15 @@ let workbenchBackground = clone(theme.background);
 
 function loadTheme() {
   try {
-    return makeTheme(JSON.parse(localStorage.getItem(storage)));
+    const current = localStorage.getItem(storage);
+    const legacy = current === null ? localStorage.getItem(legacyStorage) : null;
+    if (current === null && legacy === null) return clone(DEFAULT_THEME);
+    const loaded = makeTheme(JSON.parse(current ?? legacy));
+    if (current === null && legacy !== null) {
+      localStorage.setItem(storage, JSON.stringify(loaded));
+      localStorage.removeItem(legacyStorage);
+    }
+    return loaded;
   } catch {
     return clone(DEFAULT_THEME);
   }
@@ -166,7 +175,7 @@ $('export').addEventListener('click', () => {
   const output = makeTheme(theme);
   const anchor = document.createElement('a');
   anchor.href = URL.createObjectURL(new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' }));
-  anchor.download = 'wukong-forge-theme.json';
+  anchor.download = 'wukong-codex-theme.json';
   anchor.click();
   URL.revokeObjectURL(anchor.href);
   status('已导出 schema v2 主题配置。');

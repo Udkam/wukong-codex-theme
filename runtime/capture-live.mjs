@@ -47,15 +47,15 @@ const summary = await evaluateTarget(target, `(() => ({
   surface: document.documentElement.dataset.forgeSurface || null,
   mode: document.documentElement.dataset.forgeMode || null,
   scene: document.documentElement.dataset.forgeScene || null,
-  stylePresent: Boolean(document.getElementById('wukong-forge-style')),
-  styleLength: document.getElementById('wukong-forge-style')?.textContent.length || 0,
+  stylePresent: Boolean(document.getElementById('wukong-codex-theme-style')),
+  styleLength: document.getElementById('wukong-codex-theme-style')?.textContent.length || 0,
   markedElements: document.querySelectorAll('[data-forge-mark]').length,
   runtime: {
     v12: Boolean(window.__wukongCodexForgeRuntimeV12),
-    v13: Boolean(window.__wukongCodexForgeRuntimeV13),
-    refreshCount: window.__wukongCodexForgeRuntimeV13?.refreshCount || 0,
-    renderCount: window.__wukongCodexForgeRuntimeV13?.renderCount || 0,
-    transitionInFlight: Boolean(window.__wukongCodexForgeRuntimeV13?.transitionInFlight)
+    v13: Boolean(window.__wukongCodexThemeRuntimeV13),
+    refreshCount: window.__wukongCodexThemeRuntimeV13?.refreshCount || 0,
+    renderCount: window.__wukongCodexThemeRuntimeV13?.renderCount || 0,
+    transitionInFlight: Boolean(window.__wukongCodexThemeRuntimeV13?.transitionInFlight)
   },
   geometry: Object.fromEntries([
     ['sidebar', '.app-shell-left-panel'],
@@ -71,7 +71,7 @@ const summary = await evaluateTarget(target, `(() => ({
     return style.backgroundImage === 'none' && style.backgroundColor === 'rgba(0, 0, 0, 0)' && style.boxShadow === 'none';
   }),
   background: (() => {
-    const overlay = document.getElementById('wukong-forge-background');
+    const overlay = document.getElementById('wukong-codex-theme-background');
     const layers = [...(overlay?.querySelectorAll(':scope > [data-forge-background-layer]') || [])];
     const active = layers.find(layer => layer.dataset.forgeActive === 'true') || null;
     const image = active?.querySelector('[data-forge-background-image]') || null;

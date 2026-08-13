@@ -2,10 +2,39 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from '@playwright/test';
-import { SCENE_TONES, cssFor, validateTheme } from '../shared/theme-model.mjs';
+import {
+  DEFAULT_THEME,
+  LANDING_HERO_PROFILES,
+  SCENE_TONES,
+  cssFor,
+  validateTheme
+} from '../shared/theme-model.mjs';
 
 const active = JSON.parse(fs.readFileSync('themes/active.json', 'utf8').replace(/^\uFEFF/, ''));
-const backgroundStyleSheet = fs.readFileSync('runtime/forge-background-v13.css', 'utf8');
+const backgroundStyleSheet = fs.readFileSync('runtime/wukong-codex-theme-background-v13.css', 'utf8');
+
+const EXPECTED_HERO_PROFILES = Object.freeze({
+  B01: 'ink-on-light-flat',
+  B02: 'bone-on-dark-complex',
+  B03: 'bone-on-dark-complex',
+  B04: 'bone-on-dark-flat',
+  B05: 'ink-on-light-complex',
+  B06: 'ink-on-light-complex',
+  B07: 'ink-on-light-complex',
+  B08: 'ink-on-light-flat',
+  B09: 'ink-on-light-complex',
+  B11: 'ink-on-light-complex',
+  B12: 'bone-on-dark-complex',
+  B15: 'bone-on-dark-complex',
+  B16: 'bone-on-dark-complex',
+  S01: 'bone-on-dark-complex',
+  S02: 'bone-on-dark-flat',
+  S03: 'bone-on-dark-complex',
+  S04: 'ink-on-light-flat',
+  S05: 'ink-on-light-flat',
+  S08: 'ink-on-light-flat',
+  S10: 'bone-on-dark-flat'
+});
 
 const rgb = hex => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16));
 const luminance = color => {
@@ -47,7 +76,24 @@ test('all twenty numbered cinematic scenes declare a validated adaptive tone and
   const invalidThreadVeil = structuredClone(active);
   invalidThreadVeil.background.gallery[0].threadVeil = 1.01;
   assert.throws(() => validateTheme(invalidThreadVeil), /Invalid background\.gallery entry/);
-  assert.equal(active.background.gallery[0].position, '68% center');
+  assert.equal(
+    active.background.gallery.find(scene => scene.slot === 'B01').position,
+    'right center',
+    'B01 must spend all unavoidable cover crop on the left so Xiaotian Quan does not leave a partial limb'
+  );
+  assert.deepEqual(
+    Object.fromEntries(active.background.gallery.map(scene => [scene.slot, scene.heroProfile])),
+    EXPECTED_HERO_PROFILES,
+    'every active scene must explicitly select the reviewed hero profile for its actual landing focal area'
+  );
+  assert.deepEqual(
+    Object.fromEntries(DEFAULT_THEME.background.gallery.map(scene => [scene.slot, scene.heroProfile])),
+    EXPECTED_HERO_PROFILES,
+    'the reset/default theme must preserve the reviewed per-scene hero profiles'
+  );
+  const invalidHeroProfile = structuredClone(active);
+  invalidHeroProfile.background.gallery[0].heroProfile = 'screen-on-anything';
+  assert.throws(() => validateTheme(invalidHeroProfile), /Invalid background\.gallery entry/);
 });
 
 test('landing retains 90% colour and project threads use per-image veils while local panels preserve copy contrast', () => {
@@ -83,10 +129,17 @@ test('scene switching updates image, shell surfaces and text minerals together',
   }));
   const variables = cssFor(active, assets, {});
   await page.setContent('<style id="theme"></style>');
-  await page.evaluate(css => {
+  await page.evaluate(({ css, lightMark, darkMark }) => {
     document.getElementById('theme').textContent = css;
-    document.documentElement.classList.add('forge-ink-mountain');
-  }, variables);
+    const root = document.documentElement;
+    root.classList.add('forge-ink-mountain');
+    root.style.setProperty('--forge-ui-landing-mark', lightMark);
+    root.style.setProperty('--forge-ui-landing-mark-dark', darkMark);
+  }, {
+    css: variables,
+    lightMark: 'url("data:image/webp;base64,bGlnaHQ=")',
+    darkMark: 'url("data:image/webp;base64,ZGFyaw==")'
+  });
 
   const states = [];
   for (let index = 0; index < active.background.gallery.length; index += 1) {
@@ -104,7 +157,14 @@ test('scene switching updates image, shell surfaces and text minerals together',
         sceneBrightness: style.getPropertyValue('--forge-scene-brightness').trim(),
         sceneSlot: style.getPropertyValue('--forge-scene-slot').trim(),
         sceneOrder: Number(style.getPropertyValue('--forge-scene-order')),
-        sceneBackground: style.getPropertyValue('--forge-scene-bg').trim()
+        sceneBackground: style.getPropertyValue('--forge-scene-bg').trim(),
+        heroProfile: style.getPropertyValue('--forge-landing-hero-profile').trim(),
+        landingMark: style.getPropertyValue('--forge-landing-mark-active').trim(),
+        landingMarkOpacity: Number(style.getPropertyValue('--forge-landing-mark-opacity')),
+        landingMarkFilter: style.getPropertyValue('--forge-landing-mark-filter').trim(),
+        landingQuoteColor: style.getPropertyValue('--forge-landing-quote-color').trim(),
+        landingQuoteOpacity: Number(style.getPropertyValue('--forge-landing-quote-opacity')),
+        landingQuoteShadow: style.getPropertyValue('--forge-landing-quote-shadow').trim()
       };
     }, index));
   }
@@ -123,5 +183,14 @@ test('scene switching updates image, shell surfaces and text minerals together',
     assert.equal(state.sceneSlot, active.background.gallery[index].slot);
     assert.equal(state.sceneOrder, active.background.gallery[index].order);
     assert.match(state.sceneBackground, /data:image\/jpeg/);
+    const profileName = active.background.gallery[index].heroProfile;
+    const profile = LANDING_HERO_PROFILES[profileName];
+    assert.equal(state.heroProfile, profileName);
+    assert.match(state.landingMark, new RegExp(profile.mark === 'dark' ? 'ZGFyaw' : 'bGlnaHQ'));
+    assert.equal(state.landingMarkOpacity, profile.markOpacity);
+    assert.equal(state.landingMarkFilter, profile.markFilter);
+    assert.equal(state.landingQuoteColor, profile.quoteColor);
+    assert.equal(state.landingQuoteOpacity, profile.quoteOpacity);
+    assert.equal(state.landingQuoteShadow, profile.quoteShadow);
   });
 });

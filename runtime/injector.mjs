@@ -59,7 +59,7 @@ if (mode === '--state' || mode === '--assert-native') {
 const expression = mode === '--restore'
   ? RESTORE_EXPRESSION
   : makeApplyExpression({
-      styleSheet: fs.readFileSync(new URL('./forge-background-v13.css', import.meta.url), 'utf8'),
+      styleSheet: fs.readFileSync(new URL('./wukong-codex-theme-background-v13.css', import.meta.url), 'utf8'),
       variables: payloadFromThemeFile(themePath).variables
     });
 if (mode === '--apply') {
