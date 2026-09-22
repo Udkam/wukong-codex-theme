@@ -4,15 +4,28 @@
 
 ## 实机预览
 
-以下为 Windows 桌面客户端实际运行截图，非网页模拟图。截图时侧栏收起，避免展示私人项目与对话；保留完整客户端区域。
+以下为用户提供的 Windows 桌面客户端实机截图（2026-09-22），保留完整原图，未裁剪或合成。侧栏为收起状态。
 
-**深色主题 · 战斗背景**
+**深色主题 · 水墨新对话**
 
-![深色主题的真实客户端：新对话页、战斗背景和玻璃输入框](docs/previews/dark-battle.png)
+![深色新对话：水墨背景与玻璃输入框](docs/previews/dark-battle.png)
 
-**浅色主题 · 玻璃输入框**
+**浅色主题 · 白龙新对话**
 
-![浅色主题的真实客户端：战斗背景与浅色玻璃输入框](docs/previews/light-battle.png)
+![浅色新对话：白龙背景与玻璃输入框](docs/previews/light-battle.png)
+
+<details>
+<summary>查看雪山对话的深浅色对比</summary>
+
+**浅色主题 · 雪山对话**
+
+![浅色主题：雪山背景、对话正文与浅色玻璃输入框](docs/previews/light-thread.png)
+
+**深色主题 · 同一雪山对话**
+
+![深色主题：同一雪山背景、对话正文与深色玻璃输入框](docs/previews/dark-thread.png)
+
+</details>
 
 ## 开始使用
 
