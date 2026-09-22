@@ -73,7 +73,7 @@ test('V16 landing mark paints the official Wukong wordmark at threefold scale wi
     {},
     {}
   );
-  for (const slot of ['B01', 'B05', 'B06', 'B07', 'B08', 'B11', 'S04', 'S05', 'S08']) {
+  for (const slot of ['B01', 'B05', 'B06', 'B07', 'B08', 'B11', 'S05', 'S08']) {
     const index = activeTheme.background.gallery.findIndex(scene => scene.slot === slot);
     assert.match(
       sceneVariables,

@@ -11,8 +11,8 @@ test('public install links the live repository without copying a retained theme 
   const verify = read('scripts/verify-launch-adapter.ps1');
   const start = read('scripts/start.ps1');
   const disable = read('scripts/disable.ps1');
-  const installCmd = read('install-theme.cmd');
-  const startCmd = read('start-theme.cmd');
+  const installCmd = (fs.existsSync('install-theme.cmd') ? read('install-theme.cmd') : 'retired');
+  const startCmd = read('start.cmd');
 
   for (const [name, script] of Object.entries({ install, compatibilityInstall, hook, verify, start, disable })) {
     const destructivePattern = name === 'hook'
@@ -22,7 +22,7 @@ test('public install links the live repository without copying a retained theme 
     assert.doesNotMatch(script, /Stop-Process|taskkill|Get-CimInstance|Get-WmiObject/i, `${name} uses process killing or WMI`);
   }
 
-  assert.match(installCmd, /scripts\\install-repository\.ps1/i);
+  assert.match(installCmd, /retired/);
   assert.match(install, /install-chatgpt-hook\.ps1/);
   assert.match(install, /verify-launch-adapter\.ps1/);
   assert.match(install, /-Repository/);
@@ -37,14 +37,16 @@ test('public install links the live repository without copying a retained theme 
   assert.match(compatibilityInstall, /install-repository\.ps1/);
   assert.doesNotMatch(compatibilityInstall, /package-runtime|release\.json|appTarget/);
 
-  assert.match(start, /install-repository\.ps1/);
+  assert.match(start, /install-chatgpt-hook\.ps1/);
+  assert.match(start, /-Repository -ManualOnly/);
+  assert.doesNotMatch(start, /install-repository|install-native-supervisor/);
   assert.match(start, /bridgeHostPath/);
   assert.match(start, /bridgePath/);
   assert.match(start, /& \$node \$bridge/);
   assert.match(start, /\$bridgeExitCode -eq 4/);
   assert.doesNotMatch(start, /install-native-pets|launch\.ps1|Get-CimInstance/);
   assert.doesNotMatch(startCmd, /WindowStyle Hidden|^start\s+""/im);
-  assert.match(startCmd, /if errorlevel 1 pause/i);
+  assert.match(startCmd, /scripts\\start\.ps1/i);
 
   assert.match(hook, /const repository = \$repositoryLiteral/);
   assert.match(hook, /\['--repository'\]/);

@@ -3,7 +3,6 @@ import path from 'node:path';
 import process from 'node:process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { loadNativePetReleasePolicy } from './native-pet-release-policy.mjs';
 
 const runtimeFiles = [
   'runtime/cdp-client.mjs',
@@ -14,31 +13,20 @@ const runtimeFiles = [
   'runtime/host.mjs',
   'runtime/activate-appx.cs',
   'runtime/activate-appx.ps1',
-  'runtime/native-entry-supervisor.cs',
   'runtime/watch.mjs',
   'shared/theme-model.mjs',
-  'scripts/launch.ps1',
   'scripts/start.ps1',
-  'scripts/install-repository.ps1',
-  'scripts/install-native-pets.ps1',
   'scripts/install-chatgpt-hook.ps1',
-  'scripts/install-native-supervisor.ps1',
   'scripts/prepare-background.ps1',
   'scripts/manage-backgrounds.ps1',
-  'scripts/verify-launch-adapter.ps1',
   'scripts/disable.ps1',
-  'pets/release-policy.json',
   'themes/active.json',
   'themes/native-wukong.json',
   'package.json',
   'LICENSE',
   'README.md',
   'PORTABLE-README.txt',
-  'backgrounds.cmd',
-  'start-theme.cmd',
-  'install-theme.cmd',
-  'stop-theme.cmd',
-  'remove-theme.cmd'
+  'start.cmd',
 ];
 
 const inside = (parent, child) => {
@@ -75,14 +63,6 @@ export function packageRuntime({ source, destination }) {
     throw new Error('Runtime package destination must not already exist.');
   }
 
-  const releasePolicy = loadNativePetReleasePolicy(sourceRoot);
-  const nativePetFiles = releasePolicy.releasedPetIds.flatMap(id => [
-    `pets/${id}/pet.json`,
-    `pets/${id}/spritesheet.webp`,
-    `pets/${id}/validation.json`,
-    `pets/${id}/package-proof.json`
-  ]);
-
   const activePath = path.join(sourceRoot, 'themes', 'active.json');
   if (!fs.lstatSync(activePath).isFile()) throw new Error('Required active theme definition is missing.');
   const active = JSON.parse(fs.readFileSync(activePath, 'utf8'));
@@ -93,7 +73,7 @@ export function packageRuntime({ source, destination }) {
     ...Object.values(active.uiAssets || {})
   ].filter(Boolean).map(file => `themes/${file}`);
   const sourceRootReal = fs.realpathSync.native(sourceRoot);
-  const packageFiles = [...new Set([...runtimeFiles, ...nativePetFiles, ...themeReferences])];
+  const packageFiles = [...new Set([...runtimeFiles, ...themeReferences])];
   const sources = packageFiles.map(relativeFile => {
     const normalized = path.normalize(relativeFile);
     const sourceFile = path.resolve(sourceRoot, normalized);

@@ -1,54 +1,42 @@
-Wukong Codex Theme 0.15.0
+WUKONG CODEX THEME - LIQUID GLASS / DUAL QUEUE
 
-CURRENT V61 VISIBLE WORDMARK WITH ORDERED 20-BACKGROUND GALLERY
+This repository has one complete deliverable:
 
-This package themes the official Windows ChatGPT/Codex desktop application. It does not patch ChatGPT.exe, app.asar, WindowsApps, the application signature, or the official Codex profile, and it does not create a separately named Wukong launcher.
+1. Local dual-queue runtime
+   - Original 10 battle + 3 scenery queues, route selection, shortcuts,
+     landing quote and wordmark. It preserves the project’s authored scenes;
+     it does not substitute an unrelated mountain illustration.
+   - Launches the official ChatGPT only through project start.cmd with
+     a loopback CDP channel, or hot-applies to an existing trusted channel.
+     It never patches or kills ChatGPT.exe. Exit any unmanaged tray instance first.
+   - Apply: node runtime/injector.mjs --apply <port> themes/active.json
+   - Restore: node runtime/injector.mjs --restore <port>
 
-INSTALL AND START
+   Ordered playback is:
+   B07 -> B01 -> B02 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B16
+   S08 -> S05 -> S01
 
-1. Exit ChatGPT completely before the first managed launch, including its tray/background instance.
-2. Run install-theme.cmd once from this repository-backed package.
-3. Run start-theme.cmd. The visible process and window remain the official ChatGPT application.
-4. After installation, use the Start Menu entry named ChatGPT with the official icon. Normal task switching and tray restore do not require a restart.
-5. If the Store package updates or repairs its shortcut, run install-theme.cmd again.
+   Ctrl+Alt+F advances the active sequence and Ctrl+Alt+B moves back.
+   Ctrl+Alt+C temporarily changes the current page between battle and scenery.
+   Ctrl+Alt+K locks the exact visible image and battle/scenery sequence across
+   pages. F/B/C remain active while locked and make the manually selected
+   background the new locked target; press K again to resume the current page's
+   automatic sequence. Ctrl+Alt+T hides or shows both the New Task quote
+   “此去，欲破何局？” and the 悟空 wordmark. New Task pages automatically use the
+   battle sequence; project/thread pages automatically use the scenery sequence.
+   There is no automatic or timer-based image rotation.
 
-BACKGROUND CONTRACT
+The design uses cool liquid-glass surfaces: the scene stays visible while
+text, composer, sidebar, menus and dialogs retain high contrast. The selected
+sidebar row has no paper texture or image layer.
 
-The runtime keeps a 20-image gallery (13 battle + 7 scenery) in two explicit playback sequences. A slot is the stable physical identity; order is the independent position inside its group:
+Only start.cmd is a public command entry.
+It resolves the current official Store package on every explicit theme launch.
+Native ChatGPT.exe starts normally without automatic theme injection.
+No native-shortcut takeover, startup registration or launch supervisor is needed.
+Exit an existing unmanaged ChatGPT instance before starting the themed session.
+Other .cmd files are retired and excluded from the runtime package.
+The manual launcher does not change official update policies.
 
-B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16
-S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10
-
-Ctrl+Alt+F advances the currently visible sequence and Ctrl+Alt+B moves back. New Task pages automatically use the battle sequence; project/thread pages automatically use the scenery sequence. Ctrl+Alt+C temporarily overrides that choice on the current page only. Entering another task, thread, or page restores its automatic default without advancing the sequence. Ctrl+Alt+K locks the exact visible image and battle/scenery sequence across projects, tasks, threads, and application restarts. F/B/C remain active while locked and make the manually selected background the new locked target; press K again to resume the current page's automatic sequence. The shortcuts do not reload the document or page, reload/rebuild the theme, or replace the theme DOM. There is no automatic or timer-based image rotation, steady poll, WMI/CIM query, service, or scheduled task; K suppresses page-driven group changes, not a timer.
-
-Background images are not filtered. New Task pages apply a fixed 10% full-screen veil (90% of the original image remains visible). Project/thread pages use a separately calibrated per-image threadVeil so bright and dark assets remain readable without one global value flattening every image. The calibration follows the image and page type, not the battle/scenery sequence. The composer, content surface, persistent sidebar, and the temporary flyout shown from a collapsed sidebar all retain the translucent theme treatment.
-
-Ctrl+Alt+T hides or shows both the New Task quote “此去，欲破何局？” and the “悟空” wordmark in place. The preference survives background, task and thread changes in the current window and a no-reload hot apply; a new application process starts with both visible. It does not change the native title node, geometry, background selection or decode state.
-
-The wordmark uses four reviewed static profiles for light/dark and flat/complex landing backgrounds. All four keep the 168px paint layer fully opaque, calibrate brightness/saturation/contrast, and add tight opposite-tone edge separation: dark ink gains a light edge on bright scenes, while bone paint gains a dark edge on dark scenes. The native 56x56 anchor and hit target remain unchanged.
-
-The renderer decodes the exact DOM img that will be painted, while the old image remains visible. It keeps one steady background texture, at most two textures during the 420 ms transition, and only one in-flight decode. Hidden pages coalesce a pending request and decode after visibility returns.
-
-CUSTOM BACKGROUNDS
-
-Run backgrounds.cmd without arguments for the interactive manager, or use list, add, replace, move and remove commands. Targets accept a stable slot or scene id. Move changes only the contiguous order inside the group; it never renames a slot, id or asset. Add allocates an unused physical slot. Remove unlinks a scene from rotation but retains its image. Manifest and overwritten-asset backups are written under .wukong-runtime\background-backups. The manager calls scripts\prepare-background.ps1 for deterministic conversion without changing the source image, upscaling it, or exceeding the default 1920x1080 JPEG at quality 90. Add or replace accepts -ThreadVeil 0..1 to calibrate that image on project/thread pages; for example: backgrounds.cmd replace -Target B05 -InputPath "D:\Pictures\my.jpg" -ThreadVeil 0.42 -Force. See README.md for commands, optional crop parameters and the 48,000,000 decoded-pixel budget.
-
-After replacing a background, run stop-theme.cmd and then start-theme.cmd to reload the same reusable official renderer. If no reusable managed channel remains, exit ChatGPT completely and start it once through the managed ChatGPT entry.
-
-LIFECYCLE AND RESTORE
-
-The formal daily path is:
-
-Codex embedded Node -> repository bridge -> event-driven lifecycle host -> official ChatGPT
-
-The compiled AUMID activator starts the official application without starting PowerShell, Get-AppxPackage or Add-Type during the daily launch. PowerShell is used only for explicit installation, maintenance, background preparation, or disable commands.
-
-Run stop-theme.cmd or remove-theme.cmd to restore the open renderer to verified native DOM state without terminating ChatGPT. Removing the repository or package.json marker makes the supervisor unregister itself; later launches remain native.
-
-RELEASE SCOPE
-
-releasedPetIds is empty. Pets are deferred and excluded from this release gate. Historical themes, rejected motifs, development tools, tests, docs, and node_modules are excluded from this minimal runtime package.
-
-For full setup, customization, troubleshooting, asset notices, and licensing, read README.md.
-
-Some backgrounds were photographed or captured by the maintainer; others were collected online or supplied by users. Rights in game imagery and other third-party content remain with their respective owners. If you are a rights holder and believe an included asset infringes your rights, email chenlj89@mail2.sysu.edu.cn; the maintainer will review and remove verified infringing material.
+Light conversation pages use a scene-adaptive white veil (18%-23% for scenery).
+New Task pages have no veil in either theme. Settings return retains the decoded background.

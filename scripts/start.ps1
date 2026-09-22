@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $rootPath = [IO.Path]::GetFullPath($Root)
 
 $verificationOutput = @(
-    & (Join-Path $rootPath 'scripts\install-repository.ps1') -Root $rootPath
+    & (Join-Path $rootPath 'scripts\install-chatgpt-hook.ps1') -Root $rootPath -Repository -ManualOnly
 )
 $verificationLine = @($verificationOutput | Where-Object { $_ -and ([string]$_).Trim().StartsWith('{') })[-1]
 if (-not $verificationLine) {
@@ -25,7 +25,7 @@ $bridgeExitCode = $LASTEXITCODE
 if ($bridgeExitCode -eq 4) {
     throw @'
 ChatGPT is already running from an unmanaged native entry and has no reusable DevTools channel.
-Exit ChatGPT completely, including its tray/background instance, then run start-theme.cmd once to repair and launch the native ChatGPT entry.
+Exit ChatGPT completely, including its tray/background instance, then run start.cmd once to repair and launch the native ChatGPT entry.
 The signed Store process cannot be retrofitted after it has already started without the managed launch flags.
 '@
 }
@@ -33,4 +33,4 @@ if ($bridgeExitCode -ne 0) {
     throw "The verified repository launch bridge failed with exit code $bridgeExitCode."
 }
 
-Write-Host 'The official ChatGPT.exe is starting with the Wukong renderer theme loaded directly from this repository.'
+Write-Host 'The managed launch was requested. Theme injection is not confirmed until the runtime reports an injected renderer.'

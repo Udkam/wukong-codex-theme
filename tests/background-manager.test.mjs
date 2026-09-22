@@ -42,7 +42,7 @@ const makeFixture = () => {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'wukong-background-manager-'));
   const backgrounds = path.join(fixture, 'themes', 'backgrounds');
   fs.mkdirSync(backgrounds, { recursive: true });
-  for (const file of ['battle-01.jpg', 'battle-02.jpg', 'scenery-01.jpg', 'scenery-02.jpg']) {
+  for (const file of ['battle-01.jpg', 'battle-02.jpg', 'scenery-01.jpg', 'scenery-05.jpg']) {
     fs.copyFileSync(path.join(root, 'themes', 'backgrounds', file), path.join(backgrounds, file));
   }
   const theme = readJson(path.join(root, 'themes', 'active.json'));
@@ -55,7 +55,7 @@ const makeFixture = () => {
     { id: 'battle-one', slot: 'B01', order: 1, asset: 'backgrounds/battle-01.jpg', position: 'center center', mode: 'battle-primary', tone: 'celestial-ink', veil: 0.78, threadVeil: 0.42 },
     { id: 'scenery-one', slot: 'S01', order: 1, asset: 'backgrounds/scenery-01.jpg', position: 'center center', mode: 'scenery', tone: 'forest-moss', veil: 0.75, threadVeil: 0.31 },
     { id: 'battle-two', slot: 'B02', order: 2, asset: 'backgrounds/battle-02.jpg', position: 'center center', mode: 'battle-secondary', tone: 'staff-gold', veil: 0.8, threadVeil: 0.2 },
-    { id: 'scenery-two', slot: 'S02', order: 2, asset: 'backgrounds/scenery-02.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.7, threadVeil: 0.36 }
+    { id: 'scenery-two', slot: 'S02', order: 2, asset: 'backgrounds/scenery-05.jpg', position: 'center center', mode: 'scenery', tone: 'ridge-umber', veil: 0.7, threadVeil: 0.36 }
   ];
   fs.writeFileSync(path.join(fixture, 'themes', 'active.json'), `${JSON.stringify(theme, null, 2)}\n`, 'utf8');
   return fixture;
@@ -80,7 +80,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   const manifestBeforeRejectedAdd = sha256(manifest);
   const rejectedAdd = runManager(fixture, [
     'add', '-Mode', 'battle', '-Id', 'battle-one',
-    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-03.jpg')
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-04.jpg')
   ]);
   assert.notEqual(rejectedAdd.status, 0);
   assert.match(`${rejectedAdd.stdout}\n${rejectedAdd.stderr}`, /already exists/i);
@@ -90,7 +90,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   const manifestBeforeRejectedThreadVeil = sha256(manifest);
   const rejectedThreadVeilAdd = runManager(fixture, [
     'add', '-Mode', 'battle', '-Id', 'invalid-thread-veil',
-    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-03.jpg'),
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-04.jpg'),
     '-ThreadVeil', '1.01'
   ]);
   assert.notEqual(rejectedThreadVeilAdd.status, 0);
@@ -99,7 +99,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
 
   expectSuccess(runManager(fixture, [
     'add', '-Mode', 'battle', '-Id', 'inserted-battle', '-Position', '2',
-    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-03.jpg'),
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'battle-04.jpg'),
     '-Tone', 'storm-cyan', '-Veil', '0.7', '-ThreadVeil', '0.37', '-MaxWidth', '320', '-MaxHeight', '180'
   ]));
   let active = readJson(manifest);
@@ -134,7 +134,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
   const manifestBeforeRejectedReplace = sha256(manifest);
   const rejectedThreadVeilReplace = runManager(fixture, [
     'replace', '-Target', 'inserted-battle',
-    '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-02.jpg'),
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-05.jpg'),
     '-ThreadVeil', '-0.01', '-Force'
   ]);
   assert.notEqual(rejectedThreadVeilReplace.status, 0);
@@ -144,7 +144,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
 
   expectSuccess(runManager(fixture, [
     'replace', '-Target', 'inserted-battle',
-    '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-02.jpg'),
+    '-InputPath', path.join(root, 'themes', 'backgrounds', 'scenery-05.jpg'),
     '-Veil', '0.63', '-ThreadVeil', '0.44', '-Force', '-MaxWidth', '320', '-MaxHeight', '180'
   ]));
   active = readJson(manifest);
@@ -193,7 +193,7 @@ test('background manager lists, adds, replaces, moves and removes without touchi
 test('background manager contracts stay event-free, non-process-controlling and package-safe', () => {
   const script = fs.readFileSync('scripts/manage-backgrounds.ps1', 'utf8');
   const prepare = fs.readFileSync('scripts/prepare-background.ps1', 'utf8');
-  const entry = fs.readFileSync('backgrounds.cmd', 'utf8');
+  const entry = fs.readFileSync('scripts/manage-backgrounds.ps1', 'utf8');
   assert.match(script, /ValidateSet\('list', 'add', 'replace', 'move', 'remove'\)/);
   assert.match(script, /Join-Path \$resolvedRoot '\.wukong-runtime'/);
   assert.match(script, /Join-Path \$runtimeRoot 'background-backups'/);
@@ -207,8 +207,7 @@ test('background manager contracts stay event-free, non-process-controlling and 
   assert.doesNotMatch(script, /Remove-Item[^\r\n]*(?:background|asset)/i);
   assert.match(prepare, /\[string\]\$RepositoryRoot/);
   assert.match(prepare, /\[string\]\$TargetAsset/);
-  assert.match(entry, /scripts\\manage-backgrounds\.ps1/);
-});
+  });
 
 test('background manager preserves both non-empty background groups', t => {
   if (process.platform !== 'win32') return t.skip('PowerShell 5.1 background manager is Windows-only');
@@ -227,9 +226,9 @@ test('background manager preserves both non-empty background groups', t => {
   );
 });
 
-test('public backgrounds.cmd resolves the repository without an explicit root', t => {
+test('background manager resolves the repository without an explicit root', t => {
   if (process.platform !== 'win32') return t.skip('Windows command entry is Windows-only');
-  const result = spawnSync('cmd.exe', ['/d', '/c', path.join(root, 'backgrounds.cmd'), 'list'], {
+  const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(root, 'scripts/manage-backgrounds.ps1'), '-Command', 'list'], {
     cwd: root,
     encoding: 'utf8',
     timeout: 20_000

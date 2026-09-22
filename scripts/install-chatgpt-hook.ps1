@@ -1,9 +1,10 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [string]$Root,
     [switch]$Portable,
-    [switch]$Repository
+    [switch]$Repository,
+    [switch]$ManualOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -165,7 +166,7 @@ const hasReusableCodexChannel = async () => {
       } catch {}
       return target?.type === 'page' && !avatarOverlay && (
         /^app:\/\/codex\//.test(target.url || '') ||
-        (target.title === 'Codex' && /^app:\/\/-\/index\.html(?:[?#]|$)/.test(target.url || ''))
+        (/^app:\/\/-\/index\.html(?:[?#]|$)/.test(target.url || ''))
       );
     });
   } catch {
@@ -181,7 +182,7 @@ const showBlockedLaunch = () => {
   fs.writeFileSync(noticePath, [
     'The ChatGPT theme did not start because ChatGPT is already running from an unmanaged native entry.',
     '',
-    'Exit ChatGPT completely, including its tray/background instance, then run start-theme.cmd once to repair and launch ChatGPT.',
+    'Exit ChatGPT completely, including its tray/background instance, then run start.cmd once to repair and launch ChatGPT.',
     'No process was terminated. No WMI/CIM query was used. The repository theme was not partially applied.'
   ].join('\r\n') + '\r\n', 'utf8');
   const notepad = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'notepad.exe');
@@ -241,6 +242,24 @@ if (-not (Test-Path -LiteralPath $bridgePath)) {
 & $node --check $bridgePath
 if ($LASTEXITCODE -ne 0) {
     throw 'Generated ChatGPT Node launch bridge is invalid.'
+}
+
+if ($ManualOnly) {
+    # Explicit project launch only: no shortcut takeover, Run key or supervisor.
+    New-Item -ItemType Directory -Force -Path $nativeToolRoot | Out-Null
+    $activatorHashPath = "$nativeActivatorPath.source.sha256"
+    $sourceHash = Get-PortableSha256 $activatorSourcePath
+    if (-not (Test-Path -LiteralPath $nativeActivatorPath) -or
+        -not (Test-Path -LiteralPath $activatorHashPath) -or
+        [IO.File]::ReadAllText($activatorHashPath).Trim() -ne $sourceHash) {
+        $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+        if (-not (Test-Path -LiteralPath $compiler)) { $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
+        & $compiler /nologo /target:exe /optimize+ "/out:$nativeActivatorPath" /reference:System.dll /reference:System.Core.dll $activatorSourcePath
+        if ($LASTEXITCODE -ne 0) { throw 'AppX activation helper compilation failed.' }
+        [IO.File]::WriteAllText($activatorHashPath, $sourceHash, [Text.UTF8Encoding]::new($false))
+    }
+    @{ bridgeHostPath=$node; bridgePath=$bridgePath; mode='manual-only'; officialVersion=([version]$package.Version).ToString() } | ConvertTo-Json -Compress
+    return
 }
 
 $expectedTarget = $node

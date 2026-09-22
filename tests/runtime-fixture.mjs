@@ -757,7 +757,7 @@ export const runtimeFixtureHtml = String.raw`
         <main class="main-surface" role="main" data-native-slot="workspace">
           <div class="app-thread-header app-header-tint" data-native-slot="taskbar">
             <div class="thread-heading"><svg class="icon" viewBox="0 0 16 16"><path d="M2 4.5h4l1.2 1.5H14v6.5H2z"/></svg><span class="title">重设计黑神话悟空主题</span><span>···</span></div>
-            <div class="thread-actions"><button class="toolbar-button">打开位置<svg class="icon" viewBox="0 0 16 16"><path d="m5 6 3 3 3-3"/></svg></button><button class="toolbar-button" aria-label="视图设置"><svg class="icon" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10"/><circle cx="6" cy="4" r="1" fill="currentColor"/><circle cx="10" cy="8" r="1" fill="currentColor"/><circle cx="7" cy="12" r="1" fill="currentColor"/></svg></button></div>
+            <div class="thread-actions"><button class="toolbar-button" aria-label="打开位置">打开位置<svg class="icon" viewBox="0 0 16 16"><path d="m5 6 3 3 3-3"/></svg></button><button class="toolbar-button" aria-label="次要操作"><svg class="icon" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h10"/><circle cx="6" cy="4" r="1" fill="currentColor"/><circle cx="10" cy="8" r="1" fill="currentColor"/><circle cx="7" cy="12" r="1" fill="currentColor"/></svg></button></div>
           </div>
 
           <div class="app-shell-main-content-viewport" data-app-shell-main-content-layout="thread-edge-scroll">

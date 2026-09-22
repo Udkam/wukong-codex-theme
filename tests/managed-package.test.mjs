@@ -13,7 +13,7 @@ test('minimal managed package imports independently and omits development surfac
   packageRuntime({ source: process.cwd(), destination: target });
   const sourceTheme = JSON.parse(fs.readFileSync('themes/active.json', 'utf8'));
 
-  for (const omitted of ['.git', 'docs', 'studio', 'tests', 'node_modules']) {
+  for (const omitted of ['.git', 'docs', 'studio', 'tests', 'node_modules', 'install-theme.cmd', 'stop-theme.cmd', 'remove-theme.cmd', 'backgrounds.cmd', 'runtime/taskbar-launcher.cs']) {
     assert.equal(fs.existsSync(path.join(target, omitted)), false, `development-only path copied: ${omitted}`);
   }
   for (const required of [
@@ -22,23 +22,14 @@ test('minimal managed package imports independently and omits development surfac
     'runtime/host.mjs',
     'runtime/activate-appx.cs',
     'runtime/activate-appx.ps1',
-    'runtime/native-entry-supervisor.cs',
     'runtime/watch.mjs',
-    'scripts/launch.ps1',
     'scripts/start.ps1',
-    'scripts/install-native-pets.ps1',
     'scripts/install-chatgpt-hook.ps1',
-    'scripts/install-native-supervisor.ps1',
     'scripts/prepare-background.ps1',
     'scripts/manage-backgrounds.ps1',
-    'scripts/verify-launch-adapter.ps1',
     'scripts/disable.ps1',
-    'backgrounds.cmd',
-    'start-theme.cmd',
-    'stop-theme.cmd',
-    'remove-theme.cmd',
+    'start.cmd',
     'PORTABLE-README.txt',
-    'pets/release-policy.json',
     'themes/active.json',
     'themes/native-wukong.json',
     ...sourceTheme.background.gallery.map(entry => `themes/${entry.asset}`),
@@ -101,22 +92,8 @@ test('minimal managed package imports independently and omits development surfac
     false,
     'legacy theme manifest with retired motifs was packaged'
   );
-  const packagedPetPolicy = JSON.parse(fs.readFileSync(path.join(target, 'pets', 'release-policy.json'), 'utf8'));
-  assert.deepEqual(packagedPetPolicy.releasedPetIds, []);
-  assert.deepEqual(packagedPetPolicy.pendingPetIds, [
-    'little-bajie-v4-inart-game-motion',
-    'little-wukong-v5-yaksha-shenfeng'
-  ]);
-  assert.deepEqual(packagedPetPolicy.frozenPetIds, [
-    'little-bajie-v3-inart',
-    'little-wukong-yaksha-shenfeng'
-  ]);
-  assert.deepEqual(fs.readdirSync(path.join(target, 'pets')).sort(), ['release-policy.json']);
+  assert.equal(fs.existsSync(path.join(target, 'pets')), false, 'pet assets were packaged');
   for (const frozenPetFile of [
-    'pets/little-bajie-v3-inart/pet.json',
-    'pets/little-bajie-v3-inart/spritesheet.webp',
-    'pets/little-bajie-v3-inart/validation.json',
-    'pets/little-bajie-v3-inart/package-proof.json',
     'pets/little-wukong-yaksha-shenfeng/pet.json',
     'pets/little-wukong-yaksha-shenfeng/spritesheet.webp',
     'pets/little-wukong-yaksha-shenfeng/validation.json',
@@ -155,47 +132,39 @@ test('minimal managed package imports independently and omits development surfac
   ]) assert.equal(fs.existsSync(path.join(target, rejected)), false, `rejected asset packaged: ${rejected}`);
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'capture-live.mjs')), false);
   const portableReadme = fs.readFileSync(path.join(target, 'PORTABLE-README.txt'), 'utf8');
-  assert.match(portableReadme, /CURRENT V61 VISIBLE WORDMARK WITH ORDERED 20-BACKGROUND GALLERY/);
-  assert.match(portableReadme, /20-image gallery \(13 battle \+ 7 scenery\) in two explicit playback sequences/);
-  assert.match(portableReadme, /B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16/);
-  assert.match(portableReadme, /S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10/);
-  assert.match(portableReadme, /were photographed or captured by the maintainer/i);
+  assert.match(portableReadme, /LIQUID GLASS \/ DUAL QUEUE/);
+  assert.match(portableReadme, /Original 10 battle \+ 3 scenery queues/);
+  assert.match(portableReadme, /B07 -> B01 -> B02 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B16/);
+  assert.match(portableReadme, /S08 -> S05 -> S01/);
+  assert.match(portableReadme, /does not substitute an unrelated mountain illustration/i);
   assert.doesNotMatch(portableReadme, /20-minute cooldown/);
   assert.match(portableReadme, /There is no automatic or timer-based image rotation/);
   assert.match(portableReadme, /Ctrl\+Alt\+F/);
   assert.match(portableReadme, /Ctrl\+Alt\+B/);
   assert.match(portableReadme, /Ctrl\+Alt\+C/);
   assert.match(portableReadme, /Ctrl\+Alt\+K locks the exact visible image and battle\/scenery sequence/);
-  assert.match(portableReadme, /F\/B\/C remain active while locked and make the manually selected background the new locked target/);
-  assert.match(portableReadme, /press K again to resume the current page's automatic sequence/i);
+  assert.match(portableReadme, /F\/B\/C remain active while locked and make the manually selected\s+background the new locked target/);
+  assert.match(portableReadme, /press K again to resume the current page's\s+automatic sequence/i);
   assert.match(portableReadme, /Ctrl\+Alt\+T hides or shows both the New Task quote/);
-  assert.match(portableReadme, /New Task pages automatically use the battle sequence; project\/thread pages automatically use the scenery sequence/);
+  assert.match(portableReadme, /New Task pages automatically use the\s+battle sequence; project\/thread pages automatically use the scenery sequence/);
   assert.doesNotMatch(portableReadme, /Ctrl\+Alt\+Shift\+B/);
-  assert.match(portableReadme, /Run backgrounds\.cmd without arguments for the interactive manager/);
-  assert.match(portableReadme, /Move changes only the contiguous order inside the group/);
-  assert.match(portableReadme, /Remove unlinks a scene from rotation but retains its image/);
-  assert.match(portableReadme, /without starting PowerShell, Get-AppxPackage or Add-Type/);
-  assert.match(portableReadme, /does not create a separately named Wukong launcher/);
+  assert.match(portableReadme, /never patches or kills ChatGPT\.exe/);
+  assert.match(portableReadme, /one complete deliverable/i);
+  assert.match(portableReadme, /Only start\.cmd is a public command entry/i);
+  assert.match(portableReadme, /does not change official update policies/i);
   assert.doesNotMatch(portableReadme, /HISTORICAL V12 INSTRUCTIONS/);
-  assert.match(portableReadme, /releasedPetIds is empty/);
-  assert.match(portableReadme, /Codex embedded Node -> repository bridge -> event-driven lifecycle host -> official ChatGPT/);
-  assert.match(portableReadme, /Pets are deferred and excluded from this release gate/);
-  assert.doesNotMatch(portableReadme.split('HISTORICAL V12 INSTRUCTIONS')[0], /V12 changes only/);
+  assert.doesNotMatch(portableReadme, /pet/i);
 
   const runtime = await import(pathToFileURL(path.join(target, 'runtime', 'forge-runtime.mjs')));
   const payload = runtime.payloadFromThemeFile(path.join(target, 'themes', 'active.json'));
   assert.match(payload.variables, /data:image\/jpeg;base64/);
   assert.match(payload.variables, /data:image\/webp;base64/);
-  assert.equal(payload.assets.length, 20);
+  assert.equal(payload.assets.length, 13);
   assert.deepEqual(payload.assets.map(asset => asset.id), [
     'erlang-ink-duel',
     'great-sage-staff',
-    'storm-bearer',
     'shadow-confrontation',
     'ridge-gate',
-    'forest-shrine',
-    'mountain-path',
-    'sunlit-mountain-vista',
     'sunset-ravine',
     'training-sunset',
     'thunder-dragon-ascent',
@@ -204,9 +173,6 @@ test('minimal managed package imports independently and omits development surfac
     'red-lightning',
     'snow-lake',
     'white-dragon-frost',
-    'bear-crush',
-    'crimson-lightning-burst',
-    'verdant-cavern',
     'night-spear-confrontation'
   ]);
   assert.deepEqual(payload.motifs, {});
@@ -223,15 +189,15 @@ test('minimal managed package imports independently and omits development surfac
   ]);
   assert.match(payload.theme.name, /\S/);
   assert.match(payload.variables, /--forge-paper:#[0-9a-f]{6}/i);
-  assert.match(payload.variables, /--forge-scene-count:20/);
+  assert.match(payload.variables, /--forge-scene-count:13/);
   assert.doesNotMatch(payload.variables, /--forge-primary-scene-count:/);
-  assert.match(payload.variables, /--forge-scenery-scenes:8 7 14 4 5 6 18/);
+  assert.match(payload.variables, /--forge-scenery-scenes:10 4 3/);
   assert.match(payload.variables, /--forge-battle-primary-scenes:0 1/);
-  assert.match(payload.variables, /--forge-battle-secondary-scenes:11 2 3 9 12 13 10 15 16 17 19/);
-  assert.match(payload.variables, /--forge-battle-scenes:11 0 1 2 3 9 12 13 10 15 16 17 19/);
+  assert.match(payload.variables, /--forge-battle-secondary-scenes:7 2 5 8 9 6 11 12/);
+  assert.match(payload.variables, /--forge-battle-scenes:7 0 1 2 5 8 9 6 11 12/);
   assert.doesNotMatch(payload.variables, /--forge-art-yaksha-king-rift:/);
   assert.match(payload.variables, /--forge-art-great-sage-staff:var\(--forge-bg-1\)/);
-  assert.equal((payload.variables.match(/data:image\/jpeg;base64,/g) || []).length, 20, 'each gallery image must be embedded only once');
+  assert.equal((payload.variables.match(/data:image\/jpeg;base64,/g) || []).length, 13, 'each gallery image must be embedded only once');
   assert.match(payload.variables, /--forge-motif-xiangfei-gourd:none/);
   assert.match(payload.variables, /--forge-ui-composer-main:url\("data:image\/webp;base64,/);
   assert.match(payload.variables, /--forge-ui-sidebar-level2-hover:url\("data:image\/webp;base64,/);
@@ -248,6 +214,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.equal(typeof client.getTargets, 'function');
   assert.equal(typeof client.commandTarget, 'function');
   assert.equal(client.isCodexTarget({ type: 'page', title: 'Codex', url: 'app://-/index.html' }), true);
-  assert.equal(client.isCodexTarget({ type: 'page', title: 'Other', url: 'app://-/index.html' }), false);
+  assert.equal(client.isCodexTarget({ type: 'page', title: 'Current task title', url: 'app://-/index.html' }), true);
+  assert.equal(client.isCodexTarget({ type: 'page', title: 'ChatGPT', url: 'app://-/detached-window.html' }), false);
   assert.equal(client.isCodexTarget({ type: 'page', title: 'Codex', url: 'https://example.com/' }), false);
 });

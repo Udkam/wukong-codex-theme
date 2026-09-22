@@ -1,197 +1,48 @@
 # Wukong Codex Theme
 
-为 Windows 官方 ChatGPT/Codex 桌面应用制作的《黑神话：悟空》风格主题。项目直接从本地 Git 仓库加载背景、纸面材质与样式，最终窗口仍由官方 `ChatGPT.exe` 承载；不会修改 `ChatGPT.exe`、`app.asar`、WindowsApps、应用签名或 Codex 配置，也不会创建一个独立的“Wukong Codex”应用。
+这是一个为 Windows ChatGPT/Codex 桌面客户端制作的悟空主题。当前修复保留完整双背景队列，以原生组件的形状和语义配色为边界替换玻璃材质。浅色视觉和部分实际窗口仍未验收，具体证据见下方逐项检查表。
 
-当前源码版本为 **0.15.0 / V61**。主题提供 20 张有序背景、逐图校准并在所有明暗与复杂度组合下显著增强的首页题字与“悟空”字标、可持久锁定的当前背景、原生坐标上的四角纸面输入器、侧栏选中纸带、环境信息纸面以及清晰的运行进度状态色。
+这是单一的完整本地发行版：10 张战斗图与 3 张风景图保留为双背景队列，按页面路由、快捷键、题字和字标工作。Dream Skin 的单背景包、Gallery 构建链和投稿材料已经移除，不再作为本项目的分发方案。
 
-## 主要特性
+## 完整双队列运行时
 
-- 保留官方应用名称、图标、账号、项目、任务和原生交互。
-- 13 张战斗图和 7 张风景图按两组独立的固定顺序切换，不随机抽取；新建任务页自动使用战斗序列，项目/对话页自动使用风景序列。
-- `Ctrl+Alt+F` 在当前序列内原位切换下一张背景，`Ctrl+Alt+B` 切换上一张；`Ctrl+Alt+C` 手动切换战斗/风景序列。
-- `Ctrl+Alt+K` 锁定当前可见背景的图片与战斗/风景序列；跨项目、任务、对话和应用重启均不再自动换组。锁定期间仍可用 F/B/C 手动换图，换后的图继续保持锁定；再次按 K 后立即恢复当前页面的自动序列。
-- `Ctrl+Alt+T` 原位隐藏或重新显示新建任务页的“此去，欲破何局？”题字和“悟空”字标；该选择在当前窗口内跨背景、任务和对话保持，重启后默认显示。
-- “悟空”字标按浅色/深色、平坦/复杂四档背景分别使用满不透明度、亮度/饱和度/对比度校准和相反明暗的紧边缘分离；复杂深色背景呈高亮骨色深边，复杂浅色背景呈深墨浅边，不改变原生 56×56 锚点、168×168 绘制尺寸或交互热区。
-- `Ctrl+Alt+C` 只在当前页面临时覆盖自动序列；进入另一任务、对话或页面时恢复上述页面默认，不推进该序列中的播放位置。
-- 同一页面类型内的普通任务切换、history/hash、流式回答、窗口缩放和 DOM 重挂载都不会推进组内图片；组内播放位置只响应上述前进/后退快捷键，没有后台定时轮播。
-- 下一张图由最终参与绘制的同一个 `<img>` 完成解码后，在连续两个绘制帧之间启动 420 ms 淡入；旧图在此之前持续可见。稳态只保留一张背景纹理，过渡期最多两张，并且同时最多一个图片解码请求。
-- 图片本身不使用亮度、饱和度或对比度滤镜；新建任务页的全屏遮罩固定为 10%（保留 90% 原图），项目/对话页则为每张图片单独校准遮罩，在亮暗差异很大的素材间兼顾原色与文字可读性。该校准绑定图片和页面类型，不绑定战斗/风景序列。输入器、内容栏、常驻侧栏以及折叠侧栏临时展开的浮层都保持透明主题表面。
-- 运行链不使用 WMI/CIM、固定周期进程扫描、renderer 轮询、服务或计划任务。
-- 删除仓库后主题来源消失，监督器会注销自身，后续启动回到官方原生界面。
+本地运行时不修改 `ChatGPT.exe`、`app.asar`、WindowsApps、账号数据、Store 设置或自动更新策略。只有运行项目的 `start.cmd` 才通过官方 AppX 激活入口携带 loopback CDP 参数启动并注入主题。原生 ChatGPT.exe 和商店入口保持原生行为。也支持热应用到已有可信本机 CDP 会话；不会关闭或强杀已运行的官方客户端。
 
-## 系统要求
+当前视觉规则：
 
-- Windows 10 或 Windows 11。
-- 已安装 Microsoft Store 提供的官方 ChatGPT/Codex 桌面应用（包名 `OpenAI.Codex`）。
-- Windows 自带的 .NET Framework v4 C# 编译器可用；安装器用它构建当前用户级激活器与监督器。
-- 当前用户可以运行 PowerShell 5.1 脚本。PowerShell 只用于一次性安装、维护与停用；日常正式启动使用预编译激活器和 Codex 自带 Node。
-- 仓库必须保留在固定路径。主题资源直接从该 checkout 读取，不会复制为一套可脱离仓库运行的主题。
-- 仓库路径及关键输入文件不得经过 junction、符号链接或其他 reparse point；安装器会对此 fail closed。
+- 新建任务页使用战斗组，项目和对话页使用风景组。
+- `Ctrl+Alt+F` / `Ctrl+Alt+B` 在当前组内前进或后退。
+- `Ctrl+Alt+C` 临时切换战斗或风景组。
+- `Ctrl+Alt+K` 锁定或解锁当前图片与组。
+- `Ctrl+Alt+T` 显示或隐藏新建任务页的“此去，欲破何局？”与字标。
+- 正文与按钮保持原生字色，不增加文字阴影或 Ultra 背衬；原生已有的面板使用玻璃材质，圆角、裁切和布局保持原生。
+- 深浅色新对话均无背景遮罩；浅色对话使用随场景变化的白色薄遮罩（雪山 18%、夕阳 19.5%、峡谷 23%），深色对话保留按场景配置的暗色遮罩，不修改图片资产或文字颜色。
+- Electron 主进程绘制的系统菜单不受网页 CSS 控制，目前仍未实现玻璃材质。
 
-当前安装、运行、存储和宠物 discovery 主标识统一为 `wukong-codex-theme` / `WukongCodexTheme`。旧名称只允许出现在一次性迁移识别器和不可改写的历史/校验证据中；它们不再是活动资源或路径依赖。
-
-## 安装与首次启动
+开发或受管会话中可用以下命令热应用或还原。`<port>` 必须是已验证的本机 `127.0.0.1` CDP 端口；命令不会启动或重启 ChatGPT。
 
 ```powershell
-git clone https://github.com/Udkam/wukong-codex-theme.git
-cd wukong-codex-theme
-.\install-theme.cmd
-.\start-theme.cmd
+node runtime/injector.mjs --apply <port> themes/active.json
+node runtime/injector.mjs --state <port>
+node runtime/injector.mjs --restore <port>
 ```
 
-首次安装前，建议先完全退出 ChatGPT，包括托盘或后台实例。安装器会验证官方包、建立仓库 bridge、编译当前用户级原生入口监督器，并维护一个仍叫作 `ChatGPT`、仍使用官方图标的开始菜单入口。
+## 唯一主题入口
 
-如果 `start-theme.cmd` 提示当前窗口来自未受管入口，请完全退出 ChatGPT 后再运行一次。Chromium 的受管启动参数不能在进程创建后补加，因此只有这种首次修复场景需要完整退出；安装完成后的日常任务切换不需要重启。
+双击项目文件夹内的 **start.cmd**。不需要安装程序，不接管原生快捷方式，不注册开机项或常驻原生启动监听。原生 ChatGPT.exe 正常启动，不自动加载主题。
 
-## 日常使用
+每次显式启动都会重新查询当前官方包并准备匹配的 AppX 激活助手，因此不依赖旧版本的 WindowsApps 路径，不修改或限制官方自动更新。若已有原生客户端进程运行，请完全退出后再运行主题入口；脚本不会强制关闭现有进程。未来官方版本若移除嵌入式 Node 或改变注入接口，仍需适配。
 
-安装成功后，从开始菜单或已固定的官方名称 `ChatGPT` 入口启动即可，不需要运行 `npm`，也不需要保持 PowerShell 窗口。
+需要快捷方式时，只让它指向这个项目的 start.cmd。旧 install/stop/remove/backgrounds 批处理已删除，项目根目录只保留 start.cmd；历史存档暂不删除，具体清单见 [文件整理清单](docs/FILE_INVENTORY.md)。不要移动项目后继续使用指向旧路径的快捷方式。
 
-- 手动下一张背景：`Ctrl+Alt+F`（当前模式内循环）
-- 手动上一张背景：`Ctrl+Alt+B`（当前模式内循环）
-- 临时切换战斗/风景序列：`Ctrl+Alt+C`（当前页面有效；进入另一页面后恢复自动默认）
-- 固定/解除固定当前背景：`Ctrl+Alt+K`（固定时跨项目、任务、对话和应用重启保持；F/B/C 换出的新图继续固定）
-- 同时开关新建任务页题字与“悟空”字标：`Ctrl+Alt+T`（当前窗口内保持，重启后默认显示）
-- 五个主题快捷键都在当前 document 内工作，不刷新页面，也不重载或重建主题。
-- 临时恢复当前窗口为原生界面：运行 `stop-theme.cmd`
-- 在同一个可复用官方窗口重新应用主题：运行 `start-theme.cmd`
-- Store 更新覆盖入口后：重新运行 `install-theme.cmd`
+背景管理保留为内部脚本 scripts/manage-backgrounds.ps1。恢复当前窗口的原生样式可调用 scripts/disable.ps1；这些脚本没有单独的 .cmd 入口。发布包由 scripts/package-runtime.mjs 按活动文件白名单生成，不携带宠物。
 
-## 背景编号与切换顺序
-
-`slot` 是图片与清单条目的稳定物理编号，`order` 才是该组内的播放位置。手动前进/后退按 `order` 循环，不随机抽图；`Ctrl+Alt+C` 只临时改变当前页面使用的序列，不改写两组顺序。新建任务页默认战斗序列，项目/对话页默认风景序列；跨页面后自动恢复对应默认。按 `Ctrl+Alt+K` 后，这个页面驱动的自动换组被暂停，当前图片和组成为固定锚点；F/B/C 会更新锚点，再次按 K 才恢复页面默认。运行时本身没有定时轮播，因此 K 不是暂停计时器。
-
-| 顺序 | 战斗槽位 / 场景 ID | 风景槽位 / 场景 ID |
-| ---: | --- | --- |
-| 1 | B07 / `ink-wanderer` | S05 / `sunset-ravine` |
-| 2 | B01 / `erlang-ink-duel` | S04 / `sunlit-mountain-vista` |
-| 3 | B02 / `great-sage-staff` | S08 / `snow-lake` |
-| 4 | B03 / `storm-bearer` | S01 / `ridge-gate` |
-| 5 | B04 / `shadow-confrontation` | S02 / `forest-shrine` |
-| 6 | B05 / `training-sunset` | S03 / `mountain-path` |
-| 7 | B08 / `white-tiger` | S10 / `verdant-cavern` |
-| 8 | B09 / `red-lightning` | — |
-| 9 | B06 / `thunder-dragon-ascent` | — |
-| 10 | B11 / `white-dragon-frost` | — |
-| 11 | B12 / `bear-crush` | — |
-| 12 | B15 / `crimson-lightning-burst` | — |
-| 13 | B16 / `night-spear-confrontation` | — |
-
-完整循环分别为：
-
-```text
-B07 -> B01 -> B02 -> B03 -> B04 -> B05 -> B08 -> B09 -> B06 -> B11 -> B12 -> B15 -> B16 -> B07
-S05 -> S04 -> S08 -> S01 -> S02 -> S03 -> S10 -> S05
-```
-
-当前 20 张 JPEG 合计 6,574,985 bytes（约 6.57 MB）、41,284,792 解码像素；最大双图过渡为 5,337,600 像素。图片不会在启动时全部解码，也不会进行相邻场景预取。
-
-## 自行调整背景
-
-推荐从仓库根目录运行交互管理器；它会列出当前播放位置，并引导完成新增、替换、移动或移出轮播：
-
-```powershell
-.\backgrounds.cmd
-```
-
-也可以直接执行命令：
-
-```powershell
-# 查看真实播放顺序、稳定槽位和未加入轮播但仍保留的文件
-.\backgrounds.cmd list
-
-# 替换现有图片；可使用槽位或场景 ID 定位
-.\backgrounds.cmd replace -Target B05 -InputPath "D:\Pictures\my-battle.png" -Force
-
-# 同时为项目/对话页设置该图的独立遮罩（0=无遮挡，1=完全遮罩）
-.\backgrounds.cmd replace -Target B05 -InputPath "D:\Pictures\my-battle.png" -ThreadVeil 0.42 -Force
-
-# 只调整播放位置，不重命名图片或槽位
-.\backgrounds.cmd move -Target B07 -Position 1
-
-# 在战斗组第 3 位新增图片；省略 Position 时追加到组尾
-.\backgrounds.cmd add -Mode battle -Id my-battle -InputPath "D:\Pictures\new.jpg" -Position 3 -ThreadVeil 0.35
-
-# 从轮播移除，图片文件仍保留在磁盘
-.\backgrounds.cmd remove -Target my-battle -Force
-```
-
-管理器遵循以下边界：
-
-1. `slot`（如 B07/S05）是稳定物理身份；`order` 是组内播放位置。移动场景只重排 `order`，不会交换槽位、文件名或场景 ID。
-2. 活动清单只有 `themes/active.json`；战斗和风景组必须各保留至少一张，且两组 `order` 分别从 1 连续编号。
-3. 新增/替换会调用有界图片准备脚本：源图不被修改，默认不放大，最大 1920×1080、JPEG 质量 90。可额外传入 `-Quality`、`-CropTop`、`-CropRight`、`-CropBottom`、`-CropLeft`；`-ThreadVeil 0..1` 单独控制该图在项目/对话页的均衡遮罩，不改变新建任务页固定 10% 遮罩。
-4. 每次清单写入以及被覆盖的图片都会备份到 `.wukong-runtime/background-backups/`；移出轮播不会删除图片，`list` 会把它显示为 unlinked asset。
-5. 修改后依次运行 `stop-theme.cmd`、`start-theme.cmd`，即可让同一个受管官方窗口重新载入资源，不需要重启 ChatGPT；只有受管调试通道本身已不存在时才需要退出并重开一次。
-6. 准备公开提交前运行 `npm ci` 与 `npm run check`，确保图片数量、压缩字节、解码像素和双图过渡预算没有超限。
-
-高级用户仍可直接编辑 `themes/active.json`。JSON 条目所在行不决定播放顺序；必须保持 `slot` 唯一、场景 `id` 唯一、每组 `order` 连续，并把可选 `threadVeil` 保持在 0..1。图库最多 24 项，当前已使用 41,284,792 / 48,000,000 解码像素，因此增加高分辨率图片前应先运行完整检查。
-
-## 停用与恢复原生
-
-运行以下任一命令可以恢复当前窗口的原生 DOM 与绘制，且不会结束 ChatGPT 进程：
-
-```powershell
-.\stop-theme.cmd
-# 或
-.\remove-theme.cmd
-```
-
-如果不再使用本项目，先运行上述命令，再删除本地仓库。监督器检测到仓库或 `package.json` 标记消失后会撤销自己的当前用户启动项；残留 bridge 也只会回退启动官方应用，不再加载主题资源。
-
-## 故障排查
-
-### 启动后仍是原生主题
-
-1. 完全退出 ChatGPT，包括托盘/后台实例。
-2. 在仓库根目录重新运行 `install-theme.cmd`。
-3. 再运行 `start-theme.cmd`。
-4. 若 Store 刚完成更新，必须重跑安装器以刷新官方包路径与 AUMID 验证。
-
-### 切换任务时短暂错位
-
-主题只替换原生 DOM 上的 paint，不创建第二套输入器。若应用升级改变了原生结构，运行 `npm run check`；原生结构合同失败时应先更新适配器，不要用额外定位规则掩盖漂移。
-
-### 资源占用异常
-
-背景运行时没有定时轮播，稳态只保留一张纹理。若占用持续异常，先运行 `stop-theme.cmd` 比较原生状态，并检查是否存在开发服务器、测试浏览器或其他非日常进程；不要按进程名批量结束 ChatGPT 子进程。
-
-## 开发与验证
-
-```powershell
-npm ci
-npm run check
-```
-
-常用聚焦测试：
+## 验证
 
 ```powershell
 npm run test:runtime-states
-npm run test:backgrounds
+npm run test:lifecycle
 npm run test:managed-package
-npm run test:native
 ```
 
-项目结构：
-
-- `themes/active.json`：唯一活动主题清单。
-- `themes/backgrounds/`：B/S 编号背景槽位。
-- `runtime/`：renderer 注入、背景状态机、宿主与原生入口组件。
-- `backgrounds.cmd`：交互式与命令行背景管理入口。
-- `scripts/`：安装、启动、停用、打包与背景准备工具。
-- `tests/`：资源预算、原生几何、生命周期和最小包合同。
-- `docs/`：需求、设计、素材来源、历史决策和验收记录。
-
-进一步阅读：[当前目标](docs/CURRENT_GOAL.md)、[设计说明](docs/DESIGN.md)、[需求与验收](docs/REQUIREMENTS.md)、[素材来源](docs/ASSET_SOURCES.md)。
-
-## 素材、商标与侵权联系
-
-本项目是独立、非官方的本地主题项目，与 OpenAI、Game Science 或《黑神话：悟空》的权利人不存在隶属、授权或背书关系。ChatGPT、Codex、《黑神话：悟空》及相关角色、商标、书法、截图和美术权利归各自权利人所有。
-
-部分背景由维护者本人拍摄或自行截取，部分来自网络搜集或由用户提供，仅用于非商业主题展示。仓库不主张游戏画面、角色、美术或其他第三方内容的所有权，相关权利仍归各自权利人。若您是相关权利人并认为仓库内容侵犯了您的权利，请发送邮件至 **`chenlj89@mail2.sysu.edu.cn`**，维护者会核验并及时移除或更正。
-
-详细来源和发布边界见 [docs/ASSET_SOURCES.md](docs/ASSET_SOURCES.md)。
-
-## 许可证
-
-代码按 [MIT License](LICENSE) 发布。第三方图片、商标、角色和其他素材不因代码许可证而获得再许可。
+测试与验收边界见 [验证记录](docs/VALIDATION.md)。本轮只同步主题实现，不同步独立宠物改动。

@@ -11,6 +11,7 @@ import {
   createHostSignals,
   deriveOfficialPaths,
   disablePipeCandidates,
+  findLiveDevToolsPort,
   findReusableDevToolsPort,
   legacyControlPipeName,
   legacyRepositoryStateRoot,
@@ -18,6 +19,7 @@ import {
   repositoryStateRoot,
   resolveHostPaths,
   runEventWatcher,
+  waitForControlPipeRelease,
   waitForDevToolsPort
 } from '../runtime/host.mjs';
 import {
@@ -265,6 +267,70 @@ test('startup channel wait stops immediately when the lifecycle is terminated', 
   assert.equal(await waiting, null);
 });
 
+test('stale lifecycle host handoff waits until the old control pipe is released', async () => {
+  let now = 0;
+  let probes = 0;
+  const result = await waitForControlPipeRelease({
+    pipeName: String.raw`\\.\pipe\wukong-stale-host-test`,
+    timeoutMs: 1_000,
+    probeMs: 10,
+    dependencies: {
+      now: () => now,
+      delay: async milliseconds => { now += milliseconds; },
+      sendControl: async () => {
+        probes += 1;
+        if (probes < 3) throw Error('Unsupported lifecycle host request');
+        throw Error('connect ENOENT');
+      }
+    }
+  });
+  assert.equal(result, undefined);
+  assert.equal(probes, 3);
+});
+
+test('relinquish signal stops a stale watcher without waiting on its dead renderer', async () => {
+  const markerPath = path.join(os.tmpdir(), `wukong-event-host-relinquish-${process.pid}-${Date.now()}.json`);
+  fs.writeFileSync(markerPath, '{}', 'utf8');
+  try {
+    const signals = createHostSignals();
+    const never = new Promise(() => {});
+    const resultPromise = runEventWatcher({
+      port: 17783,
+      expression: 'APPLY',
+      disableRequest: '',
+      rootPid: process.pid,
+      markerPath,
+      signals,
+      dependencies: {
+        getBrowserVersion: async () => ({
+          Browser: 'Codex/test',
+          webSocketDebuggerUrl: 'ws://127.0.0.1:17783/devtools/browser/stale'
+        }),
+        getTargets: async () => never,
+        isCodexTarget: () => true,
+        connectBrowserEvents: async () => ({
+          command: async () => ({}),
+          closed: never,
+          close() {}
+        })
+      }
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    signals.requestRelinquish();
+    const result = await Promise.race([
+      resultPromise,
+      new Promise((_, reject) => setTimeout(() => reject(Error('relinquish timed out')), 500))
+    ]);
+    assert.deepEqual(result, {
+      reason: 'stale-host-relinquished',
+      targets: 0,
+      deferredNative: true
+    });
+  } finally {
+    fs.unlinkSync(markerPath);
+  }
+});
+
 test('host refresh signal requests reconciliation without changing stop state', () => {
   const signals = createHostSignals();
   let changes = 0;
@@ -274,6 +340,7 @@ test('host refresh signal requests reconciliation without changing stop state', 
   assert.equal(changes, 1);
   assert.equal(signals.disableRequested, false);
   assert.equal(signals.terminateRequested, false);
+  assert.equal(signals.relinquishRequested, false);
 });
 
 test('an orphaned event host can safely reattach to the live Codex profile channel', async () => {
@@ -301,6 +368,20 @@ test('an orphaned event host can safely reattach to the live Codex profile chann
     port: 17775,
     identity: 'Chrome/test\nws://127.0.0.1:17775/devtools/browser/live-codex',
     targets: 1
+  });
+
+  const liveWithoutRenderer = await findLiveDevToolsPort({
+    profilePath,
+    dependencies: {
+      getBrowserVersion: async () => ({
+        Browser: 'Chrome/test',
+        webSocketDebuggerUrl: 'ws://127.0.0.1:17775/devtools/browser/live-codex'
+      })
+    }
+  });
+  assert.deepEqual(liveWithoutRenderer, {
+    port: 17775,
+    identity: 'Chrome/test\nws://127.0.0.1:17775/devtools/browser/live-codex'
   });
 });
 
@@ -373,7 +454,7 @@ test('event watcher applies once, verifies active state, and restores before dis
 
   const result = await runEventWatcher({
     port: 17777,
-    expression: 'APPLY',
+    expression: () => 'APPLY',
     disableRequest: '',
     rootPid: process.pid,
     markerPath,

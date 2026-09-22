@@ -1,29 +1,292 @@
-/*
- * Wukong Codex Theme V13
- *
- * Native-layout runtime. The active scope is the full-window background, the
- * approved landing title/icon skin, and paint-only Black Myth surfaces for the
- * native composer and sidebar rows. Text, controls, hit boxes, spacing, scroll
- * behavior and DOM order remain native.
+/* Native paint boundary, audited against desktop 26.915.4065.0.
+ * No client foreground tokens, fonts, radii or layout are replaced.
+ * Only the existing landing wordmark/quote and inert background own geometry.
  */
 :root.forge-ink-mountain {
-  --forge-paper: #101210;
-  --forge-scene-brightness: 1;
+  --forge-paper: #151515;
   --forge-background-transition: 420ms;
   --forge-landing-color-retention: .9;
   --forge-thread-color-retention: .75;
-  --forge-mode-veil:
-    linear-gradient(90deg, rgba(8, 10, 9, .34), rgba(12, 14, 13, .18) 30%, rgba(12, 14, 13, .18) 70%, rgba(8, 10, 9, .32)),
-    linear-gradient(180deg, rgba(8, 10, 9, .22), rgba(8, 10, 9, .09) 22%, rgba(8, 10, 9, .12) 78%, rgba(8, 10, 9, .28));
-  --forge-scene-veil:
-    linear-gradient(90deg, rgba(11, 13, 12, .7) 0%, rgba(17, 19, 18, .42) 25%, rgba(17, 19, 18, .42) 75%, rgba(11, 13, 12, .66) 100%),
-    linear-gradient(180deg, rgba(15, 17, 16, .4), rgba(18, 20, 19, .24) 18%, rgba(18, 20, 19, .27) 82%, rgba(15, 17, 16, .46));
+  --forge-glass-fill: rgba(64, 76, 88, .72);
+  --forge-glass-highlight: linear-gradient(135deg, rgba(220,237,250,.12), rgba(220,237,250,.025) 48%, rgba(8,16,24,.04));
+  --forge-glass-edge: rgba(211,231,247,.22);
+  --forge-glass-shadow: 0 1px 0 rgba(255,255,255,.16) inset, 0 8px 22px rgba(0,0,0,.18);
+  --forge-glass-filter: blur(12px) saturate(1.04);
+  --forge-shell-fill: rgba(20, 24, 28, var(--forge-shell-dark-alpha, .88));
+  --forge-shell-filter: blur(8px);
+  --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
+}
+:root.forge-ink-mountain[data-forge-native-theme="light"] {
+  --forge-shell-fill: rgba(247, 249, 251, var(--forge-shell-light-alpha, .88));
+  --forge-glass-fill: rgba(247,249,251,.6);
+  --forge-glass-highlight: linear-gradient(135deg, rgba(255,255,255,.6), rgba(255,255,255,.06) 22%, rgba(255,255,255,.02) 62%, rgba(255,255,255,.28));
+  --forge-glass-edge: rgba(255,255,255,.68);
+  --forge-glass-shadow: 0 1px 0 rgba(255,255,255,.85) inset, 0 -1px 0 rgba(89,111,135,.12) inset, 0 6px 18px rgba(36,50,65,.09);
+  --forge-glass-filter: blur(10px) saturate(1.2);
 }
 
-:root.forge-ink-mountain[data-forge-mode="battle"] {
-  --forge-mode-veil:
-    linear-gradient(90deg, rgba(8, 10, 9, .12), rgba(12, 14, 13, .035) 29%, rgba(12, 14, 13, .035) 71%, rgba(8, 10, 9, .12)),
-    linear-gradient(180deg, rgba(9, 11, 10, .07), rgba(10, 12, 11, .018) 20%, rgba(10, 12, 11, .028) 80%, rgba(9, 11, 10, .09));
+/* Transparent layout carriers. Native controls beneath them keep their own paint. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root :is(
+  main.bg-surface,
+  webview.bg-surface,
+  [data-app-shell-main-surface],
+  [data-app-shell-main-content-layout],
+  .app-shell-main-content-frame,
+  .forge-page-content,
+  .forge-composer-context,
+  [data-composer-utility-bar-scroll-area]
+) {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+:root.forge-ink-mountain #root :is(
+  [data-app-shell-main-content-top-fade],
+  [class*="MainContentTopFade"],
+  .forge-composer-thread-fade,
+  .forge-composer-progress-fade
+) {
+  background: none !important;
+  box-shadow: none !important;
+}
+:root.forge-ink-mountain #root .pointer-events-none.bg-gradient-to-t.from-surface.via-surface {
+  background-image: none !important;
+}
+:root.forge-ink-mountain #root header.fixed.h-toolbar :is(
+  .text-md.flex.min-w-0.flex-1.items-center,
+  .ms-auto.flex.shrink-0.items-center.justify-end
+) {
+  background: transparent !important;
+}
+
+/* Current SearchablePageLayout: clear the sticky carrier, never the input shell. */
+:root.forge-ink-mountain .sticky:has(:is(
+  #scheduled-page-search, #plugins-page-search, #plugins-store-page-search
+)) {
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain .sticky:has(:is(
+  #scheduled-page-search, #plugins-page-search, #plugins-store-page-search
+))::after {
+  background: none !important;
+  box-shadow: none !important;
+}
+
+/* One material uses the native component's own paint variables.
+ * On ChatGPT home the BODY owns the capsule/rounded rectangle; the ROOT is
+ * layout only. On a thread the ROOT owns the surface. Do not paint both.
+ */
+:root.forge-ink-mountain [data-composer-surface-variant]:not([data-composer-surface-variant="inline"]) {
+  --composer-layout-surface-background: var(--forge-glass-fill) !important;
+  --composer-layout-surface-backdrop-filter: var(--forge-glass-filter) !important;
+  --composer-layout-surface-shadow: var(--forge-glass-shadow) !important;
+}
+:root.forge-ink-mountain :is(
+  [data-composer-surface-variant]:not([data-composer-utility-bar-variant="home"]):not([data-composer-surface-variant="inline"]),
+  [data-composer-utility-bar-variant="home"] > [data-composer-body]
+) {
+  background-image: var(--forge-glass-highlight) !important;
+}
+/* User messages retain the same native paint treatment in both themes. */
+/* Native default Markdown code cards. An opaque reading tint also lets the
+ * sticky toolbar cover scrolled code without a second translucent stripe.
+ * Preview/hover blocks, syntax colours, selection and geometry stay native. */
+:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha {
+  --forge-code-fill: rgb(36, 40, 44);
+  background-color: var(--forge-code-fill) !important;
+  background-image: none !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
+}
+:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha[data-theme="light"] {
+  --forge-code-fill: rgb(237, 240, 243);
+}
+:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha > [data-markdown-copy="exclude"] {
+  background-color: var(--forge-code-fill) !important;
+  background-image: none !important;
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha {
+    --forge-code-fill: var(--color-surface, Canvas) !important;
+    box-shadow: none !important;
+  }
+}
+/* First-paint selectors: body portals must not wait for JS marker scans. */
+:root.forge-ink-mountain :is(
+  [role="menu"][class*="bg-"],
+  [role="listbox"][class*="bg-"]:not([cmdk-list]):not([data-cmdk-list]),
+  [role="dialog"][class*="bg-"]:not(:has(img.object-contain)),
+  [role="alertdialog"][class*="bg-"],
+  [role="tooltip"][class*="bg-"],
+  [class*="_floatingSurface_"],
+  .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"],
+  .w-80.rounded-xl[class~="bg-surface-elevated-secondary/95"][class*="max-w-"],
+  aside[data-testid="app-shell-floating-left-panel"],
+  [data-testid="app-shell-floating-left-panel"] > aside,
+  [class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted),
+  [class*="ComposerTopMenuPanel"],
+  .composer-home-top-menu
+) {
+  background-color: var(--forge-glass-fill) !important;
+  background-image: var(--forge-glass-highlight) !important;
+  border-color: var(--forge-glass-edge) !important;
+  box-shadow: var(--forge-glass-shadow) !important;
+  backdrop-filter: var(--forge-glass-filter) !important;
+  -webkit-backdrop-filter: var(--forge-glass-filter) !important;
+}
+/* A role describes behaviour, not the paint surface. Unstyled tooltip/dialog
+ * positioning wrappers must remain native and transparent. In particular the
+ * navigation preview paints its own rounded child, never the outer tooltip.
+ */
+
+/* Shared readable shell: a stable theme-aware tint bounds wallpaper contrast.
+ * A lighter blur is sufficient behind the tint and reduces large-area filtering.
+ * The native containers retain their own corners, clipping and dimensions.
+ */
+:root.forge-ink-mountain :is(
+  aside.app-shell-left-panel:not([data-testid="app-shell-floating-left-panel"]):not([data-testid="app-shell-floating-left-panel"] > aside),
+  [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"])
+) {
+  background-color: var(--forge-shell-fill) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: var(--forge-shell-filter) !important;
+  -webkit-backdrop-filter: var(--forge-shell-filter) !important;
+}
+/* One continuous material behind the full titlebar and sidebar. The union
+ * mask avoids overlapping tint and separate blur samples at their junction. */
+:root.forge-ink-mountain [class*="_Layout_"]:has(> [class*="_ApplicationMenuTopBar_"]) aside.app-shell-left-panel:not([data-testid="app-shell-floating-left-panel"]):not([data-testid="app-shell-floating-left-panel"] > aside) {
+  background-color: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain [class*="_Layout_"]:has(> [class*="_ApplicationMenuTopBar_"])::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  /* Match the native Windows main surface corner using its own radius token. */
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000), radial-gradient(circle at bottom right, transparent calc(var(--radius-lg) - .5px), #000 var(--radius-lg));
+  mask-size: 100% var(--height-toolbar-sm, 36px), var(--app-shell-animated-left-panel-width, 0px) 100%, min(calc(var(--radius-lg) + 1px), var(--app-shell-animated-left-panel-width, 0px)) calc(var(--radius-lg) + 1px);
+  mask-position: 0 0, 0 0, calc(var(--app-shell-animated-left-panel-width, 0px) - 1px) calc(var(--height-toolbar-sm, 36px) - 1px);
+  mask-repeat: no-repeat;
+  pointer-events: none;
+  z-index: -1;
+  background: var(--forge-shell-fill);
+  backdrop-filter: var(--forge-shell-filter);
+  -webkit-backdrop-filter: var(--forge-shell-filter);
+}
+/* Native divider geometry remains; its straight stroke must not cross the glass corner. */
+:root.forge-ink-mountain [data-app-shell-main-surface="default"] {
+  border-color: transparent !important;
+}
+/* Settings exposes the wallpaper in both themes; cards retain their material. */
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+:root.forge-ink-mountain[data-forge-native-theme] [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"]) {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+}
+/* SettingsLayout's direct sticky controls own the unwanted surface band and
+ * fade, shared by usage tabs, archived chat search and keyboard shortcuts.
+ * Keep the inner controls and sticky geometry native. */
+:root.forge-ink-mountain [class~="group/settings"] > .sticky.z-30.bg-surface {
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+:root.forge-ink-mountain [class~="group/settings"] > .sticky.z-30.bg-surface::after {
+  background: none !important;
+  box-shadow: none !important;
+}
+/* SettingsCard uses an inline background variable, unlike the theme preview.
+ * Paint the real cards without recolouring swatches or the code preview.
+ * Cards use tint and highlights without adding GPU blur layers.
+ */
+:root.forge-ink-mountain [class~="group/settings"] .flex.flex-col.rounded-2xl:is(
+  [style*="--color-background-panel"],
+  [class~="bg-surface-secondary/92"],
+  [class~="dark:bg-surface-secondary/92"]
+) {
+  background-color: var(--forge-glass-fill) !important;
+  background-image: var(--forge-glass-highlight) !important;
+  border-color: var(--forge-glass-edge) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
+}
+/* SummaryPanel's native sticky headers must occlude scrolling rows, including
+ * their 8px ::before cap. Use one opaque tint across the card and its headers:
+ * nested translucent backdrops create bands and leak text through that cap.
+ * Corners, clipping, sticky positions and pseudo-element geometry stay native.
+ */
+:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]:has([data-slot="thread-summary-panel-item-button"]) {
+  background-color: var(--forge-summary-fill) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]
+  header.sticky.bg-surface-elevated-secondary,
+:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]
+  header.sticky.bg-surface-elevated-secondary::before {
+  background-color: var(--forge-summary-fill) !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain [class*="ComposerTopMenuPanel"] {
+  --composer-top-tray-background: transparent !important;
+}
+:root.forge-ink-mountain [class*="ComposerTopMenuPanel"] :is([cmdk-root], [data-cmdk-root]) {
+  background: transparent !important;
+}
+
+/* Goal/queue strips and resource cards retain their native clipping and corners.
+ * Only the outer strip blurs; inner queue leaves never create extra blur layers.
+ */
+:root.forge-ink-mountain :is(
+  .forge-composer-panel[class*="bg-"],
+  [data-composer-rail-item],
+  .forge-composer-progress-pill[class*="bg-"],
+  .forge-plan-pill[class*="bg-"],
+  .forge-diff-summary[class*="bg-"],
+  .forge-review-card[class*="bg-"],
+  .forge-right-card[class*="bg-"],
+  .forge-right-section[class*="bg-"],
+  .forge-page-card[class*="bg-"],
+  [class*="thread-resource-card-row-padding-x"].overflow-hidden
+) {
+  background-color: var(--forge-glass-fill) !important;
+  background-image: var(--forge-glass-highlight) !important;
+  border-color: var(--forge-glass-edge) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
+}
+:root.forge-ink-mountain .forge-composer-panel[class*="bg-"] {
+  backdrop-filter: var(--forge-glass-filter) !important;
+  -webkit-backdrop-filter: var(--forge-glass-filter) !important;
+}
+:root.forge-ink-mountain .forge-composer-queue-item {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain [class*="thread-resource-card-row-padding-x"] button[class~="bg-surface/70"] {
+  background-color: transparent !important;
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  :root.forge-ink-mountain {
+    --forge-glass-fill: var(--color-surface, Canvas) !important;
+    --forge-glass-highlight: none !important;
+    --forge-glass-filter: none !important;
+    --forge-shell-fill: var(--color-surface, Canvas) !important;
+    --forge-shell-filter: none !important;
+    --forge-summary-fill: var(--color-surface, Canvas) !important;
+  }
 }
 
 :root.forge-ink-mountain[data-forge-mode="scenery"] {
@@ -97,7 +360,7 @@
 }
 
 :root.forge-ink-mountain[data-forge-surface="landing"] [data-forge-background-veil] {
-  opacity: calc(1 - var(--forge-landing-color-retention));
+  opacity: 0;
 }
 
 :root.forge-ink-mountain[data-forge-surface="thread"] [data-forge-background-veil] {
@@ -107,11 +370,20 @@
   );
 }
 
-/*
- * Keep the native root above the inert background without isolating body.
- * Body-level native portals with their own z-index therefore retain their
- * normal ordering relative to #root.
- */
+/* Light reading uses a white veil with per-scene strength, never the dark
+ * gradient. Snow .48 -> .18; sunset .42 -> .195; ravine .28 -> .23. */
+:root.forge-ink-mountain[data-forge-native-theme="light"][data-forge-surface="thread"] [data-forge-background-veil] {
+  background-image: linear-gradient(#fff, #fff) !important;
+  opacity: clamp(.10, calc(.30 - var(--forge-layer-thread-veil, .25) * .25), .25);
+}
+
+:root.forge-ink-mountain[data-forge-settings-veil="true"] [data-forge-background-veil] {
+  opacity: var(
+    --forge-layer-thread-veil,
+    calc(1 - var(--forge-thread-color-retention))
+  );
+}
+
 :root.forge-ink-mountain #root {
   position: relative;
   z-index: 1;
@@ -122,11 +394,6 @@
   background-image: none !important;
 }
 
-/*
- * Codex 26.715.2305.0 paints the central column on <main class="main-surface">.
- * The source-backed selector below clears only that paint and the decorative
- * top fade. The native radius, shadow, clipping, size and hit boxes stay intact.
- */
 :root.forge-ink-mountain[data-forge-background-ready="true"] main.main-surface {
   background-color: transparent !important;
   background-image: none !important;
@@ -147,48 +414,6 @@
   background-image: none !important;
 }
 
-/*
- * Plugins and Scheduled Tasks share SearchablePageLayout. Its source-backed
- * sticky search carrier paints a full-width main-surface strip and a 32px
- * ::after fade. Clear only those two paint layers when they own one of the
- * two native page-search inputs; the search chrome, blur, border, geometry and
- * hit targets remain entirely native.
- */
-:root.forge-ink-mountain[data-forge-background-ready="true"] :is(
-  main.main-surface,
-  .forge-workspace
-) .sticky.top-0.z-30.bg-token-main-surface-primary:has(:is(
-  #plugins-page-search,
-  #scheduled-page-search
-)) {
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain[data-forge-background-ready="true"] :is(
-  main.main-surface,
-  .forge-workspace
-) .sticky.top-0.z-30.bg-token-main-surface-primary:has(:is(
-  #plugins-page-search,
-  #scheduled-page-search
-))::after {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-/*
- * New-task hero: preserve the official 56×56 icon and title footprints while
- * replacing only their paint. The motif is the official 悟空 brush wordmark
- * and seal, painted at three times the native icon size from a 2× raster.
- * Light and dark variants follow each manifest slot. Four reviewed background
- * profiles apply a static brightness/saturation/contrast treatment with tight
- * opposite-tone edge separation to the 168 px paint layer. This keeps every
- * profile visibly distinct while preserving the brush texture, avoiding a
- * diffuse glow surface, and leaving native geometry unchanged. The native
- * kicker and descriptive subtitle keep their layout boxes but become visually
- * transparent so the hero contains only the mark and themed title.
- */
 :root.forge-ink-mountain [data-forge-title-copy] {
   position: relative !important;
 }
@@ -273,1438 +498,30 @@
   pointer-events: none;
 }
 
-/*
- * The four native application-menu buttons deliberately keep Codex's own
- * quiet, hover, focus, open and disabled paint. The runtime marker remains a
- * lifecycle hook only, so restoration can still remove marks from older
- * injected revisions without restyling these platform controls.
- */
-
-/*
- * Ancient-volume composer material. The native component tree, text flow,
- * controls, content coordinates and hit boxes remain intact. The paper is a
- * paint-only pseudo layer; native width, height, padding and bottom anchoring
- * remain authoritative so React remounts cannot jump between two geometries.
- */
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-) {
-  --color-token-foreground: #080604;
-  --color-token-text-primary: #080604;
-  --color-token-text-secondary: #2c2015;
-  --color-token-text-tertiary: #38291b;
-  --color-token-description-foreground: #302317;
-  --color-token-input-placeholder-foreground: #181008;
-  --color-token-icon-foreground: #080604;
-  --color-token-icon-secondary: #2b2015;
-  --color-token-icon-tertiary: #35271a;
-  color: #080604 !important;
-  position: relative !important;
-  isolation: isolate;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-)::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image:
-    var(--forge-ui-composer-main),
-    var(--forge-ui-paper-tile);
-  background-position: center, center;
-  background-repeat: no-repeat, repeat;
-  background-size: 100% 100%, 512px 220px !important;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    8px 100%,
-    0 calc(100% - 8px),
-    0 8px
-  );
-  box-shadow:
-    0 1px 0 rgba(235, 216, 184, .18) inset,
-    0 -1px 0 rgba(70, 48, 25, .38) inset,
-    0 2px 0 rgba(20, 14, 8, .28),
-    0 7px 20px rgba(5, 4, 3, .26);
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-):focus-within::before {
-  box-shadow:
-    0 1px 0 rgba(235, 216, 184, .24) inset,
-    0 -1px 0 rgba(70, 48, 25, .42) inset,
-    0 0 0 1px rgba(111, 74, 37, .72) inset,
-    0 5px 18px rgba(5, 4, 3, .28);
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-) .ProseMirror {
-  color: inherit !important;
-  text-shadow: 0 1px 0 rgba(224, 204, 172, .12);
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-) .ProseMirror p.is-editor-empty:first-child::before,
-:root.forge-ink-mountain :is(
-  .forge-composer-frame,
-  [data-codex-composer-root] .composer-surface-chrome,
-  [data-thread-find-composer="true"] .composer-surface-chrome
-) [data-placeholder]::before {
-  color: #181008 !important;
-}
-
-:root.forge-ink-mountain .forge-composer-context,
-:root.forge-ink-mountain .forge-composer-panel-stack {
-  --color-token-foreground: #080604;
-  --color-token-text-primary: #080604;
-  --color-token-text-secondary: #2a1f14;
-  --color-token-description-foreground: #332619;
-  --color-token-icon-foreground: #080604;
-  color: #080604 !important;
-  position: relative !important;
-  isolation: isolate;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-context::before,
-:root.forge-ink-mountain .forge-composer-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image:
-    linear-gradient(
-      to bottom,
-      rgba(75, 51, 27, .62) 0 1px,
-      rgba(235, 216, 184, .1) 1px 2px,
-      transparent 2px
-    ),
-    var(--forge-ui-paper-tile);
-  background-position: center, center;
-  background-repeat: no-repeat, repeat;
-  background-size: 100% 100%, 512px 220px !important;
-  clip-path: none;
-  box-shadow:
-    1px 0 0 rgba(75, 51, 27, .42) inset,
-    -1px 0 0 rgba(75, 51, 27, .42) inset;
-}
-
-:root.forge-ink-mountain .forge-composer-context-above::before,
-:root.forge-ink-mountain
-  .forge-composer-panel-stack
-  > .forge-composer-panel:first-child::before {
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-}
-
-/*
- * Adjacent outer rows already share an exact native edge. Only the first row
- * owns the two-pixel top engraving; repeating it on the goal row reads as a
- * physical gap between the queue and the active goal. Keep an intentional
- * brown separator on the retained native border, extend the goal paper one
- * pixel upward, and place a continuous paper field behind the whole stack.
- * The shared underpaint prevents Chromium's fractional-DPI antialiasing from
- * sampling the scene while the separator still preserves the row boundary.
- */
-:root.forge-ink-mountain
-  .forge-composer-panel
-  + .forge-composer-panel {
-  border-top-color: rgba(75, 51, 27, .5) !important;
-}
-
-:root.forge-ink-mountain
-  .forge-composer-panel
-  + .forge-composer-panel::before {
-  top: -1px;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-}
-
-:root.forge-ink-mountain .forge-composer-context-below::before {
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    8px 100%,
-    0 calc(100% - 8px)
-  );
-}
-
-:root.forge-ink-mountain .forge-composer-context::after,
-:root.forge-ink-mountain
-  .forge-composer-panel-stack
-  > .forge-composer-panel:first-child::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  height: 29px;
-  z-index: -1;
-  pointer-events: none;
-  background-color: transparent;
-  background-image: var(--forge-ui-composer-strip);
-  background-repeat: no-repeat;
-  background-size: 100% 58px !important;
-}
-
-:root.forge-ink-mountain .forge-composer-context-above::after,
-:root.forge-ink-mountain
-  .forge-composer-panel-stack
-  > .forge-composer-panel:first-child::after {
-  top: 0;
-  background-position: center top;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-}
-
-/*
- * Work places the project/plugin utility strip below the main composer. Use
- * the lower half of the two-ended strip asset and close the lower corners;
- * thread project/environment/branch controls keep the independent upper half.
- */
-:root.forge-ink-mountain .forge-composer-context-below::after {
-  bottom: 0;
-  background-position: center bottom;
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    8px 100%,
-    0 calc(100% - 8px)
-  );
-}
-
-:root.forge-ink-mountain .forge-composer-panel {
-  color: inherit !important;
-  position: relative !important;
-  isolation: isolate;
-  background: transparent !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-panel-stack::before {
-  content: "" !important;
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-  box-shadow: none;
-}
-
-:root.forge-ink-mountain .forge-composer-panel + .forge-composer-panel {
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-queue-item {
-  color: inherit !important;
-  position: relative !important;
-  isolation: isolate;
-  background: transparent !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-queue-item::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline: calc((var(--spacing, 4px) * -3) + 1px);
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-  clip-path: none;
-  box-shadow: none;
-}
-
-:root.forge-ink-mountain
-  .forge-composer-queue-item
-  + .forge-composer-queue-item::after {
-  content: "";
-  position: absolute;
-  inset-inline: calc((var(--spacing, 4px) * -3) + 1px);
-  top: -1px;
-  height: 1px;
-  z-index: 0;
-  pointer-events: none;
-  background: rgba(75, 51, 27, .5);
-}
-
-/*
- * Production queue/goal aliases. These exact native topology selectors apply
- * before the observer's compatibility markers, so a newly mounted thread does
- * not expose its dark native panel borders for one frame.
- */
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *):has(
-    > .relative.min-w-0.overflow-clip.text-token-foreground
-  ) {
-  --color-token-foreground: #080604;
-  --color-token-text-primary: #080604;
-  --color-token-text-secondary: #2a1f14;
-  --color-token-description-foreground: #332619;
-  --color-token-icon-foreground: #080604;
-  color: #080604 !important;
-  position: relative !important;
-  isolation: isolate;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *):has(
-    > .relative.min-w-0.overflow-clip.text-token-foreground
-  )::before {
-  content: "" !important;
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-  box-shadow: none;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  + .relative.min-w-0.overflow-clip.text-token-foreground {
-  border-top-color: rgba(75, 51, 27, .5) !important;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground {
-  color: inherit !important;
-  position: relative !important;
-  isolation: isolate;
-  background: transparent !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image:
-    linear-gradient(
-      to bottom,
-      rgba(75, 51, 27, .62) 0 1px,
-      rgba(235, 216, 184, .1) 1px 2px,
-      transparent 2px
-    ),
-    var(--forge-ui-paper-tile);
-  background-position: center, center;
-  background-repeat: no-repeat, repeat;
-  background-size: 100% 100%, 512px 220px !important;
-  clip-path: none;
-  box-shadow:
-    1px 0 0 rgba(75, 51, 27, .42) inset,
-    -1px 0 0 rgba(75, 51, 27, .42) inset;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  + .relative.min-w-0.overflow-clip.text-token-foreground::before {
-  top: -1px;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground:first-child::before {
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground:first-child::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 0;
-  height: 29px;
-  z-index: -1;
-  pointer-events: none;
-  background-color: transparent;
-  background-image: var(--forge-ui-composer-strip);
-  background-position: center top;
-  background-repeat: no-repeat;
-  background-size: 100% 58px !important;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% 100%,
-    0 100%,
-    0 8px
-  );
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-  > .overflow-visible {
-  color: inherit !important;
-  position: relative !important;
-  isolation: isolate;
-  background: transparent !important;
-  border-radius: 0 !important;
-  corner-shape: initial !important;
-  clip-path: none !important;
-  border-color: transparent !important;
-  border-image: none !important;
-  outline: 0 !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-  > .overflow-visible::before {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  inset-inline: calc((var(--spacing, 4px) * -3) + 1px);
-  z-index: -1;
-  pointer-events: none;
-  background-color: #87755d;
-  background-image: var(--forge-ui-paper-tile);
-  background-position: center;
-  background-repeat: repeat;
-  background-size: 512px 220px !important;
-  clip-path: none;
-  box-shadow: none;
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-  > .overflow-visible
-  + .overflow-visible::after {
-  content: "";
-  position: absolute;
-  inset-inline: calc((var(--spacing, 4px) * -3) + 1px);
-  top: -1px;
-  height: 1px;
-  z-index: 0;
-  pointer-events: none;
-  background: rgba(75, 51, 27, .5);
-}
-
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-  > .relative.min-w-0.overflow-clip.text-token-foreground
-  :is(button, [role="button"]) {
-  color: inherit !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-context button,
-:root.forge-ink-mountain .forge-composer-context [role="button"],
-:root.forge-ink-mountain .forge-composer-panel button,
-:root.forge-ink-mountain .forge-composer-panel [role="button"] {
-  color: inherit !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain .forge-composer-progress-fade,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  > .absolute.inset-x-0.bottom-1.flex.min-h-7.items-center.justify-center.gap-2.pb-1
-  > .pointer-events-none.absolute.inset-x-0.-bottom-1.h-7.bg-gradient-to-t,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  > .pointer-events-none.absolute.inset-x-0.-bottom-1.h-7.bg-gradient-to-t {
-  background-color: transparent !important;
-  background-image: none !important;
-  opacity: 0 !important;
-}
-
-/*
- * Native thread-scroll-layout adds a full-height solid-surface gradient
- * behind the entire footer. It is paint-only and pointer transparent. The
- * Wukong scene already owns that blend, so retain the native node geometry
- * while suppressing only its obsolete solid-surface paint.
- */
-:root.forge-ink-mountain .forge-composer-thread-fade,
-:root.forge-ink-mountain
-  [data-thread-scroll-footer="true"]
-  > .pointer-events-none.absolute.inset-x-0.bottom-0.z-0.flex.h-full.w-full.justify-center.pt-4
-  > .z-0.h-full.bg-gradient-to-t {
-  background: none !important;
-  box-shadow: none !important;
-  filter: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  opacity: 0 !important;
-}
-
-:root.forge-ink-mountain .forge-composer-progress-pill,
-:root.forge-ink-mountain .forge-plan-pill,
-:root.forge-ink-mountain .forge-diff-summary,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5 {
-  --color-token-foreground: #080604;
-  --color-token-text-primary: #080604;
-  --color-token-text-secondary: #2a1f14;
-  color: #080604 !important;
-  background-color: transparent !important;
-  background-image:
-    var(--forge-ui-composer-pill),
-    var(--forge-ui-paper-tile) !important;
-  background-position: center, center !important;
-  background-repeat: no-repeat, repeat !important;
-  background-size: 100% 100%, 512px 220px !important;
-  border-radius: 999px !important;
-  corner-shape: round !important;
-  border-color: transparent !important;
-  backdrop-filter: none !important;
-  box-shadow:
-    0 1px 0 rgba(235, 216, 184, .18) inset,
-    0 -1px 0 rgba(75, 51, 27, .38) inset,
-    0 2px 0 rgba(20, 14, 8, .24),
-    0 4px 11px rgba(5, 4, 3, .24) !important;
-}
-
-:root.forge-ink-mountain .forge-progress-status-icon,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
-  svg {
-  color: #063f61 !important;
-  opacity: 1 !important;
-}
-
-:root.forge-ink-mountain .forge-progress-status-icon :is(circle, path),
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
-  svg :is(circle, path) {
-  stroke: currentColor !important;
-  stroke-opacity: 1 !important;
-  stroke-width: 1.65px !important;
-}
-
-:root.forge-ink-mountain .forge-diff-added,
-:root.forge-ink-mountain .forge-diff-removed {
-  -webkit-text-stroke: .18px rgba(17, 11, 6, .62);
-  text-shadow: 0 .35px .35px rgba(17, 11, 6, .34);
-}
-
-:root.forge-ink-mountain .forge-diff-added,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  .text-token-git-decoration-added-resource-foreground {
-  color: #064521 !important;
-}
-
-:root.forge-ink-mountain .forge-diff-removed,
-:root.forge-ink-mountain
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-  [data-above-composer-portal]
-  .relative.col-start-1.row-start-1.h-8.self-end
-  .text-token-git-decoration-deleted-resource-foreground {
-  color: #781718 !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-) {
-  color: #f7e8c7 !important;
-  background-color: #49361f !important;
-  background-image: none !important;
-  border-color: rgba(47, 32, 17, .72) !important;
-  opacity: 1 !important;
-  box-shadow:
-    0 1px 0 rgba(255, 226, 169, .18) inset,
-    0 2px 7px rgba(21, 14, 8, .32) !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-) svg {
-  color: inherit !important;
-  opacity: 1 !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-) svg [fill="currentColor"] {
-  fill: currentColor !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-) svg [stroke="currentColor"] {
-  stroke: currentColor !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-):is(:hover, :focus-visible) {
-  color: #f0dab0 !important;
-  background-color: #5a4327 !important;
-  box-shadow:
-    0 1px 0 rgba(255, 226, 169, .22) inset,
-    0 0 0 1px rgba(154, 112, 62, .45),
-    0 2px 8px rgba(21, 14, 8, .36) !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-):is(:disabled, [aria-disabled="true"]) {
-  color: #f0dfbd !important;
-  background-color: #5f5548 !important;
-  border-color: rgba(47, 39, 29, .46) !important;
-  opacity: 1 !important;
-  box-shadow: 0 1px 0 rgba(255, 235, 193, .1) inset !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-composer-submit,
-  :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome
-    div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"]
-):is(:disabled, [aria-disabled="true"]) svg {
-  color: inherit !important;
-  opacity: 1 !important;
-}
-
-/*
- * Native 300px environment panel, repainted as a smoked scripture leaf.
- * The official panel/card/row boxes remain untouched: the clipped silhouette
- * lives on a pointer-transparent paint layer so every native control keeps its
- * original position and rectangular hit region.
- */
-:root.forge-ink-mountain #root .forge-right-card,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5 {
-  --color-token-foreground: #eee2cc;
-  --color-token-text-primary: #eee2cc;
-  --color-token-text-secondary: #cbbda8;
-  --color-token-text-tertiary: #a99b88;
-  --color-token-description-foreground: #b5a791;
-  --color-token-icon-foreground: #eadcc5;
-  --color-token-icon-secondary: #c9baa4;
-  --color-token-icon-tertiary: #9f917e;
-  color: #eee2cc !important;
-  position: relative !important;
-  isolation: isolate;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  backdrop-filter: none !important;
-  box-shadow: 0 11px 26px rgba(8, 6, 4, .34) !important;
-  clip-path: none !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-card::before,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5::before {
-  content: "";
-  position: absolute;
-  inset: 2px;
-  z-index: -1;
-  pointer-events: none;
-  background-color: #665844;
-  background-image:
-    linear-gradient(rgba(43, 34, 24, .48), rgba(43, 34, 24, .48)),
-    var(--forge-ui-paper-tile);
-  background-position: center, center;
-  background-repeat: no-repeat, repeat;
-  background-size: 100% 100%, 512px 220px !important;
-  clip-path: polygon(
-    8px 0,
-    calc(100% - 8px) 0,
-    100% 8px,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    8px 100%,
-    0 calc(100% - 8px),
-    0 8px
-  );
-  box-shadow:
-    0 0 0 1px rgba(222, 198, 157, .18) inset,
-    0 0 0 2px rgba(55, 38, 23, .34) inset,
-    3px 0 0 rgba(128, 89, 48, .28) inset;
-}
-
-:root.forge-ink-mountain #root .forge-right-title {
-  color: #f3e6cf !important;
-  text-shadow: 0 1px 0 rgba(26, 17, 10, .52);
-}
-
-/*
- * Codex renders the main title and every optional section title as sticky
- * dropdown-colour headers. They remain separate DOM regions for native
- * scrolling and hit testing, but must not read as separate black bars: the
- * card's single scripture layer is allowed to show through all of them.
- */
-:root.forge-ink-mountain #root :is(
-  .forge-right-title-surface,
-  .forge-right-section-title
-),
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5
-  > :is(div, header)[class~="bg-token-dropdown-background"]:has(> :is(h1, h2, h3, h4, h5, h6, [role="heading"])),
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3
-  > header.sticky.top-0.z-10.flex.h-7.w-full.bg-token-dropdown-background {
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  border-radius: 0 !important;
-  clip-path: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-:root.forge-ink-mountain #root :is(
-  .forge-right-title-surface,
-  .forge-right-section-title
-)::before,
-:root.forge-ink-mountain #root :is(
-  .forge-right-title-surface,
-  .forge-right-section-title
-)::after,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5
-  > :is(div, header)[class~="bg-token-dropdown-background"]:has(> :is(h1, h2, h3, h4, h5, h6, [role="heading"]))::before,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5
-  > :is(div, header)[class~="bg-token-dropdown-background"]:has(> :is(h1, h2, h3, h4, h5, h6, [role="heading"]))::after,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3
-  > header.sticky.top-0.z-10.flex.h-7.w-full.bg-token-dropdown-background::before,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3
-  > header.sticky.top-0.z-10.flex.h-7.w-full.bg-token-dropdown-background::after {
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-section,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3 {
-  position: relative !important;
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-section::after,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3::after {
-  background-image: linear-gradient(
-    90deg,
-    rgba(218, 193, 153, .04),
-    rgba(218, 193, 153, .22) 18%,
-    rgba(72, 49, 29, .52) 80%,
-    rgba(72, 49, 29, .04)
-  ) !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-section-title,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  section.relative.z-0.flex.flex-col.pb-3
-  > header.sticky.top-0.z-10.flex.h-7.w-full.bg-token-dropdown-background {
-  --color-token-foreground: #efe2cc;
-  --color-token-text-primary: #efe2cc;
-  --color-token-text-secondary: #d2c3ac;
-  --color-token-text-tertiary: #cbbca5;
-  --color-token-icon-foreground: #eadcc5;
-  color: #eadcc5 !important;
-  text-shadow: 0 1px 0 rgba(13, 9, 6, .62);
-}
-
-:root.forge-ink-mountain #root .forge-right-row,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  [data-slot="thread-summary-panel-item"] {
-  color: inherit !important;
-  position: relative !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-row::after,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  [data-slot="thread-summary-panel-item"]::after {
-  content: "";
-  position: absolute;
-  inset-inline: 1px;
-  bottom: 0;
-  height: 1px;
-  z-index: 0;
-  pointer-events: none;
-  background-image: linear-gradient(
-    90deg,
-    rgba(218, 193, 153, .05),
-    rgba(218, 193, 153, .24) 16%,
-    rgba(78, 53, 30, .48) 78%,
-    rgba(78, 53, 30, .05)
-  );
-}
-
-:root.forge-ink-mountain #root .forge-right-row:is(:hover, :focus-within),
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  [data-slot="thread-summary-panel-item"]:is(:hover, :focus-within) {
-  background-color: rgba(235, 218, 187, .075) !important;
-}
-
-:root.forge-ink-mountain #root .forge-right-card :is(
-  button,
-  [role="button"],
-  a[href]
-):focus-visible,
-:root.forge-ink-mountain #root
-  [data-pip-obstacle="thread-summary-panel"]
-  :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5
-  :is(button, [role="button"], a[href])
-:focus-visible {
-  outline: 1px solid rgba(235, 210, 169, .82) !important;
-  outline-offset: -1px !important;
-}
-
-/*
- * Keep every unselected native sidebar row entirely native. The only themed
- * row state is the source-backed current selection, matching Codex's own
- * state model instead of turning the directory into a stack of cards.
- */
-:root.forge-ink-mountain :is(
-  .forge-sidebar-shell,
-  aside.app-shell-left-panel,
-  aside[data-testid="app-shell-floating-left-panel"],
-  [data-testid="app-shell-floating-left-panel"] > aside,
-  [class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)
-) {
-  --color-token-side-bar-background: rgba(9, 8, 6, .66);
-  --color-token-foreground: #d2cdc5;
-  --color-token-text-primary: #d2cdc5;
-  --color-token-text-secondary: #b8b2aa;
-  --color-token-description-foreground: #8f8a83;
-  --color-token-icon-foreground: #c8c2b9;
-  color: #d2cdc5;
-  background-color: transparent !important;
-  background-image:
-    linear-gradient(90deg, rgba(8, 7, 5, .76), rgba(8, 7, 5, .62)) !important;
-  background-position: 0 0 !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100% !important;
-  backdrop-filter: none !important;
-}
-
-:root.forge-ink-mountain .forge-sidebar-action-active,
-:root.forge-ink-mountain .forge-sidebar-action-active:hover,
-:root.forge-ink-mountain .forge-sidebar-action-active:is(
-  :focus-visible,
-  :has(:focus-visible)
-),
-:root.forge-ink-mountain .forge-sidebar-action-active:is(
-  [aria-expanded="true"],
-  [data-state="open"],
-  :has([aria-expanded="true"]),
-  :has([data-state="open"])
-) {
-  --color-token-foreground: #2f2822;
-  --color-token-text-primary: #2f2822;
-  --color-token-text-secondary: #4d4339;
-  --color-token-description-foreground: #655a50;
-  --color-token-icon-foreground: #3f352d;
-  color: #2f2822 !important;
-  background-color: transparent !important;
-  background-image: var(--forge-ui-sidebar-selected) !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100% !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-:root.forge-ink-mountain
-  :is(
-    .forge-sidebar-action-active,
-    .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-    [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-    [data-app-action-sidebar-thread-row][aria-current="page"],
-    [data-app-action-sidebar-thread-row][aria-selected="true"],
-    [data-app-action-sidebar-project-row][aria-current="page"],
-    [data-app-action-sidebar-project-row][aria-selected="true"]
-  )
-  :where(*):not([data-native-status], [data-native-status] *) {
-  color: #2f2822 !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-  [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-  [data-app-action-sidebar-thread-row][aria-current="page"],
-  [data-app-action-sidebar-thread-row][aria-selected="true"],
-  [data-app-action-sidebar-project-row][aria-current="page"],
-  [data-app-action-sidebar-project-row][aria-selected="true"]
-) {
-  --forge-sidebar-row-material: var(--forge-ui-sidebar-selected);
-  --vscode-textLink-foreground: #853823;
-  --color-token-foreground: #2f2822;
-  --color-token-text-primary: #2f2822;
-  --color-token-text-secondary: #4d4339;
-  --color-token-description-foreground: #655a50;
-  --color-token-icon-foreground: #3f352d;
-  color: #2f2822 !important;
-  background-color: transparent !important;
-  background-image: var(--forge-ui-sidebar-selected) !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100% !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
-/*
- * Runtime mapping guarantees that only the explicit native thread row owns
- * selected paper, never its singleton sortable/animation wrappers. Keep the
- * native row geometry and hit target untouched; normalize paint origin only.
- */
-:root.forge-ink-mountain
-  [data-app-action-sidebar-project-list-id]
-  :is(
-    .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-    [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-    [data-app-action-sidebar-thread-row][aria-current="page"],
-    [data-app-action-sidebar-thread-row][aria-selected="true"]
-  )[data-app-action-sidebar-thread-row] {
-  background-origin: border-box !important;
-  background-clip: border-box !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-  [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-  [data-app-action-sidebar-thread-row][aria-current="page"],
-  [data-app-action-sidebar-thread-row][aria-selected="true"],
-  [data-app-action-sidebar-project-row][aria-current="page"],
-  [data-app-action-sidebar-project-row][aria-selected="true"]
-):hover {
-  background-image:
-    linear-gradient(rgba(255, 250, 239, .035), rgba(255, 250, 239, .035)),
-    var(--forge-ui-sidebar-selected) !important;
-}
-
-:root.forge-ink-mountain :is(
-  .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-  [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-  [data-app-action-sidebar-thread-row][aria-current="page"],
-  [data-app-action-sidebar-thread-row][aria-selected="true"],
-  [data-app-action-sidebar-project-row][aria-current="page"],
-  [data-app-action-sidebar-project-row][aria-selected="true"]
-):is(
-  :focus-visible,
-  :has(:focus-visible)
-) {
-  background-image:
-    linear-gradient(rgba(255, 250, 239, .045), rgba(255, 250, 239, .045)),
-    var(--forge-ui-sidebar-selected) !important;
-  box-shadow: none !important;
-}
-
-/*
- * A current project is both a level-one directory row and the pale current
- * selection. This selector deliberately outranks expanded/collapsed project
- * paint without treating mere expansion as selection.
- */
-:root.forge-ink-mountain
-  :is(
-    .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-    [data-app-action-sidebar-project-row][aria-current="page"],
-    [data-app-action-sidebar-project-row][aria-selected="true"]
-  )[data-app-action-sidebar-project-row],
-:root.forge-ink-mountain
-  :is(
-    .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-    [data-app-action-sidebar-project-row][aria-current="page"],
-    [data-app-action-sidebar-project-row][aria-selected="true"]
-  )[data-app-action-sidebar-project-row]:hover,
-:root.forge-ink-mountain
-  :is(
-    .forge-sidebar-selected:not([data-app-action-sidebar-thread-row], [data-app-action-sidebar-project-row]),
-    [data-app-action-sidebar-project-row][aria-current="page"],
-    [data-app-action-sidebar-project-row][aria-selected="true"]
-  )[data-app-action-sidebar-project-row]:is(
-    :focus-visible,
-    :has(:focus-visible)
-  ) {
-  --color-token-foreground: #2f2822;
-  --color-token-text-primary: #2f2822;
-  --color-token-text-secondary: #4d4339;
-  --color-token-description-foreground: #655a50;
-  --color-token-icon-foreground: #3f352d;
-  color: #2f2822 !important;
-  background-color: transparent !important;
-  background-image: var(--forge-ui-sidebar-selected) !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
-  background-size: 100% 100% !important;
-  border-color: transparent !important;
-  box-shadow: none !important;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  :root.forge-ink-mountain { --forge-background-transition: 0ms; }
-
-  :root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer] {
+  :root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer],
+  :root.forge-ink-mountain [data-forge-background-veil] {
     transition: none !important;
   }
 }
 
 @media (forced-colors: active) {
-  :root.forge-ink-mountain #wukong-codex-theme-background { display: none !important; }
-
-  :root.forge-ink-mountain body,
-  :root.forge-ink-mountain #root,
-  :root.forge-ink-mountain #root > :first-child,
-  :root.forge-ink-mountain .forge-workspace,
-  :root.forge-ink-mountain main.main-surface {
-    background-color: Canvas !important;
+  :root.forge-ink-mountain #wukong-codex-theme-background,
+  :root.forge-ink-mountain [data-forge-title-copy]::after,
+  :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"]::before {
+    display: none !important;
   }
-
-  :root.forge-ink-mountain [data-forge-title-copy] > * {
+  :root.forge-ink-mountain[data-forge-background-ready="true"],
+  :root.forge-ink-mountain[data-forge-background-ready="true"] body,
+  :root.forge-ink-mountain[data-forge-background-ready="true"] #root {
+    background: Canvas !important;
+  }
+  :root.forge-ink-mountain [data-forge-title-copy] > *,
+  :root.forge-ink-mountain [data-forge-title-copy] > * * {
     color: CanvasText !important;
     -webkit-text-fill-color: CanvasText !important;
   }
-
-  :root.forge-ink-mountain [data-forge-title-copy]::after,
-  :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"]::before {
-    content: none !important;
-  }
-
   :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] > * {
-    opacity: revert !important;
-  }
-
-  :root.forge-ink-mountain #root .forge-composer-frame,
-  :root.forge-ink-mountain #root .forge-composer-context,
-  :root.forge-ink-mountain #root .forge-composer-panel-stack,
-  :root.forge-ink-mountain #root .forge-composer-panel,
-  :root.forge-ink-mountain #root .forge-composer-queue-item,
-  :root.forge-ink-mountain #root .forge-composer-thread-fade,
-  :root.forge-ink-mountain #root .forge-composer-progress-pill,
-  :root.forge-ink-mountain #root .forge-progress-status-icon,
-  :root.forge-ink-mountain #root .forge-diff-added,
-  :root.forge-ink-mountain #root .forge-diff-removed,
-  :root.forge-ink-mountain #root .forge-plan-pill,
-  :root.forge-ink-mountain #root .forge-diff-summary,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    [data-above-composer-portal]
-    .relative.col-start-1.row-start-1.h-8.self-end
-    .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5,
-  :root.forge-ink-mountain #root .forge-composer-submit,
-  :root.forge-ink-mountain #root .forge-topbar-menu-item,
-  :root.forge-ink-mountain #root .forge-sidebar-shell,
-  :root.forge-ink-mountain #root .forge-sidebar-action,
-  :root.forge-ink-mountain #root .forge-sidebar-level1,
-  :root.forge-ink-mountain #root .forge-sidebar-level2,
-  :root.forge-ink-mountain #root .forge-sidebar-selected,
-  :root.forge-ink-mountain #root .forge-right-card,
-  :root.forge-ink-mountain #root .forge-right-title,
-  :root.forge-ink-mountain #root .forge-right-title-surface,
-  :root.forge-ink-mountain #root .forge-right-section,
-  :root.forge-ink-mountain #root .forge-right-section-title,
-  :root.forge-ink-mountain #root .forge-right-row,
-  :root.forge-ink-mountain #root :is([data-codex-composer-root], [data-thread-find-composer="true"]) .composer-surface-chrome,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *):has(
-      > .relative.min-w-0.overflow-clip.text-token-foreground
-    ),
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground
-    .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-    > .overflow-visible,
-  :root.forge-ink-mountain #root :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome div.select-none[class*="_footer_"]
-    button[class~="cursor-interaction"][class~="size-token-button-composer"],
-  :root.forge-ink-mountain #root aside.app-shell-left-panel,
-  :root.forge-ink-mountain #root :is(
-    [data-app-action-sidebar-thread-row][data-app-action-sidebar-thread-active="true"],
-    [data-app-action-sidebar-thread-row][aria-current="page"],
-    [data-app-action-sidebar-thread-row][aria-selected="true"],
-    [data-app-action-sidebar-project-row][aria-current="page"],
-    [data-app-action-sidebar-project-row][aria-selected="true"]
-  ),
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5
-    > :is(div, header)[class~="bg-token-dropdown-background"]:has(> :is(h1, h2, h3, h4, h5, h6, [role="heading"])),
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    section.relative.z-0.flex.flex-col.pb-3,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    section.relative.z-0.flex.flex-col.pb-3
-    > header.sticky.top-0.z-10.flex.h-7.w-full.bg-token-dropdown-background,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    [data-slot="thread-summary-panel-item"] {
-    --color-token-foreground: CanvasText;
-    --color-token-text-primary: CanvasText;
-    --color-token-text-secondary: CanvasText;
-    --color-token-description-foreground: CanvasText;
-    --color-token-icon-foreground: CanvasText;
-    --vscode-textLink-foreground: LinkText;
-    color: CanvasText !important;
-    background-color: Canvas !important;
-    background-image: none !important;
-    border-color: CanvasText !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
     opacity: 1 !important;
-    filter: none !important;
-    clip-path: none !important;
-    forced-color-adjust: auto;
-    outline: revert !important;
-  }
-
-  :root.forge-ink-mountain #root .forge-progress-status-icon,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    [data-above-composer-portal]
-    .relative.col-start-1.row-start-1.h-8.self-end
-    .flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\.5
-    svg,
-  :root.forge-ink-mountain #root .forge-diff-added,
-  :root.forge-ink-mountain #root .forge-diff-removed,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    [data-above-composer-portal]
-    .relative.col-start-1.row-start-1.h-8.self-end
-    :is(
-      .text-token-git-decoration-added-resource-foreground,
-      .text-token-git-decoration-deleted-resource-foreground
-    ) {
-    color: CanvasText !important;
-    -webkit-text-stroke: 0 !important;
-    text-shadow: none !important;
-  }
-
-  :root.forge-ink-mountain #root .forge-composer-progress-fade,
-  :root.forge-ink-mountain #root .forge-composer-thread-fade,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    [data-above-composer-portal]
-    .relative.col-start-1.row-start-1.h-8.self-end
-    > .absolute.inset-x-0.bottom-1.flex.min-h-7.items-center.justify-center.gap-2.pb-1
-    > .pointer-events-none.absolute.inset-x-0.-bottom-1.h-7.bg-gradient-to-t,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    [data-above-composer-portal]
-    .relative.col-start-1.row-start-1.h-8.self-end
-    > .pointer-events-none.absolute.inset-x-0.-bottom-1.h-7.bg-gradient-to-t,
-  :root.forge-ink-mountain #root
-    [data-thread-scroll-footer="true"]
-    > .pointer-events-none.absolute.inset-x-0.bottom-0.z-0.flex.h-full.w-full.justify-center.pt-4
-    > .z-0.h-full.bg-gradient-to-t {
-    background: none !important;
-    opacity: 0 !important;
-    forced-color-adjust: none;
-  }
-
-  :root.forge-ink-mountain #root .forge-composer-frame::before,
-  :root.forge-ink-mountain #root .forge-composer-context::before,
-  :root.forge-ink-mountain #root .forge-composer-context::after,
-  :root.forge-ink-mountain #root .forge-composer-panel-stack::before,
-  :root.forge-ink-mountain #root .forge-composer-panel::before,
-  :root.forge-ink-mountain #root .forge-composer-panel::after,
-  :root.forge-ink-mountain #root .forge-composer-queue-item::before,
-  :root.forge-ink-mountain #root .forge-composer-queue-item::after,
-  :root.forge-ink-mountain #root .forge-right-card::before,
-  :root.forge-ink-mountain #root .forge-right-card::after,
-  :root.forge-ink-mountain #root .forge-right-section::after,
-  :root.forge-ink-mountain #root .forge-right-row::after,
-  :root.forge-ink-mountain #root :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .composer-surface-chrome::before,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground::before,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground::after,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground
-    .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-    > .overflow-visible::before,
-  :root.forge-ink-mountain #root
-    :is([data-codex-composer-root], [data-thread-find-composer="true"])
-    .order-2.flex.min-w-0.flex-col:not([data-above-composer-portal] *)
-    > .relative.min-w-0.overflow-clip.text-token-foreground
-    .vertical-scroll-fade-mask.hide-scrollbar.flex[class~="max-h-[30dvh]"].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y
-    > .overflow-visible::after,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    :is(div, section).relative.flex.max-h-full.min-h-0.flex-col.overflow-hidden.rounded-3xl.bg-token-dropdown-background.pt-2\.5::before,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    section.relative.z-0.flex.flex-col.pb-3::after,
-  :root.forge-ink-mountain #root
-    [data-pip-obstacle="thread-summary-panel"]
-    [data-slot="thread-summary-panel-item"]::after {
-    content: none !important;
-    background: none !important;
-    box-shadow: none !important;
-  }
-
-  :root.forge-ink-mountain #root :is(
-    .forge-sidebar-action,
-    .forge-sidebar-level1,
-    .forge-sidebar-level2,
-    .forge-sidebar-selected
-  ) :focus-visible {
-    outline: revert !important;
-  }
-
-  :root.forge-ink-mountain #root :is(
-    .forge-topbar-menu-item,
-    .forge-sidebar-action,
-    .forge-sidebar-level1,
-    .forge-sidebar-level2,
-    .forge-sidebar-selected
-  ):is(
-    :disabled,
-    [aria-disabled="true"],
-    [data-disabled]:not([data-disabled="false"]),
-    [data-disabled="true"],
-    :has(> button:not([aria-haspopup="menu"]):disabled),
-    :has(> button:not([aria-haspopup="menu"])[aria-disabled="true"]),
-    :has(> button:not([aria-haspopup="menu"])[data-disabled]:not([data-disabled="false"])),
-    :has(> button:not([aria-haspopup="menu"])[data-disabled="true"])
-  ) {
-    --color-token-foreground: GrayText;
-    --color-token-text-primary: GrayText;
-    --color-token-text-secondary: GrayText;
-    --color-token-description-foreground: GrayText;
-    --color-token-icon-foreground: GrayText;
-    color: GrayText !important;
   }
 }

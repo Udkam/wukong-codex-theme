@@ -46,11 +46,31 @@ test('native entry detection is event-driven and verifies the exact official exe
     supervisor,
     /String\.Equals\(CanonicalPath\(actualPath\), expectedChatGptPath, StringComparison\.OrdinalIgnoreCase\)/
   );
+  assert.doesNotMatch(supervisor, /process\.Kill\(/);
+  assert.doesNotMatch(supervisor, /taskkill|\/IM|Stop-Process|Kill\(\s*"?ChatGPT/i);
+});
+
+test('owned Codex windows suppress the DWM accent border and restore it on shutdown', () => {
+  assert.match(supervisor, /private const int DwmwaBorderColor = 34;/);
+  assert.match(supervisor, /private const uint DwmColorNone = 0xFFFFFFFE;/);
+  assert.match(supervisor, /private const uint DwmColorDefault = 0xFFFFFFFF;/);
   assert.match(
     supervisor,
-    /if \(!IsExpectedOfficialProcess\(processId\)\)[\s\S]*?continue;[\s\S]*?if \(!process\.HasExited && IsExpectedOfficialProcess\(processId\)\)[\s\S]*?process\.Kill\(\)/
+    /ApplyThemeBordersToOfficialWindows\(\);[\s\S]*?Log\("supervisor-ready"/
   );
-  assert.doesNotMatch(supervisor, /taskkill|\/IM|Stop-Process|Kill\(\s*"?ChatGPT/i);
+  assert.match(
+    supervisor,
+    /if \(!IsExpectedOfficialProcess\(processId\)\)[\s\S]*?ApplyThemeWindowBorder\(window\);/
+  );
+  assert.match(
+    supervisor,
+    /DwmSetWindowAttribute\([\s\S]*?DwmwaBorderColor,[\s\S]*?ref borderColor/
+  );
+  assert.match(
+    supervisor,
+    /Interlocked\.Exchange\(ref shuttingDown, 1\);[\s\S]*?RestoreThemeWindowBorders\(\);/
+  );
+  assert.match(supervisor, /\[DllImport\("dwmapi\.dll"\)\]/);
 });
 
 test('repository install verifies the bridge before starting and merging supervisor evidence', () => {
@@ -129,13 +149,9 @@ test('active AppX launch path executes the compiled C# helper without PowerShell
   }
 });
 
-test('managed relaunch suppression and restart circuit are explicitly bounded', () => {
-  assert.match(supervisor, /managedRelaunchSuppressedUntilUtc = DateTime\.UtcNow\.AddSeconds\(45\)/);
-  assert.match(supervisor, /private const int RestartWindowMinutes = 10;/);
-  assert.match(supervisor, /private const int RestartLimit = 3;/);
-  assert.match(supervisor, /DateTime cutoff = now\.AddMinutes\(-RestartWindowMinutes\)/);
-  assert.match(supervisor, /if \(RestartHistory\.Count >= RestartLimit\)[\s\S]*?return false;/);
-  assert.match(supervisor, /Log\("restart-circuit-open"/);
+test('an unmanaged native window is preserved without a restart or kill path', () => {
+  assert.match(supervisor, /native-channel-unavailable-preserved/);
+  assert.doesNotMatch(supervisor, /StopOfficialProcesses|TryConsumeRestartBudget|process\.Kill\(|WmClose/);
 });
 
 test('unmanaged native entry performs one CDP check instead of a six-second probe loop', () => {
@@ -152,12 +168,27 @@ test('unmanaged native entry performs one CDP check instead of a six-second prob
   assert.match(launchHandler, /if \(HasCodexCdp\(\)\)/);
 });
 
-test('cold native replacement uses a short exact-process shutdown budget', () => {
-  assert.match(supervisor, /private const int NativeCloseGraceMs = 600;/);
-  assert.match(supervisor, /private const int NativeKillSettleMs = 1200;/);
-  assert.match(supervisor, /WaitUntilNoOfficialProcesses\(NativeCloseGraceMs\)/);
-  assert.match(supervisor, /WaitUntilNoOfficialProcesses\(NativeKillSettleMs\)/);
-  assert.doesNotMatch(supervisor, /WaitUntilNoOfficialProcesses\(2500\)/);
+test('auxiliary official windows preserve a confirmed managed process tree before probing transient CDP state', () => {
+  const launchHandler = supervisor.match(
+    /private static void HandleOfficialLaunch\(LaunchObservation observation\)[\s\S]*?(?=private static int CaptureManagedProcessIdentities\()/
+  )?.[0] ?? '';
+  const identityGuard = launchHandler.indexOf('if (HasLiveManagedProcessIdentity())');
+  const cdpProbe = launchHandler.indexOf('if (HasCodexCdp())');
+  assert.ok(identityGuard >= 0, 'managed process identity guard is missing');
+  assert.ok(cdpProbe > identityGuard, 'transient CDP must not be probed before the managed process identity guard');
+  assert.match(launchHandler, /managed-process-identity-confirmed/);
+  assert.match(launchHandler, /int managedProcessCount = CaptureManagedProcessIdentities\(\)/);
+  assert.match(supervisor, /private static readonly Dictionary<int, long> ManagedProcessIdentities/);
+  assert.match(supervisor, /process\.StartTime\.ToUniversalTime\(\)\.Ticks == identity\.Value/);
+  assert.match(supervisor, /IsExpectedOfficialProcess\(identity\.Key\)/);
+  assert.match(
+    launchHandler,
+    /if \(observation\.ManagedLaunchSignaled\)[\s\S]*?CaptureManagedProcessIdentities\(\)[\s\S]*?managed-launch-signal-consumed/
+  );
+  assert.match(
+    supervisor,
+    /ApplyThemeBordersToOfficialWindows\(\);[\s\S]*?if \(HasCodexCdp\(\)\)[\s\S]*?initial-managed-channel-confirmed[\s\S]*?Log\("supervisor-ready"/
+  );
 });
 
 test('repository marker loss removes only the exact per-user Run value', () => {

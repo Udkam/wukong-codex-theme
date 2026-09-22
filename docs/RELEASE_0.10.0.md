@@ -61,4 +61,4 @@ node --test tests/native-pets-contract.test.mjs tests/injection-fixture.test.mjs
 - 禁止项审计：`docs`、`tests`、`artifacts`、`node_modules`、`.wukong-runtime`、WebSocket 调研件均为 0
 - 只增不删 stage：`E:\Proj\wukong-codex-forge-package-stage-0.10.0-20260722-123609-0afe4b0`
 
-下载并解压后双击 `start-theme.cmd`。`stop-theme.cmd` 只把当前 renderer 恢复为原生外观并验证清理，不删除文件。宠物 payload 依赖保留的解压目录；该目录不存在后图集在下一次宠物刷新时不可读。根据本轮“任何内容不得删除”的最高约束，脚本会保留小型发现元数据和历史证据，用户可在自行审计后决定是否手工清理。
+下载并解压后双击 `start.cmd`。`stop-theme.cmd` 只把当前 renderer 恢复为原生外观并验证清理，不删除文件。宠物 payload 依赖保留的解压目录；该目录不存在后图集在下一次宠物刷新时不可读。根据本轮“任何内容不得删除”的最高约束，脚本会保留小型发现元数据和历史证据，用户可在自行审计后决定是否手工清理。

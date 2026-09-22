@@ -47,7 +47,10 @@ export const isCodexTarget = (target, options = {}) => {
   const allowLocalDevelopment = options.allowLocalDevelopment ?? process.env.WUKONG_ALLOW_LOCAL_CDP === '1';
   return target?.type === 'page' && !isCodexAvatarOverlayTarget(target) && (
     /^app:\/\/codex\//.test(target.url || '') ||
-    (target.title === 'Codex' && /^app:\/\/-\/index\.html(?:[?#]|$)/.test(target.url || '')) ||
+    // The current desktop client deliberately uses the active task title for
+    // this renderer. The stable contract is the main app URL, not the title;
+    // special initial routes such as avatar-overlay are filtered above.
+    /^app:\/\/-\/index\.html(?:[?#]|$)/.test(target.url || '') ||
     (allowLocalDevelopment && /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?\//.test(target.url || ''))
   );
 };

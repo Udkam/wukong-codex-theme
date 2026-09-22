@@ -27,6 +27,8 @@ export const LEGACY_LIFECYCLE_IDS = Object.freeze({
 export const HOST_MARKER = 'WukongCodexThemeEventHostV1';
 const CONTROL_TIMEOUT_MS = 12_000;
 const STARTUP_TIMEOUT_MS = 45_000;
+const STALE_HOST_RELEASE_TIMEOUT_MS = 5_000;
+const STALE_HOST_RELEASE_PROBE_MS = 80;
 const INITIAL_TARGET_SETTLE_MS = 650;
 const EVENT_CHANNEL_DISCONNECT_GRACE_MS = 4_000;
 const STARTUP_TARGET_PROBE_DELAYS_MS = [120, 280, 650, 1_200, 2_400, 4_800];
@@ -224,6 +226,28 @@ export const sendControl = (pipeName, request, { timeoutMs = CONTROL_TIMEOUT_MS 
   });
 });
 
+export const waitForControlPipeRelease = async ({
+  pipeName,
+  timeoutMs = STALE_HOST_RELEASE_TIMEOUT_MS,
+  probeMs = STALE_HOST_RELEASE_PROBE_MS,
+  dependencies = {}
+}) => {
+  const send = dependencies.sendControl || sendControl;
+  const pause = dependencies.delay || delay;
+  const now = dependencies.now || Date.now;
+  const deadline = now() + timeoutMs;
+  while (now() < deadline) {
+    try {
+      await send(pipeName, { type: 'handoff-probe' }, { timeoutMs: Math.min(500, timeoutMs) });
+    } catch (error) {
+      if (/ENOENT|ECONNREFUSED|closed the control channel/u.test(error.message)) return;
+      if (!/Unsupported lifecycle host request|control timed out/u.test(error.message)) throw error;
+    }
+    await pause(probeMs);
+  }
+  throw Error('Timed out waiting for the stale lifecycle host to release its control pipe');
+};
+
 export const browserIdentity = version => {
   const endpoint = String(version?.webSocketDebuggerUrl || '');
   if (!/^ws:\/\/127\.0\.0\.1(?::\d+)?\/devtools\/browser\//.test(endpoint)) {
@@ -336,6 +360,7 @@ export const createHostSignals = () => {
   const events = new EventEmitter();
   let disableRequested = false;
   let terminateRequested = false;
+  let relinquishRequested = false;
   let disabledResolve;
   let disabledReject;
   const disabled = new Promise((resolve, reject) => {
@@ -345,6 +370,7 @@ export const createHostSignals = () => {
   return {
     get disableRequested() { return disableRequested; },
     get terminateRequested() { return terminateRequested; },
+    get relinquishRequested() { return relinquishRequested; },
     disabled,
     subscribe(listener) {
       events.on('change', listener);
@@ -357,6 +383,10 @@ export const createHostSignals = () => {
     },
     requestTerminate() {
       terminateRequested = true;
+      events.emit('change');
+    },
+    requestRelinquish() {
+      relinquishRequested = true;
       events.emit('change');
     },
     requestRefresh() {
@@ -532,7 +562,7 @@ export async function runEventWatcher({
               continue;
             }
             onProgress({ phase: 'renderer-applying', targets: targets.length });
-            await evaluate(target, expression);
+            await evaluate(target, typeof expression === 'function' ? await expression() : expression);
             active = await evaluate(target, ACTIVE_PROBE_EXPRESSION).catch(() => false);
           }
           states.push(active ? await evaluate(target, THEME_STATE_EXPRESSION) : null);
@@ -571,7 +601,17 @@ export async function runEventWatcher({
     reconcileQueued = true;
     queueMicrotask(() => { void reconcile(); });
   };
-  const unsubscribe = signals.subscribe(scheduleReconcile);
+  const relinquish = () => finish({
+    reason: 'stale-host-relinquished',
+    targets: 0,
+    deferredNative: true
+  });
+  const onSignalChange = () => {
+    if (signals.relinquishRequested) relinquish();
+    else scheduleReconcile();
+  };
+  const unsubscribe = signals.subscribe(onSignalChange);
+  if (signals.relinquishRequested) relinquish();
 
   let requestWatch = null;
   let markerWatch = null;
@@ -712,15 +752,26 @@ export const waitForDevToolsPort = ({
   });
 };
 
-export const findReusableDevToolsPort = async ({ profilePath, dependencies = {} }) => {
+export const findLiveDevToolsPort = async ({ profilePath, dependencies = {} }) => {
   const versionFor = dependencies.getBrowserVersion || getBrowserVersion;
-  const targetsFor = dependencies.getTargets || getTargets;
-  const targetMatches = dependencies.isCodexTarget || isCodexTarget;
   const port = readDevToolsPort({ profilePath });
   if (!port) return null;
   try {
     const version = await versionFor(port);
     const identity = browserIdentity(version);
+    return { port, identity };
+  } catch {
+    return null;
+  }
+};
+
+export const findReusableDevToolsPort = async ({ profilePath, dependencies = {} }) => {
+  const targetsFor = dependencies.getTargets || getTargets;
+  const targetMatches = dependencies.isCodexTarget || isCodexTarget;
+  const live = await findLiveDevToolsPort({ profilePath, dependencies });
+  if (!live) return null;
+  try {
+    const { port, identity } = live;
     const targets = (await targetsFor(port)).filter(targetMatches);
     if (!targets.length) return null;
     return { port, identity, targets: targets.length };
@@ -959,9 +1010,14 @@ export async function runHost({
     return response || { ok: true, state: 'not-running' };
   }
 
+  let staleHostHandoff = false;
   try {
     const response = await sendControl(pipeName, { type: 'activate' }, { timeoutMs: 2_000 });
-    return { reason: 'activated-existing-host', response };
+    if (response?.result?.reason !== 'stale-host-relinquishing') {
+      return { reason: 'activated-existing-host', response };
+    }
+    staleHostHandoff = true;
+    await waitForControlPipeRelease({ pipeName });
   } catch (error) {
     if (!/ENOENT|ECONNREFUSED|closed the control channel/.test(error.message)) throw error;
   }
@@ -973,11 +1029,21 @@ export async function runHost({
   fs.mkdirSync(paths.requestDirectory, { recursive: true });
 
   const signals = createHostSignals();
+  let lifecycleStage = 'starting';
   let server;
   try {
     server = await createControlServer({
       pipeName,
       activate: async () => {
+        const liveChannel = await findLiveDevToolsPort({ profilePath: paths.profilePath });
+        if (!liveChannel) {
+          if (lifecycleStage === 'starting') {
+            return { reason: 'managed-startup-pending', targets: 0 };
+          }
+          lifecycleStage = 'relinquishing';
+          signals.requestRelinquish();
+          return { reason: 'stale-host-relinquishing', targets: 0 };
+        }
         const activation = spawnOfficialActivation({
           chatGpt: official.chatGpt,
           profilePath: paths.profilePath,
@@ -992,6 +1058,9 @@ export async function runHost({
   } catch (error) {
     if (error.code === 'EADDRINUSE') {
       const response = await sendControl(pipeName, { type: 'activate' });
+      if (response?.result?.reason === 'stale-host-relinquishing') {
+        throw Error('A stale lifecycle host was still relinquishing its control pipe after handoff');
+      }
       return { reason: 'activated-racing-host', response };
     }
     throw error;
@@ -1058,6 +1127,7 @@ export async function runHost({
     disableRequest,
     pipeName,
     launchMode,
+    staleHostHandoff,
     ...(port ? { port } : {})
   });
 
@@ -1090,7 +1160,7 @@ export async function runHost({
       });
       return result;
     }
-    const expression = makeApplyExpression({
+    const expression = () => makeApplyExpression({
       styleSheet: fs.readFileSync(paths.stylePath, 'utf8'),
       variables: payloadFromThemeFile(paths.themePath).variables
     });
@@ -1121,7 +1191,10 @@ export async function runHost({
       rootPid,
       markerPath: paths.markerPath,
       signals,
-      onReady: readyResolve,
+      onReady: proof => {
+        lifecycleStage = 'watching';
+        readyResolve(proof);
+      },
       onProgress: reportProgress
     });
     const startup = await Promise.race([
@@ -1187,6 +1260,7 @@ export async function runHost({
     });
     throw error;
   } finally {
+    lifecycleStage = 'stopped';
     server.close();
     if (watcherPromise) await watcherPromise.catch(() => {});
   }

@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$Root = (Split-Path $PSScriptRoot -Parent),
     [switch]$NoShortcut
@@ -106,7 +106,7 @@ $verification | Add-Member -NotePropertyName nativeEntrySupervisor -NoteProperty
 
 Write-Host "Wukong now loads directly from this repository: $rootPath"
 Write-Host 'The visible application remains the official ChatGPT/Codex entry; no separately named Wukong launcher is installed.'
-Write-Host 'Both the native Store/taskbar entry and the user Start Menu ChatGPT entry route to the same repository bridge.'
+Write-Host 'The managed Start Menu ChatGPT shortcut routes to the repository bridge; direct EXE and Store/taskbar entries may bypass it.'
 Write-Host 'No theme runtime was copied into CODEX_HOME and no pet package was installed.'
 Write-Host 'ChatGPT.exe, app.asar, WindowsApps and the official Codex configuration were not modified.'
 Write-Host 'The native Store/taskbar entry is observed by SetWinEventHook without WMI or steady polling.'

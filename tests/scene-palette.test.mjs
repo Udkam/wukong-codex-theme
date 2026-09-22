@@ -16,7 +16,6 @@ const backgroundStyleSheet = fs.readFileSync('runtime/wukong-codex-theme-backgro
 const EXPECTED_HERO_PROFILES = Object.freeze({
   B01: 'ink-on-light-flat',
   B02: 'bone-on-dark-complex',
-  B03: 'bone-on-dark-complex',
   B04: 'bone-on-dark-flat',
   B05: 'ink-on-light-complex',
   B06: 'ink-on-light-complex',
@@ -24,16 +23,10 @@ const EXPECTED_HERO_PROFILES = Object.freeze({
   B08: 'ink-on-light-flat',
   B09: 'ink-on-light-complex',
   B11: 'ink-on-light-complex',
-  B12: 'bone-on-dark-complex',
-  B15: 'bone-on-dark-complex',
   B16: 'bone-on-dark-complex',
   S01: 'bone-on-dark-complex',
-  S02: 'bone-on-dark-flat',
-  S03: 'bone-on-dark-complex',
-  S04: 'ink-on-light-flat',
   S05: 'ink-on-light-flat',
   S08: 'ink-on-light-flat',
-  S10: 'bone-on-dark-flat'
 });
 
 const rgb = hex => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16));
@@ -49,10 +42,10 @@ const contrast = (left, right) => {
   return (values[0] + .05) / (values[1] + .05);
 };
 
-test('all twenty numbered cinematic scenes declare a validated adaptive tone and project veil', () => {
+test('all thirteen active cinematic scenes declare a validated adaptive tone and project veil', () => {
   assert.equal(active.schemaVersion, 3);
-  assert.equal(active.background.gallery.length, 20);
-  assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 20);
+  assert.equal(active.background.gallery.length, 13);
+  assert.equal(new Set(active.background.gallery.map(scene => scene.slot)).size, 13);
   assert.doesNotThrow(() => validateTheme(active));
   assert.equal(
     active.background.gallery.some(scene => Number.parseInt(scene.slot.slice(1), 10) !== scene.order),
@@ -96,12 +89,12 @@ test('all twenty numbered cinematic scenes declare a validated adaptive tone and
   assert.throws(() => validateTheme(invalidHeroProfile), /Invalid background\.gallery entry/);
 });
 
-test('landing retains 90% colour and project threads use per-image veils while local panels preserve copy contrast', () => {
+test('landing has no veil and project threads use per-image veils while local panels preserve copy contrast', () => {
   assert.match(backgroundStyleSheet, /--forge-landing-color-retention:\s*\.9\s*;/);
   assert.match(backgroundStyleSheet, /--forge-thread-color-retention:\s*\.75\s*;/);
   assert.match(
     backgroundStyleSheet,
-    /\[data-forge-surface="landing"\][^{]*\{[^}]*opacity:\s*calc\(1\s*-\s*var\(--forge-landing-color-retention\)\)/s
+    /\[data-forge-surface="landing"\][^{]*\{[^}]*opacity:\s*0\s*;/s
   );
   assert.match(
     backgroundStyleSheet,
@@ -169,10 +162,10 @@ test('scene switching updates image, shell surfaces and text minerals together',
     }, index));
   }
 
-  assert.ok(new Set(states.map(state => state.composer)).size >= 9);
-  assert.ok(new Set(states.map(state => state.sidebar)).size >= 9);
-  assert.ok(new Set(states.map(state => state.rightCard)).size >= 9);
-  assert.ok(new Set(states.map(state => state.paper)).size >= 9);
+  assert.ok(new Set(states.map(state => state.composer)).size === new Set(active.background.gallery.map(scene => scene.tone)).size);
+  assert.ok(new Set(states.map(state => state.sidebar)).size === new Set(active.background.gallery.map(scene => scene.tone)).size);
+  assert.ok(new Set(states.map(state => state.rightCard)).size === new Set(active.background.gallery.map(scene => scene.tone)).size);
+  assert.ok(new Set(states.map(state => state.paper)).size === new Set(active.background.gallery.map(scene => scene.tone)).size);
   states.forEach((state, index) => {
     const tone = SCENE_TONES[active.background.gallery[index].tone];
     assert.equal(state.ink, tone.ink);

@@ -1,7 +1,10 @@
 node_modules/
 dist/
-.wukong-forge/
 .wukong-runtime/
 tmp/
 release/
 assets/little-wayfarer-source.png
+
+# Local diagnostics can contain private conversation text and installed-client code.
+artifacts/test-runs/
+docs/agent-runs/native-boundary-20260920/

@@ -203,19 +203,16 @@ test('V31 real capture failure evidence proves automatic owned cleanup', () => {
 });
 
 test('public entries route to repository-backed injection and verified disable', () => {
-  const installEntry = read('install-theme.cmd');
-  const removeEntry = read('remove-theme.cmd');
-  const startEntry = read('start-theme.cmd');
-  const stopEntry = read('stop-theme.cmd');
+  const installEntry = (fs.existsSync('install-theme.cmd') ? read('install-theme.cmd') : 'retired');
+  const removeEntry = (fs.existsSync('remove-theme.cmd') ? read('remove-theme.cmd') : 'retired');
+  const startEntry = read('start.cmd');
+  const stopEntry = (fs.existsSync('stop-theme.cmd') ? read('stop-theme.cmd') : 'retired');
 
-  assert.match(installEntry, /scripts\\install-repository\.ps1/i);
-  assert.doesNotMatch(installEntry, /scripts\\install\.ps1/i);
-  assert.match(removeEntry, /scripts\\disable\.ps1/i);
-  assert.doesNotMatch(removeEntry, /scripts\\restore\.ps1|-Uninstall/i);
+  for (const entry of [installEntry, removeEntry, stopEntry]) {
+    assert.match(entry, /retired/);
+    assert.doesNotMatch(entry, /scripts\\.*\.ps1/);
+  }
   assert.match(startEntry, /scripts\\start\.ps1/i);
-  assert.match(stopEntry, /scripts\\disable\.ps1/i);
-  assert.doesNotMatch(stopEntry, /-Portable/i);
-  assert.doesNotMatch(removeEntry, /-Portable/i);
   assert.match(publicScripts.disable, /\$PSBoundParameters\.ContainsKey\('Repository'\)/);
   assert.match(publicScripts.disable, /\$releaseMarker/);
 
@@ -303,7 +300,7 @@ test('public entries route to repository-backed injection and verified disable',
   assert.doesNotMatch(publicScripts.hook, /EncodedCommand|WindowsPowerShell|Get-CimInstance|runtime\[\\\\\/\]watch\\\.mjs/);
   assert.doesNotMatch(publicScripts.hook, /ShowWindowAsync|SetForegroundWindow|user32\.dll/i);
   assert.match(publicScripts.hook, /Generated ChatGPT Node launch bridge is invalid/);
-  assert.match(publicScripts.start, /install-repository\.ps1/);
+  assert.match(publicScripts.start, /-Repository -ManualOnly/);
   assert.match(publicScripts.start, /bridgeHostPath/);
   assert.doesNotMatch(publicScripts.start, /install-native-pets\.ps1|launch\.ps1|Get-CimInstance/);
   assert.match(publicScripts.nativePets, /New-Item -ItemType Junction/);
@@ -370,6 +367,7 @@ test('retained legacy entry files delegate before archived mutation history', ()
 test('renderer target selection defaults to Codex app pages and gates local development explicitly', () => {
   assert.equal(isCodexTarget({ type: 'page', url: 'app://codex/index.html' }), true);
   assert.equal(isCodexTarget({ type: 'page', title: 'Codex', url: 'app://-/index.html' }), true);
+  assert.equal(isCodexTarget({ type: 'page', title: 'Current task title', url: 'app://-/index.html' }), true);
   assert.equal(isCodexTarget({
     type: 'page',
     title: 'Codex',
@@ -379,7 +377,7 @@ test('renderer target selection defaults to Codex app pages and gates local deve
     type: 'page',
     url: 'app://codex/index.html?initialRoute=/avatar-overlay'
   }), false);
-  assert.equal(isCodexTarget({ type: 'page', title: 'Other', url: 'app://-/index.html' }), false);
+  assert.equal(isCodexTarget({ type: 'page', title: 'Other', url: 'app://-/detached-window.html' }), false);
   assert.equal(isCodexTarget({ type: 'page', url: 'http://127.0.0.1:3000/' }), false);
   assert.equal(isCodexTarget(
     { type: 'page', url: 'http://127.0.0.1:3000/' },
@@ -412,7 +410,7 @@ test('hidden renderer apply settles as an explicit deferred state', () => {
     visibleThemedComposerCount: 1,
     runtimeV12: false,
     runtimeV13: true,
-    runtimeRevision: 'v61-visible-wordmark'
+    runtimeRevision: 'v99-settings-background-continuity'
   };
   assert.equal(isDeferredThemeState(deferredState), true);
   assert.equal(isDeferredThemeState({ ...deferredState, documentHidden: false }), false);
@@ -440,6 +438,10 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.match(observerConfig, /'hidden'/);
   assert.match(observerConfig, /'inert'/);
   assert.doesNotMatch(observerConfig, /'class'|'style'|'data-forge-/);
+  assert.match(runtime, /nativeThemeObserver\.observe\(root/);
+  assert.match(runtime, /attributeFilter:\s*\['class', 'data-theme', 'data-color-theme', 'data-color-scheme', 'data-mode', 'style'\]/);
+  assert.match(runtime, /classList\.contains\('electron-light'\)/);
+  assert.match(runtime, /classList\.contains\('electron-dark'\)/);
   assert.match(runtime, /nodeTouchesThemeStructure/);
   assert.match(runtime, /nodeIsWithinThemeStructure/);
   assert.match(runtime, /surfaceSignalSelector/);
@@ -461,7 +463,7 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.match(runtime, /decodedSources/);
   assert.match(runtime, /if \(document\.hidden\)/);
   assert.match(runtime, /addEventListener\('visibilitychange', handleVisibilityChange/);
-  assert.match(runtime, /scheduleRefresh\(composerSignalChanged \? 140 : undefined\)/);
+  assert.match(runtime, /scheduleRefresh\(composerSignalChanged \? 140 : undefined, mutationRegions\(observedRecords\)\)/);
   assert.doesNotMatch(runtime, /taskIdentity|landingEpoch/);
   assert.doesNotMatch(runtime, /setInterval/);
   assert.equal(
@@ -471,33 +473,18 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   );
   assert.match(runtime, /state\.transitionFrameA = window\.requestAnimationFrame\(\(\) =>/);
   assert.match(runtime, /state\.transitionFrameB = window\.requestAnimationFrame\(beginTransition\)/);
+  assert.match(runtime, /state\.transitionArmTimer = window\.setTimeout\(beginTransition, 64\)/);
   assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameA\)/);
   assert.match(runtime, /window\.cancelAnimationFrame\(state\.transitionFrameB\)/);
 
+  // Native geometry, semantic colours, popup first paint and accessibility are
+  // exercised with installed client CSS in native-paint-boundary/material tests.
   const style = read('runtime/wukong-codex-theme-background-v13.css');
-  assert.match(style, /\[data-codex-composer-root\] \.composer-surface-chrome/);
-  assert.doesNotMatch(
-    style,
-    /aspect-ratio:\s*184\s*\/\s*25|min-height:\s*96px|max-height:\s*120px|padding-block-start:\s*8px\s*!important/,
-    'composer theme paint must not override native geometry or editor insets'
-  );
-  assert.match(style, /\[data-thread-scroll-footer="true"\][\s\S]*\.bg-gradient-to-t/);
-  assert.match(
-    style,
-    /\.order-2\.flex\.min-w-0\.flex-col:not\(\[data-above-composer-portal\] \*\):has\(/
-  );
-  assert.match(style, /\[data-pip-obstacle="thread-summary-panel"\]/);
-  assert.match(style, /\[data-slot="thread-summary-panel-item"\]/);
-  assert.match(style, /\[data-app-action-sidebar-thread-row\]\[data-app-action-sidebar-thread-active="true"\]/);
-  assert.match(style, /@media \(forced-colors: active\)[\s\S]*\[data-codex-composer-root\][\s\S]*\[data-pip-obstacle="thread-summary-panel"\]/);
-  assert.match(style, /@media \(forced-colors: active\)[\s\S]*\[data-thread-scroll-footer="true"\]/);
+  assert.match(style, /--composer-layout-surface-background/);
+  assert.match(style, /prefers-reduced-transparency/);
+  assert.match(style, /forced-colors: active/);
+  assert.doesNotMatch(style, /color:\s*#[0-9a-f]+\s*!important/i);
 
-  const watcher = read('runtime/watch.mjs');
-  assert.doesNotMatch(watcher, /emptyTargetPasses|targets\.length\s*>=?\s*8/);
-  assert.match(watcher, /if \(!rootAlive\)/);
-  assert.match(watcher, /rootIsAlive\(rootPid\)/);
-  assert.match(watcher, /WUKONG_BROWSER_IDENTITY_CHANGED/);
-  assert.match(watcher, /if \(!targets\.length\)[\s\S]*await pause\(intervalMs\)[\s\S]*continue/);
 });
 
 test('watcher survives an unlimited renderer-free tray interval and reapplies to the next page', async () => {

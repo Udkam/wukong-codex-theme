@@ -1,0 +1,11 @@
+{
+  "root": "rounded-3xl bg-surface-elevated-secondary electron:elevation-prominent extension:border extension:border-default extension:shadow-md relative flex max-h-full min-h-0 flex-col overflow-hidden",
+  "scroller": "flex h-fit max-h-full min-h-0 flex-col overflow-y-auto",
+  "stack": "flex flex-col gap-2 pt-2.5 pb-2.5",
+  "section": "relative z-0 flex flex-col pb-2 after:absolute after:inset-x-5 after:bottom-0 after:h-[0.5px] after:bg-border after:content-[''] last:after:hidden last:pb-0",
+  "header": "sticky top-2 z-10 flex h-7 w-full min-w-0 items-center justify-start gap-2 bg-surface-elevated-secondary ps-5 pe-2.5 pb-0.5 text-sm text-secondary before:pointer-events-none before:absolute before:inset-x-0 before:-top-2 before:h-2 before:bg-surface-elevated-secondary before:content-['']",
+  "body": "relative z-0 overflow-hidden",
+  "bodyStyle": "height: auto; opacity: 1; margin-top: 2px;",
+  "rows": "flex flex-col gap-0.5 px-5",
+  "row": "group/summary-panel-item relative isolate flex min-h-token-button-composer w-full min-w-0 items-center gap-token-button-composer-gap rounded-sm border-0 bg-transparent px-0 py-1 text-start group-data-[variant=card]/summary-card:min-h-10 group-data-[variant=card]/summary-card:rounded-none group-data-[variant=card]/summary-card:px-3 group-data-[variant=card]/summary-card:py-2 group-data-[variant=card]/summary-card:after:pointer-events-none group-data-[variant=card]/summary-card:after:absolute group-data-[variant=card]/summary-card:after:end-0 group-data-[variant=card]/summary-card:after:start-10 group-data-[variant=card]/summary-card:after:top-full group-data-[variant=card]/summary-card:after:h-px group-data-[variant=card]/summary-card:after:bg-border cursor-interaction before:absolute before:inset-y-0 before:-inset-x-2 before:-z-10 before:rounded-sm before:content-[''] hover:before:bg-primary-ghost-hover group-data-[variant=card]/summary-card:before:inset-x-0 group-data-[variant=card]/summary-card:before:rounded-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring disabled:cursor-not-allowed disabled:text-tertiary text-default"
+}

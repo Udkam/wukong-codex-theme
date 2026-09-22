@@ -17,14 +17,12 @@ internal static class NativeEntrySupervisor
     private const uint WineventSkipOwnProcess = 0x0002;
     private const int ObjectIdWindow = 0;
     private const uint ProcessQueryLimitedInformation = 0x1000;
-    private const uint WmClose = 0x0010;
     private const uint WmQuit = 0x0012;
     private const uint PmNoRemove = 0x0000;
+    private const int DwmwaBorderColor = 34;
+    private const uint DwmColorDefault = 0xFFFFFFFF;
+    private const uint DwmColorNone = 0xFFFFFFFE;
     private const int NewProcessMaximumAgeMs = 20000;
-    private const int NativeCloseGraceMs = 600;
-    private const int NativeKillSettleMs = 1200;
-    private const int RestartWindowMinutes = 10;
-    private const int RestartLimit = 3;
     private const string StopEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.Stop";
     private const string ReadyEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.Ready";
     private const string ManagedLaunchEventName = @"Local\WukongCodexTheme.NativeEntrySupervisor.ManagedLaunch";
@@ -34,7 +32,8 @@ internal static class NativeEntrySupervisor
     private static readonly object StateLock = new object();
     private static readonly object LogLock = new object();
     private static readonly HashSet<string> ObservedProcesses = new HashSet<string>(StringComparer.Ordinal);
-    private static readonly Queue<DateTime> RestartHistory = new Queue<DateTime>();
+    private static readonly HashSet<IntPtr> BorderStyledWindows = new HashSet<IntPtr>();
+    private static readonly Dictionary<int, long> ManagedProcessIdentities = new Dictionary<int, long>();
     private static readonly JavaScriptSerializer Json = new JavaScriptSerializer();
 
     private static string repositoryRoot;
@@ -151,6 +150,13 @@ internal static class NativeEntrySupervisor
                 throw new InvalidOperationException("SetWinEventHook(EVENT_OBJECT_SHOW) failed.");
             }
             armedAtUtc = DateTime.UtcNow;
+            ApplyThemeBordersToOfficialWindows();
+            if (HasCodexCdp())
+            {
+                int initialManagedProcessCount = CaptureManagedProcessIdentities();
+                Dictionary<string, object> initialConfirmation = Fields("managedProcessCount", initialManagedProcessCount);
+                Log("initial-managed-channel-confirmed", initialConfirmation, null);
+            }
 
             Log("supervisor-ready", Fields("chatGptPath", expectedChatGptPath), null);
             readyEvent.Set();
@@ -165,6 +171,7 @@ internal static class NativeEntrySupervisor
         finally
         {
             Interlocked.Exchange(ref shuttingDown, 1);
+            RestoreThemeWindowBorders();
             if (winEventHook != IntPtr.Zero)
             {
                 NativeMethods.UnhookWinEvent(winEventHook);
@@ -247,6 +254,7 @@ internal static class NativeEntrySupervisor
         {
             return;
         }
+        ApplyThemeWindowBorder(window);
 
         DateTime startTimeUtc;
         try
@@ -311,6 +319,93 @@ internal static class NativeEntrySupervisor
             });
     }
 
+    private static void ApplyThemeBordersToOfficialWindows()
+    {
+        HashSet<int> officialProcessIds = new HashSet<int>(GetOfficialProcessIds());
+        if (officialProcessIds.Count == 0)
+        {
+            return;
+        }
+        NativeMethods.EnumWindows(
+            delegate(IntPtr window, IntPtr parameter)
+            {
+                uint unsignedProcessId;
+                NativeMethods.GetWindowThreadProcessId(window, out unsignedProcessId);
+                if (
+                    unsignedProcessId <= Int32.MaxValue &&
+                    officialProcessIds.Contains((int)unsignedProcessId) &&
+                    NativeMethods.IsWindowVisible(window))
+                {
+                    ApplyThemeWindowBorder(window);
+                }
+                return true;
+            },
+            IntPtr.Zero);
+    }
+
+    private static void ApplyThemeWindowBorder(IntPtr window)
+    {
+        if (window == IntPtr.Zero)
+        {
+            return;
+        }
+        uint borderColor = DwmColorNone;
+        int result;
+        try
+        {
+            result = NativeMethods.DwmSetWindowAttribute(
+                window,
+                DwmwaBorderColor,
+                ref borderColor,
+                Marshal.SizeOf(typeof(uint)));
+        }
+        catch (DllNotFoundException)
+        {
+            return;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return;
+        }
+        if (result != 0)
+        {
+            return;
+        }
+        lock (StateLock)
+        {
+            BorderStyledWindows.Add(window);
+        }
+    }
+
+    private static void RestoreThemeWindowBorders()
+    {
+        IntPtr[] windows;
+        lock (StateLock)
+        {
+            windows = new IntPtr[BorderStyledWindows.Count];
+            BorderStyledWindows.CopyTo(windows);
+            BorderStyledWindows.Clear();
+        }
+        foreach (IntPtr window in windows)
+        {
+            uint borderColor = DwmColorDefault;
+            try
+            {
+                NativeMethods.DwmSetWindowAttribute(
+                    window,
+                    DwmwaBorderColor,
+                    ref borderColor,
+                    Marshal.SizeOf(typeof(uint)));
+            }
+            catch (DllNotFoundException)
+            {
+            }
+            catch (EntryPointNotFoundException)
+            {
+            }
+        }
+    }
+
     private static void HandleOfficialLaunch(LaunchObservation observation)
     {
         if (Volatile.Read(ref shuttingDown) != 0)
@@ -319,7 +414,10 @@ internal static class NativeEntrySupervisor
         }
         if (observation.ManagedLaunchSignaled)
         {
-            Log("managed-launch-signal-consumed", Fields("processId", observation.ProcessId), null);
+            int signaledManagedProcessCount = CaptureManagedProcessIdentities();
+            Dictionary<string, object> signaledLaunch = Fields("processId", observation.ProcessId);
+            signaledLaunch["managedProcessCount"] = signaledManagedProcessCount;
+            Log("managed-launch-signal-consumed", signaledLaunch, null);
         }
         DateTime suppressionDeadline;
         lock (StateLock)
@@ -338,13 +436,29 @@ internal static class NativeEntrySupervisor
         details["ageAtEventMs"] = observation.AgeAtEventMs;
         Log("official-window-observed", details, null);
 
+        // Codex opens some in-app surfaces (notably its internal browser) in an
+        // auxiliary official ChatGPT window. Creating that window can make the
+        // target list briefly unavailable even though the already-managed app
+        // process tree is still alive. Never turn that transient CDP gap into a
+        // whole-app restart: it would destroy the originating project thread.
+        // Exact PID + start-time + executable-path identities make this latch
+        // self-expire once the managed app process tree has really exited.
+        if (HasLiveManagedProcessIdentity())
+        {
+            Log("managed-process-identity-confirmed", Fields("processId", observation.ProcessId), null);
+            return;
+        }
+
         if (HasCodexCdp())
         {
+            int managedProcessCount = CaptureManagedProcessIdentities();
             lock (StateLock)
             {
                 managedRelaunchSuppressedUntilUtc = DateTime.MinValue;
             }
-            Log("managed-channel-confirmed", Fields("processId", observation.ProcessId), null);
+            Dictionary<string, object> confirmation = Fields("processId", observation.ProcessId);
+            confirmation["managedProcessCount"] = managedProcessCount;
+            Log("managed-channel-confirmed", confirmation, null);
             return;
         }
         if (Volatile.Read(ref shuttingDown) != 0)
@@ -362,55 +476,88 @@ internal static class NativeEntrySupervisor
             RequestShutdown(true, "repository-marker-missing");
             return;
         }
-        if (!TryConsumeRestartBudget())
-        {
-            Log("restart-circuit-open", Fields("processId", observation.ProcessId), null);
-            return;
-        }
+        // Theme activation must never close or replace an official process.
+        // An unmanaged launch stays native until the user starts a theme client.
+        Log("native-channel-unavailable-preserved", Fields("processId", observation.ProcessId), null);
+    }
 
-        Log("native-restart-requested", Fields("processId", observation.ProcessId), null);
-        if (!StopOfficialProcesses())
+    private static int CaptureManagedProcessIdentities()
+    {
+        Dictionary<int, long> captured = new Dictionary<int, long>();
+        foreach (int processId in GetOfficialProcessIds())
         {
-            Log("native-restart-blocked", Fields("reason", "official-process-remained"), null);
-            return;
+            try
+            {
+                using (Process process = Process.GetProcessById(processId))
+                {
+                    if (!process.HasExited && IsExpectedOfficialProcess(processId))
+                    {
+                        captured[processId] = process.StartTime.ToUniversalTime().Ticks;
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
-        if (Volatile.Read(ref shuttingDown) != 0 || !ValidateInputs())
-        {
-            return;
-        }
-
         lock (StateLock)
         {
-            // The repository host has its own 45-second bounded channel wait.
-            // Never restart the official process created by this bridge while
-            // that first managed launch is still settling.
-            managedRelaunchSuppressedUntilUtc = DateTime.UtcNow.AddSeconds(45);
-        }
-        try
-        {
-            ProcessStartInfo launch = new ProcessStartInfo();
-            launch.FileName = embeddedNodePath;
-            launch.Arguments = QuoteWindowsArgument(bridgePath);
-            launch.WorkingDirectory = repositoryRoot;
-            launch.UseShellExecute = false;
-            launch.CreateNoWindow = true;
-            launch.WindowStyle = ProcessWindowStyle.Hidden;
-            Process bridge = Process.Start(launch);
-            int bridgeProcessId = bridge == null ? 0 : bridge.Id;
-            if (bridge != null)
+            ManagedProcessIdentities.Clear();
+            foreach (KeyValuePair<int, long> identity in captured)
             {
-                bridge.Dispose();
+                ManagedProcessIdentities[identity.Key] = identity.Value;
             }
-            Log("managed-bridge-started", Fields("bridgeProcessId", bridgeProcessId), null);
         }
-        catch
+        return captured.Count;
+    }
+
+    private static bool HasLiveManagedProcessIdentity()
+    {
+        List<KeyValuePair<int, long>> identities;
+        lock (StateLock)
+        {
+            identities = new List<KeyValuePair<int, long>>(ManagedProcessIdentities);
+        }
+
+        List<int> expired = new List<int>();
+        bool live = false;
+        foreach (KeyValuePair<int, long> identity in identities)
+        {
+            try
+            {
+                using (Process process = Process.GetProcessById(identity.Key))
+                {
+                    bool matches =
+                        !process.HasExited &&
+                        process.StartTime.ToUniversalTime().Ticks == identity.Value &&
+                        IsExpectedOfficialProcess(identity.Key);
+                    if (matches)
+                    {
+                        live = true;
+                    }
+                    else
+                    {
+                        expired.Add(identity.Key);
+                    }
+                }
+            }
+            catch
+            {
+                expired.Add(identity.Key);
+            }
+        }
+
+        if (expired.Count != 0)
         {
             lock (StateLock)
             {
-                managedRelaunchSuppressedUntilUtc = DateTime.MinValue;
+                foreach (int processId in expired)
+                {
+                    ManagedProcessIdentities.Remove(processId);
+                }
             }
-            throw;
         }
+        return live;
     }
 
     private static bool HasCodexCdp()
@@ -500,99 +647,6 @@ internal static class NativeEntrySupervisor
                 return reader.ReadToEnd();
             }
         }
-    }
-
-    private static bool TryConsumeRestartBudget()
-    {
-        DateTime now = DateTime.UtcNow;
-        DateTime cutoff = now.AddMinutes(-RestartWindowMinutes);
-        lock (StateLock)
-        {
-            while (RestartHistory.Count > 0 && RestartHistory.Peek() < cutoff)
-            {
-                RestartHistory.Dequeue();
-            }
-            if (RestartHistory.Count >= RestartLimit)
-            {
-                return false;
-            }
-            RestartHistory.Enqueue(now);
-            return true;
-        }
-    }
-
-    private static bool StopOfficialProcesses()
-    {
-        IList<int> processIds = GetOfficialProcessIds();
-        if (processIds.Count == 0)
-        {
-            return true;
-        }
-
-        HashSet<int> expectedIds = new HashSet<int>(processIds);
-        NativeMethods.EnumWindows(
-            delegate(IntPtr window, IntPtr parameter)
-            {
-                uint unsignedProcessId;
-                NativeMethods.GetWindowThreadProcessId(window, out unsignedProcessId);
-                if (unsignedProcessId <= Int32.MaxValue && expectedIds.Contains((int)unsignedProcessId))
-                {
-                    NativeMethods.PostMessage(window, WmClose, IntPtr.Zero, IntPtr.Zero);
-                }
-                return true;
-            },
-            IntPtr.Zero);
-
-        if (WaitUntilNoOfficialProcesses(NativeCloseGraceMs))
-        {
-            return true;
-        }
-
-        foreach (int processId in GetOfficialProcessIds())
-        {
-            if (!IsExpectedOfficialProcess(processId))
-            {
-                continue;
-            }
-            try
-            {
-                using (Process process = Process.GetProcessById(processId))
-                {
-                    if (!process.HasExited && IsExpectedOfficialProcess(processId))
-                    {
-                        process.Kill();
-                    }
-                }
-            }
-            catch (ArgumentException)
-            {
-            }
-            catch (InvalidOperationException)
-            {
-            }
-            catch (System.ComponentModel.Win32Exception error)
-            {
-                Log("official-process-stop-failed", Fields("processId", processId), error);
-            }
-        }
-        return WaitUntilNoOfficialProcesses(NativeKillSettleMs);
-    }
-
-    private static bool WaitUntilNoOfficialProcesses(int timeoutMs)
-    {
-        Stopwatch timer = Stopwatch.StartNew();
-        while (timer.ElapsedMilliseconds < timeoutMs)
-        {
-            if (GetOfficialProcessIds().Count == 0)
-            {
-                return true;
-            }
-            if (stopEvent != null && stopEvent.WaitOne(100))
-            {
-                return false;
-            }
-        }
-        return GetOfficialProcessIds().Count == 0;
     }
 
     private static IList<int> GetOfficialProcessIds()
@@ -941,6 +995,17 @@ internal static class NativeEntrySupervisor
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool EnumWindows(EnumWindowsDelegate callback, IntPtr parameter);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        internal static extern bool IsWindowVisible(IntPtr window);
+
+        [DllImport("dwmapi.dll")]
+        internal static extern int DwmSetWindowAttribute(
+            IntPtr window,
+            int attribute,
+            ref uint attributeValue,
+            int attributeSize);
 
         [DllImport("user32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

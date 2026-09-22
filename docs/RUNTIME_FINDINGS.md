@@ -102,7 +102,7 @@ Windows Codex 26.715.2305.0 的原生 Chrome Theme 只能表达颜色、字体�
 
 ## 为什么需要主题入口
 
-已经运行的普通 Codex 没有调试通道，外部文件复制无法取得 renderer。强行补丁官方包与“使用成本最优、不得导致崩溃”的要求冲突。0.8.0 因此使用包内 `start-theme.cmd`：它启动官方 `ChatGPT.exe`，为 Chromium web 数据使用解压目录内 `.wukong-runtime\profile`，并把调试端口限制在 `127.0.0.1` 的随机端口。没有开始菜单快捷方式、系统服务或开机项。
+已经运行的普通 Codex 没有调试通道，外部文件复制无法取得 renderer。强行补丁官方包与“使用成本最优、不得导致崩溃”的要求冲突。0.8.0 因此使用包内 `start.cmd`：它启动官方 `ChatGPT.exe`，为 Chromium web 数据使用解压目录内 `.wukong-runtime\profile`，并把调试端口限制在 `127.0.0.1` 的随机端口。没有开始菜单快捷方式、系统服务或开机项。
 
 watcher 默认只接受 `app://codex/` 或标题为 Codex 的精确 `app://-/index.html` renderer；localhost 仅在显式开发开关下允许。调试协议 URL 必须是 loopback。它使用 Codex 包内 Node 24 和仅依赖 Node 核心模块的原始协议客户端，不携带 `node_modules`、第三方 WebSocket 包或运行时 npm 依赖。它检查 V9 style/runtime probe，缺失时才重新注入；Codex 退出后结束。停用请求先触发 `RESTORE_EXPRESSION`，随后重新读取 renderer state；style、class、标记、状态属性和 V4–V9 runtime 全部清空后才确认成功。
 
