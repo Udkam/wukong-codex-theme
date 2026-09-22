@@ -31,7 +31,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 在 [Releases](https://github.com/Udkam/wukong-codex-theme/releases) 选择主题运行包 ZIP。GitHub 自动生成的 **Source code** 是开发源码；旧版发行资产可能仍使用旧目录布局。
+1. 下载 [v0.16.0 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.16.0/Wukong-Codex-Theme-0.16.0-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -46,7 +46,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-本次更新只同步源码和打包流程，尚未创建新版 Release。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.16.0**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

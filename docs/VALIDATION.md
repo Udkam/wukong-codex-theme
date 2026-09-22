@@ -39,3 +39,7 @@ Electron system menus are outside renderer CSS and remain native. Broad visual a
 ## 主题专用仓库与简化下载包
 
 2026-09-22：取消跟踪 255 个宠物和旧主题资料文件，工作区原文件前后 SHA-256 一致。独立源码 npm run check：153 项，146 通过、0 失败、7 项既有跳过；Studio 端到端检查通过（修正旧默认素材引用，并移除宠物预览）。下载包导入与中文空格路径测试通过，只有根目录 start.cmd 一个批处理，app 中 13 张活动背景可独立解码装载。未为验证重启正在使用的客户端；本次不创建新版 GitHub Release。
+
+## v0.16.0 正式包
+
+独立源码 npm run check：153 项，146 通过、0 失败、7 跳过。正式 ZIP：43 文件，13 背景，解压前后哈希一致。中文空格解压路径下 manual-start 预检通过，未改动官方快捷方式和开机项；未额外冷启动正在运行的客户端。

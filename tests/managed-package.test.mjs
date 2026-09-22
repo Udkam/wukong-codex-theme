@@ -105,7 +105,7 @@ test('minimal managed package imports independently and omits development surfac
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'ws-client.mjs')), false, 'superseded ws bundle was packaged');
   assert.equal(fs.existsSync(path.join(target, 'runtime', 'ws-client-node.mjs')), false, 'diagnostic ws bundle was packaged');
   const packagedManifest = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
-  assert.equal(packagedManifest.version, '0.15.0');
+  assert.equal(packagedManifest.version, '0.16.0');
   assert.deepEqual(packagedManifest.dependencies, {});
   for (const rejected of [
     'themes/assets/erlang-meishan.jpg',
