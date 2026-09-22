@@ -15,8 +15,7 @@ const publicScripts = {
   hook: read('scripts/install-chatgpt-hook.ps1'),
   verifyAdapter: read('scripts/verify-launch-adapter.ps1'),
   start: read('scripts/start.ps1'),
-  appxActivator: read('runtime/activate-appx.ps1'),
-  nativePets: read('scripts/install-native-pets.ps1')
+  appxActivator: read('runtime/activate-appx.ps1')
 };
 
 test('repository start delegates one preflight to the verified Node bridge', () => {
@@ -43,7 +42,6 @@ test('all public and retained legacy lifecycle scripts parse', () => {
     'scripts/install-preserving.ps1',
     'scripts/launch.ps1',
     'scripts/start.ps1',
-    'scripts/install-native-pets.ps1',
     'scripts/manage-backgrounds.ps1',
     'scripts/prepare-background.ps1',
     'runtime/activate-appx.ps1',
@@ -303,26 +301,6 @@ test('public entries route to repository-backed injection and verified disable',
   assert.match(publicScripts.start, /-Repository -ManualOnly/);
   assert.match(publicScripts.start, /bridgeHostPath/);
   assert.doesNotMatch(publicScripts.start, /install-native-pets\.ps1|launch\.ps1|Get-CimInstance/);
-  assert.match(publicScripts.nativePets, /New-Item -ItemType Junction/);
-  assert.match(publicScripts.nativePets, /spriteVersionNumber 2/);
-  assert.match(publicScripts.nativePets, /native-pet-links\.jsonl/);
-  assert.match(publicScripts.nativePets, /Get-WebpDimensions/);
-  assert.match(publicScripts.nativePets, /1536x2288/);
-  assert.match(publicScripts.nativePets, /validation\.json/);
-  assert.match(publicScripts.nativePets, /package-proof\.json/);
-  assert.match(publicScripts.nativePets, /transparent_rgb_residue_pixels/);
-  assert.match(publicScripts.nativePets, /Assert-NoReparseSegments/);
-  assert.ok(
-    publicScripts.nativePets.indexOf('$plans = @()') < publicScripts.nativePets.indexOf('New-Item -ItemType Junction'),
-    'native pet junction creation begins before package preflight finishes'
-  );
-  assert.doesNotMatch(publicScripts.nativePets, /Remove-Item|Move-Item|Copy-Item[^\r\n]*-Force/);
-  assert.match(publicScripts.nativePets, /payloadName[\s\S]*spritesheet\.webp/);
-  assert.match(publicScripts.nativePets, /source-pet\.json/);
-  assert.match(publicScripts.nativePets, /managed-upgrade/);
-  assert.match(publicScripts.nativePets, /versioned-linked-payload/);
-  assert.doesNotMatch(publicScripts.nativePets, /Copy-Item[^\r\n]*spritesheet\.webp/);
-
   const packager = read('scripts/package-runtime.mjs');
   assert.doesNotMatch(packager, /node_modules/);
   assert.doesNotMatch(packager, /runtime\/ws-client(?:-node)?\.mjs/);

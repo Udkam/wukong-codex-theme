@@ -16,8 +16,6 @@
     "test:runtime-visual": "node --test tests/background-runtime-v13.test.mjs",
     "test:backgrounds": "node --test tests/background-manager.test.mjs",
     "test:managed-package": "node --test tests/managed-package.test.mjs",
-    "test:native-pets": "node --test tests/native-pets-contract.test.mjs",
-    "prepare:native-pets": "node scripts/prepare-native-pets.mjs",
     "test:preserve": "node --test tests/preserving-install-contract.test.mjs",
     "test:scene-palette": "node --test tests/scene-palette.test.mjs"
   },

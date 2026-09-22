@@ -2,10 +2,11 @@ import { chromium } from '@playwright/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { validateTheme } from '../shared/theme-model.mjs';
+import { DEFAULT_THEME, validateTheme } from '../shared/theme-model.mjs';
 
 const url = process.env.STUDIO_URL || 'http://127.0.0.1:5190/studio/';
 const browser = await chromium.launch({ headless: true });
+try {
 const page = await browser.newPage({
   viewport: { width: 1440, height: 1050 },
   reducedMotion: 'reduce'
@@ -26,13 +27,13 @@ const stageBox = await page.locator('#preview').boundingBox();
 assert(stageBox.x === 0 && stageBox.width === 1440, 'Preview does not fill the full window after removing the editor column');
 assert(await page.locator('#preview').getAttribute('data-surface') === 'landing', 'Studio did not start in landing state');
 const defaultImage = await page.locator('#preview').evaluate(element => element.style.getPropertyValue('--studio-image'));
-assert(defaultImage.includes('great-sage-staff.jpg'), 'Bundled Great Sage staff image was not loaded by default');
+assert(defaultImage.includes(DEFAULT_THEME.background.asset), 'Active default background was not loaded');
+assert(await page.evaluate(async asset => { const img = new Image(); img.src = '../themes/' + asset; await img.decode(); return img.naturalWidth > 0; }, DEFAULT_THEME.background.asset), 'Default background failed to decode');
 
 await page.evaluate(() => document.getElementById('showThread').click());
 assert(await page.locator('#preview').getAttribute('data-surface') === 'thread', 'Thread preview did not activate');
 assert(await page.locator('.thread-scene').evaluate(element => getComputedStyle(element).visibility) === 'visible', 'Thread scene stayed hidden');
 assert(await page.locator('.landing-scene').evaluate(element => getComputedStyle(element).visibility) === 'hidden', 'Landing scene stayed visible');
-assert(await page.locator('#wayfarer').evaluate(element => getComputedStyle(element).pointerEvents) === 'none', 'Companion blocks pointer events');
 await page.evaluate(() => document.getElementById('showLanding').click());
 
 const png = Buffer.from(
@@ -93,7 +94,7 @@ for (const file of [
   if (!fs.existsSync(file) || fs.statSync(file).size < 20000) throw Error('Studio screenshot is missing or empty: ' + file);
 }
 if (errors.length) throw Error('Studio page errors: ' + errors.join('; '));
-await browser.close();
+} finally { await browser.close(); }
 console.log('Studio full-window native-shell preview, hidden editor boundary, local image, export, and screenshots PASS');
 
 function assert(condition, message) {

@@ -8,3 +8,29 @@ assets/little-wayfarer-source.png
 # Local diagnostics can contain private conversation text and installed-client code.
 artifacts/test-runs/
 docs/agent-runs/native-boundary-20260920/
+
+# Local-only pets and retired theme materials (retained on disk).
+/pets/
+/artifacts/native-pets/
+/docs/pets/
+/docs/agent-runs/
+/docs/design/
+/docs/checkpoints/
+/docs/screenshots/
+/themes/assets/
+/themes/motifs/
+/assets/little-wayfarer.png
+/docs/PET_DESIGN.md
+/docs/PET_GENERATION.md
+/scripts/build-pet-base-qa.py
+/scripts/install-native-pets.ps1
+/scripts/native-pet-release-policy.mjs
+/scripts/prepare-native-pets.mjs
+/tests/native-pets-contract.test.mjs
+/docs/RELEASE_0.9.0.md
+/docs/RELEASE_0.10.0.md
+/docs/WORKLOG.md
+/docs/WORKBREAKDOWN.md
+/artifacts/asar-ui-audit-*/
+/artifacts/black-myth-ui-shape-audit-*/
+/artifacts/local-yaksha-resource-audit-*/

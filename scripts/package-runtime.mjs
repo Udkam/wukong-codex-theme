@@ -47,7 +47,7 @@ const assertNoLinkedExistingSegments = (candidate, label) => {
   }
 };
 
-export function packageRuntime({ source, destination }) {
+export function packageRuntime({ source, destination, download = false }) {
   const sourceRoot = path.resolve(source);
   const target = path.resolve(destination);
   assertNoLinkedExistingSegments(sourceRoot, 'Runtime package source');
@@ -73,7 +73,8 @@ export function packageRuntime({ source, destination }) {
     ...Object.values(active.uiAssets || {})
   ].filter(Boolean).map(file => `themes/${file}`);
   const sourceRootReal = fs.realpathSync.native(sourceRoot);
-  const packageFiles = [...new Set([...runtimeFiles, ...themeReferences])];
+  const selectedFiles = download ? runtimeFiles.filter(file => !['start.cmd', 'README.md', 'PORTABLE-README.txt'].includes(file)) : runtimeFiles;
+  const packageFiles = [...new Set([...selectedFiles, ...themeReferences])];
   const sources = packageFiles.map(relativeFile => {
     const normalized = path.normalize(relativeFile);
     const sourceFile = path.resolve(sourceRoot, normalized);
@@ -115,6 +116,32 @@ export function packageRuntime({ source, destination }) {
   return target;
 }
 
+export function packageDownload({ source, destination }) {
+  const target = path.resolve(destination);
+  assertNoLinkedExistingSegments(target, 'Download destination');
+  if (fs.existsSync(target)) throw new Error('Download destination must not already exist.');
+  const sourceRoot = path.resolve(source);
+  if (target === sourceRoot || inside(sourceRoot, target) || inside(target, sourceRoot)) {
+    throw new Error('Download destination must be separate from the source repository.');
+  }
+  const stage = `${target}.stage-${process.pid}-${randomUUID()}`;
+  packageRuntime({ source, destination: path.join(stage, 'app'), download: true });
+  try {
+    fs.writeFileSync(path.join(stage, 'start.cmd'), [
+      '@echo off',
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0app\\scripts\\start.ps1" -Root "%~dp0app"',
+      'if errorlevel 1 pause',
+      ''
+    ].join('\r\n'), 'utf8');
+    fs.copyFileSync(path.join(sourceRoot, 'docs', 'QUICK_START.txt'), path.join(stage, '使用说明.txt'));
+    fs.renameSync(stage, target);
+  } catch (error) {
+    error.message += ` Incomplete download retained at ${stage}.`;
+    throw error;
+  }
+  return target;
+}
+
 function args(argv) {
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
@@ -130,7 +157,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   try {
     const values = args(process.argv.slice(2));
     if (!values.source || !values.destination) throw new Error('Use --source DIR --destination DIR.');
-    console.log(`PACKAGED: ${packageRuntime(values)}`);
+    if (values.layout && !['download', 'runtime'].includes(values.layout)) throw new Error('Layout must be download or runtime.');
+    console.log(`PACKAGED: ${(values.layout === 'runtime' ? packageRuntime : packageDownload)(values)}`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

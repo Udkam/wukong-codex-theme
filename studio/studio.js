@@ -3,7 +3,7 @@ import { DEFAULT_THEME, makeTheme, validateTheme } from '../shared/theme-model.m
 const $ = id => document.getElementById(id);
 const storage = 'wukong-codex-theme.theme.v2';
 const legacyStorage = 'wukong-codex-forge.theme.v2';
-const bundledArt = '../themes/assets/great-sage-return.jpg';
+const bundledArt = '../themes/' + DEFAULT_THEME.background.asset;
 const clone = value => JSON.parse(JSON.stringify(value));
 
 let theme = loadTheme();
@@ -55,11 +55,6 @@ function render() {
   $('artOut').value = Math.round(theme.background.taskIntensity * 100) + '%';
   $('landingArtOut').value = Math.round(theme.background.landingIntensity * 100) + '%';
   $('reducedMotion').checked = theme.accessibility.reducedMotion;
-  $('companion').checked = theme.companion.enabled;
-  $('side').value = theme.companion.side;
-  $('size').value = theme.companion.size;
-  $('sizeOut').value = theme.companion.size + 'px';
-  $('still').checked = theme.companion.motion === 'still';
   $('localFileLabel').hidden = theme.background.mode !== 'local';
 
   const preview = $('preview');
@@ -72,16 +67,9 @@ function render() {
   preview.classList.toggle('reduced-motion', theme.accessibility.reducedMotion);
   const image = theme.background.mode === 'local' && localImage
     ? 'url("' + localImage.replaceAll('"', '%22') + '")'
-    : 'none';
+    : theme.background.mode === 'gallery' ? 'url("../themes/' + theme.background.asset.replaceAll('"', '%22') + '")' : 'none';
   preview.style.setProperty('--studio-image', image);
 
-  const wayfarer = $('wayfarer');
-  wayfarer.hidden = !theme.companion.enabled;
-  wayfarer.dataset.side = theme.companion.side;
-  wayfarer.dataset.motion = theme.accessibility.reducedMotion || theme.companion.motion === 'still'
-    ? 'still'
-    : 'quiet';
-  wayfarer.style.setProperty('--companion-size', theme.companion.size + 'px');
   save();
 }
 
@@ -100,10 +88,6 @@ const inputBindings = [
   ['art', value => { theme.background.taskIntensity = Number(value) / 100; }],
   ['landingArt', value => { theme.background.landingIntensity = Number(value) / 100; }],
   ['reducedMotion', value => { theme.accessibility.reducedMotion = value; }],
-  ['companion', value => { theme.companion.enabled = value; }],
-  ['side', value => { theme.companion.side = value; }],
-  ['size', value => { theme.companion.size = Number(value); }],
-  ['still', value => { theme.companion.motion = value ? 'still' : 'quiet'; }]
 ];
 
 for (const [id, mutator] of inputBindings) {

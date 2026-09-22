@@ -1,0 +1,31 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { packageDownload } from '../scripts/package-runtime.mjs';
+
+test('download has one entry, Chinese quick start and a self-contained app folder', async t => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'wukong-download-'));
+  const destination = path.join(parent, '悟空 主题');
+  packageDownload({ source: process.cwd(), destination });
+  t.diagnostic(`Download retained for inspection: ${destination}`);
+  assert.deepEqual(fs.readdirSync(destination).sort(), ['app', 'start.cmd', '使用说明.txt'].sort());
+  const walk = dir => fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(path.join(dir, entry.name)) : [path.join(dir, entry.name)]);
+  const files = walk(destination);
+  assert.deepEqual(files.filter(file => file.endsWith('.cmd')).map(file => path.relative(destination, file)), ['start.cmd']);
+  const launcher = fs.readFileSync(path.join(destination, 'start.cmd'), 'utf8');
+  assert.ok(launcher.includes('"%~dp0app\\scripts\\start.ps1" -Root "%~dp0app"'));
+  assert.match(launcher, /if errorlevel 1 pause/);
+  assert.ok(fs.existsSync(path.join(destination, 'app/scripts/start.ps1')));
+  const guide = fs.readFileSync(path.join(destination, '使用说明.txt'), 'utf8');
+  assert.match(guide, /完整解压/);
+  assert.match(guide, /双击 start.cmd/);
+  for (const omitted of ['pets', 'tests', 'studio', 'docs', 'node_modules', '.git']) assert.ok(!fs.existsSync(path.join(destination, 'app', omitted)));
+  const runtime = await import(pathToFileURL(path.join(destination, 'app/runtime/forge-runtime.mjs')));
+  const payload = runtime.payloadFromThemeFile(path.join(destination, 'app/themes/active.json'));
+  assert.equal(payload.assets.length, 13);
+  assert.throws(() => packageDownload({ source: process.cwd(), destination }), /already exist/);
+  assert.throws(() => packageDownload({ source: process.cwd(), destination: path.join(process.cwd(), 'nested-download') }), /separate/);
+});

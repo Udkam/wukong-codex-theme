@@ -1,24 +1,9 @@
-# 历史文件整理清单（保留，暂不删除）
+# 仓库整理结果
 
-用户于 2026-09-22 决定暂不删除以下废弃主题设计、截图、交接存档及任务栏启动桥；后续又明确暂停发行。本清单仅供整理参考，不是删除授权。保留宠物全部文件、当前原生测试及其依赖证据、现役运行时和用户 profile；不建立旧版存档。
+用户已明确要求远程只保留主题，宠物材料仅保留本地。本轮采用取消 Git 跟踪，不删除工作区文件；不重写历史。
 
-总计 76 个文件，85.71 MiB。
+255 个文件、约 87.48 MiB 的本地副本逐文件核对 SHA-256 一致。详细本地证据：artifacts/test-runs/remote-cleanup-local-preservation.json（已忽略，不上传）。
 
-- `docs/agent-runs/unified-theme-v68`
-- `docs/agent-runs/unified-surfaces-v69`
-- `docs/agent-runs/unified-ming-paper-v70`
-- `docs/agent-runs/surface-readability-v72`
-- `docs/agent-runs/frosted-ming-paper-v73`
-- `docs/agent-runs/opaque-paper-rollback-v74`
-- `docs/agent-runs/bounded-paper-overlays-v75`
-- `docs/agent-runs/dream-skin-full-feature-compat-20260903`
-- `docs/agent-runs/dream-skin-migration-20260816`
-- `docs/design/composer-options`
-- `docs/checkpoints`
-- `tmp`
-- `runtime/taskbar-launcher.cs`
-- `scripts/start-taskbar.ps1`
-- `scripts/install-taskbar-entry.ps1`
-- `tests/taskbar-entry.test.mjs`
+移出当前分支：宠物包与制作资料、宠物专用脚本和测试、旧截图、弃用设计、旧素材副本、过时阶段文档。此前未跟踪的历史存档继续保留本地。现役测试依赖的 V23/V24/V30/V31 证据继续跟踪。
 
-详细逐文件清单保留在本地 docs/release/CLEANUP.json，不随源码同步。
+此清理只影响当前分支内容，不能缩小已有 Git 历史。下载运行包使用白名单，仅含 start.cmd、使用说明.txt、app。

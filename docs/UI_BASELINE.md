@@ -42,4 +42,4 @@
 
 ## 视觉差分原则
 
-原生基线截图是 `docs/screenshots/native-ui-baseline.png`。主题截图必须与它保持同一槽位坐标、尺寸、圆角和文字；允许变化的只有全窗背景、表面透明度、边框/阴影颜色，以及输入器两侧空白沟槽中的无交互同行者/葫芦。fixture 证明 DOM/CSS 合同，不冒充真实生产 renderer 截图。
+历史基线截图 `docs/screenshots/native-ui-baseline.png` 已移入本地保留范围，不随仓库分发。主题截图必须与它保持同一槽位坐标、尺寸、圆角和文字；允许变化的只有全窗背景、表面透明度、边框/阴影颜色，以及输入器两侧空白沟槽中的无交互同行者/葫芦。fixture 证明 DOM/CSS 合同，不冒充真实生产 renderer 截图。

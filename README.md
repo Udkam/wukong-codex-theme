@@ -1,48 +1,56 @@
 # Wukong Codex Theme
 
-这是一个为 Windows ChatGPT/Codex 桌面客户端制作的悟空主题。当前修复保留完整双背景队列，以原生组件的形状和语义配色为边界替换玻璃材质。浅色视觉和部分实际窗口仍未验收，具体证据见下方逐项检查表。
+为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生布局、文字颜色和交互；10 张战斗图、3 张风景图，对话默认雪山。
 
-这是单一的完整本地发行版：10 张战斗图与 3 张风景图保留为双背景队列，按页面路由、快捷键、题字和字标工作。Dream Skin 的单背景包、Gallery 构建链和投稿材料已经移除，不再作为本项目的分发方案。
+## 开始使用
 
-## 完整双队列运行时
+需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-本地运行时不修改 `ChatGPT.exe`、`app.asar`、WindowsApps、账号数据、Store 设置或自动更新策略。只有运行项目的 `start.cmd` 才通过官方 AppX 激活入口携带 loopback CDP 参数启动并注入主题。原生 ChatGPT.exe 和商店入口保持原生行为。也支持热应用到已有可信本机 CDP 会话；不会关闭或强杀已运行的官方客户端。
+1. 在 [Releases](https://github.com/Udkam/wukong-codex-theme/releases) 选择主题运行包 ZIP。GitHub 自动生成的 **Source code** 是开发源码；旧版发行资产可能仍使用旧目录布局。
+2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
+3. 双击 **start.cmd**。
 
-当前视觉规则：
+新的下载包结构：
 
-- 新建任务页使用战斗组，项目和对话页使用风景组。
-- `Ctrl+Alt+F` / `Ctrl+Alt+B` 在当前组内前进或后退。
-- `Ctrl+Alt+C` 临时切换战斗或风景组。
-- `Ctrl+Alt+K` 锁定或解锁当前图片与组。
-- `Ctrl+Alt+T` 显示或隐藏新建任务页的“此去，欲破何局？”与字标。
-- 正文与按钮保持原生字色，不增加文字阴影或 Ultra 背衬；原生已有的面板使用玻璃材质，圆角、裁切和布局保持原生。
-- 深浅色新对话均无背景遮罩；浅色对话使用随场景变化的白色薄遮罩（雪山 18%、夕阳 19.5%、峡谷 23%），深色对话保留按场景配置的暗色遮罩，不修改图片资产或文字颜色。
-- Electron 主进程绘制的系统菜单不受网页 CSS 控制，目前仍未实现玻璃材质。
-
-开发或受管会话中可用以下命令热应用或还原。`<port>` 必须是已验证的本机 `127.0.0.1` CDP 端口；命令不会启动或重启 ChatGPT。
-
-```powershell
-node runtime/injector.mjs --apply <port> themes/active.json
-node runtime/injector.mjs --state <port>
-node runtime/injector.mjs --restore <port>
+```text
+Wukong-Codex-Theme/
+├─ start.cmd       ← 双击这里
+├─ 使用说明.txt
+└─ app/           ← 必要运行文件，无需打开
 ```
 
-## 唯一主题入口
+请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-双击项目文件夹内的 **start.cmd**。不需要安装程序，不接管原生快捷方式，不注册开机项或常驻原生启动监听。原生 ChatGPT.exe 正常启动，不自动加载主题。
+本次更新只同步源码和打包流程，尚未创建新版 Release。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
-每次显式启动都会重新查询当前官方包并准备匹配的 AppX 激活助手，因此不依赖旧版本的 WindowsApps 路径，不修改或限制官方自动更新。若已有原生客户端进程运行，请完全退出后再运行主题入口；脚本不会强制关闭现有进程。未来官方版本若移除嵌入式 Node 或改变注入接口，仍需适配。
+## 常用操作
 
-需要快捷方式时，只让它指向这个项目的 start.cmd。旧 install/stop/remove/backgrounds 批处理已删除，项目根目录只保留 start.cmd；历史存档暂不删除，具体清单见 [文件整理清单](docs/FILE_INVENTORY.md)。不要移动项目后继续使用指向旧路径的快捷方式。
+| 操作 | 快捷键 |
+| --- | --- |
+| 下一张 / 上一张 | Ctrl+Alt+F / Ctrl+Alt+B |
+| 切换战斗 / 风景组 | Ctrl+Alt+C |
+| 锁定 / 解锁背景 | Ctrl+Alt+K |
+| 显示 / 隐藏新对话题字 | Ctrl+Alt+T |
 
-背景管理保留为内部脚本 scripts/manage-backgrounds.ps1。恢复当前窗口的原生样式可调用 scripts/disable.ps1；这些脚本没有单独的 .cmd 入口。发布包由 scripts/package-runtime.mjs 按活动文件白名单生成，不携带宠物。
+新对话使用战斗组，对话和项目页使用风景组。背景不会定时自动轮播。
 
-## 验证
+## 没有出现主题？
 
-```powershell
-npm run test:runtime-states
-npm run test:lifecycle
-npm run test:managed-package
-```
+- **应用已经开着：** 从系统托盘完全退出，再双击 start.cmd。已有普通进程无法补加主题启动参数。
+- **找不到客户端：** 先安装并正常打开一次官方桌面客户端。
+- **启动报错：** 错误窗口会保留，复制内容到 [Issues](https://github.com/Udkam/wukong-codex-theme/issues)。
+- **恢复原生：** 完全退出后，从官方入口启动 ChatGPT.exe。
 
-测试与验收边界见 [验证记录](docs/VALIDATION.md)。本轮只同步主题实现，不同步独立宠物改动。
+主题不修改官方安装文件、账号配置或自动更新策略。start.cmd 每次启动重新查找已安装版本；未来客户端若改变注入接口，仍可能需要主题适配。关闭主题启动的应用后，可删除解压目录；已有账户数据不由主题卸载操作清理。
+
+## 源码与开发
+
+仓库中的 start.cmd 也可直接使用。runtime、scripts、shared、themes 是运行与开发文件；用户下载包会把它们集中到 app 内。
+
+- [开发、测试与打包](docs/DEVELOPMENT.md)
+- [文件结构](docs/FILE_INVENTORY.md)
+- [深浅色设计](docs/THEME_COMPARISON.md)
+- [验证记录](docs/VALIDATION.md)
+- [资源来源](docs/ASSET_SOURCES.md)
+
+仓库当前分支仅保留主题。宠物制作资料、旧截图和弃用设计已退出版本跟踪，本地副本保留；Git 历史未重写。
