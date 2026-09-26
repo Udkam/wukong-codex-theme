@@ -1,5 +1,6 @@
-/* Native paint boundary, audited against desktop 26.915.4065.0.
- * No client foreground tokens, fonts, radii or layout are replaced.
+/* Native paint boundary, audited against desktop 26.924.2738.0.
+ * Native fonts, radii and layout are retained. Navigation uses a translucent
+ * reading surface with foreground colours matched to the native theme.
  * Only the existing landing wordmark/quote and inert background own geometry.
  */
 :root.forge-ink-mountain {
@@ -13,6 +14,13 @@
   --forge-glass-shadow: 0 1px 0 rgba(255,255,255,.16) inset, 0 8px 22px rgba(0,0,0,.18);
   --forge-glass-filter: blur(12px) saturate(1.04);
   --forge-shell-fill: rgba(20, 24, 28, var(--forge-shell-dark-alpha, .88));
+  --forge-navigation-fill: rgba(20, 24, 28, .64);
+  --forge-navigation-filter: blur(12px);
+  --forge-catalog-fill: rgba(20,24,28,.86);
+  --forge-nav-ink: #f4f0e8;
+  --forge-nav-muted: #d0d2d3;
+  --forge-nav-shadow: none;
+  --forge-nav-hover: rgba(255,255,255,.14);
   --forge-shell-filter: blur(8px);
   --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
 }
@@ -23,6 +31,17 @@
   --forge-glass-edge: rgba(255,255,255,.68);
   --forge-glass-shadow: 0 1px 0 rgba(255,255,255,.85) inset, 0 -1px 0 rgba(89,111,135,.12) inset, 0 6px 18px rgba(36,50,65,.09);
   --forge-glass-filter: blur(10px) saturate(1.2);
+  --forge-catalog-fill: rgba(247,249,251,.90);
+}
+
+/* The reading tint and its ink switch together, including bright wallpaper
+ * in dark mode. Avoid wallpaper-driven black text on the dark glass surface. */
+:root.forge-ink-mountain[data-forge-native-theme="light"] {
+  --forge-navigation-fill: rgba(247,249,251,.60);
+  --forge-nav-ink: #182019;
+  --forge-nav-muted: #303a32;
+  --forge-nav-shadow: none;
+  --forge-nav-hover: rgba(15,30,22,.13);
 }
 
 /* Transparent layout carriers. Native controls beneath them keep their own paint. */
@@ -58,7 +77,24 @@
   background: transparent !important;
 }
 
-/* Current SearchablePageLayout: clear the sticky carrier, never the input shell. */
+/* Desktop 26.924 SearchablePageLayout/Library toolbar uses a CSS-module shell,
+ * not the .sticky utility. Its ::before owns the actual header fill and native
+ * scroll inset/corners. Replace that paint only; never change its geometry.
+ */
+:root.forge-ink-mountain [data-sticky][class*="_shell_"]:has(> [class*="_content_"])::before {
+  background-color: var(--forge-navigation-fill) !important;
+  backdrop-filter: var(--forge-navigation-filter) !important;
+  -webkit-backdrop-filter: var(--forge-navigation-filter) !important;
+}
+
+/* Catalogs keep native ink, including secondary labels. Paint the existing
+ * content surface with a stronger reading tint; no measured overlay or blur
+ * over the entire scrolling page. Native headers retain their sticky owner. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-app-shell-main-surface]:has([class*="_shell_"] > [class*="_content_"]) {
+  background-color: var(--forge-catalog-fill) !important;
+}
+
+/* SearchablePageLayout carrier: keep the input shell native. */
 :root.forge-ink-mountain .sticky:has(:is(
   #scheduled-page-search, #plugins-page-search, #plugins-store-page-search
 )) {
@@ -118,7 +154,6 @@
   [role="listbox"][class*="bg-"]:not([cmdk-list]):not([data-cmdk-list]),
   [role="dialog"][class*="bg-"]:not(:has(img.object-contain)),
   [role="alertdialog"][class*="bg-"],
-  [role="tooltip"][class*="bg-"],
   [class*="_floatingSurface_"],
   .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"],
   .w-80.rounded-xl[class~="bg-surface-elevated-secondary/95"][class*="max-w-"],
@@ -139,49 +174,53 @@
  * positioning wrappers must remain native and transparent. In particular the
  * navigation preview paints its own rounded child, never the outer tooltip.
  */
+/* Tooltip foregrounds can intentionally be inverse even in light mode.
+ * Preserve their native fill/ink pairing instead of applying light glass. */
 
-/* Shared readable shell: a stable theme-aware tint bounds wallpaper contrast.
- * A lighter blur is sufficient behind the tint and reduces large-area filtering.
- * The native containers retain their own corners, clipping and dimensions.
+/* Desktop 26.924: the outer aside includes BOTH rail and conversation list.
+ * The native .sidebar-navigation paints a second 65% surface and owns the
+ * 12px start corners. Transfer that old layered material to the rail only.
+ * Leave all native border radii, clipping, gutter and divider geometry intact.
  */
-:root.forge-ink-mountain :is(
-  aside.app-shell-left-panel:not([data-testid="app-shell-floating-left-panel"]):not([data-testid="app-shell-floating-left-panel"] > aside),
-  [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"])
-) {
+:root.forge-ink-mountain nav[class~="group/sidebar-rail"] {
+  background-color: var(--forge-shell-fill) !important;
+  background-image: linear-gradient(color-mix(in oklab, var(--color-surface) 65%, transparent), color-mix(in oklab, var(--color-surface) 65%, transparent)) !important;
+  backdrop-filter: var(--forge-shell-filter) !important;
+  -webkit-backdrop-filter: var(--forge-shell-filter) !important;
+}
+:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"]:not([data-testid="app-shell-floating-left-panel"]) {
+  background-color: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"] .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation) {
+  background-color: var(--forge-navigation-fill) !important;
+  background-image: none !important;
+  backdrop-filter: var(--forge-navigation-filter) !important;
+  -webkit-backdrop-filter: var(--forge-navigation-filter) !important;
+}
+:root.forge-ink-mountain .sidebar-navigation[class*="_ConversationSidebar_"] nav[class*="_Navigation_"] {
+  --color-text: var(--forge-nav-ink) !important;
+  --color-text-secondary: var(--forge-nav-muted) !important;
+  --color-text-secondary-solid: var(--forge-nav-muted) !important;
+  --color-text-tertiary: var(--forge-nav-muted) !important;
+  --color-background-primary-ghost-hover: var(--forge-nav-hover) !important;
+  color: var(--forge-nav-ink) !important;
+  text-shadow: var(--forge-nav-shadow);
+}
+:root.forge-ink-mountain [class*="_ApplicationMenuTopBar_"] {
+  background-color: var(--forge-shell-fill) !important;
+  background-image: none !important;
+  backdrop-filter: var(--forge-shell-filter) !important;
+  -webkit-backdrop-filter: var(--forge-shell-filter) !important;
+}
+:root.forge-ink-mountain [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"]) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
   box-shadow: none !important;
   backdrop-filter: var(--forge-shell-filter) !important;
   -webkit-backdrop-filter: var(--forge-shell-filter) !important;
-}
-/* One continuous material behind the full titlebar and sidebar. The union
- * mask avoids overlapping tint and separate blur samples at their junction. */
-:root.forge-ink-mountain [class*="_Layout_"]:has(> [class*="_ApplicationMenuTopBar_"]) aside.app-shell-left-panel:not([data-testid="app-shell-floating-left-panel"]):not([data-testid="app-shell-floating-left-panel"] > aside) {
-  background-color: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-:root.forge-ink-mountain [class*="_Layout_"]:has(> [class*="_ApplicationMenuTopBar_"])::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 100vw;
-  /* Match the native Windows main surface corner using its own radius token. */
-  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000), radial-gradient(circle at bottom right, transparent calc(var(--radius-lg) - .5px), #000 var(--radius-lg));
-  mask-size: 100% var(--height-toolbar-sm, 36px), var(--app-shell-animated-left-panel-width, 0px) 100%, min(calc(var(--radius-lg) + 1px), var(--app-shell-animated-left-panel-width, 0px)) calc(var(--radius-lg) + 1px);
-  mask-position: 0 0, 0 0, calc(var(--app-shell-animated-left-panel-width, 0px) - 1px) calc(var(--height-toolbar-sm, 36px) - 1px);
-  mask-repeat: no-repeat;
-  pointer-events: none;
-  z-index: -1;
-  background: var(--forge-shell-fill);
-  backdrop-filter: var(--forge-shell-filter);
-  -webkit-backdrop-filter: var(--forge-shell-filter);
-}
-/* Native divider geometry remains; its straight stroke must not cross the glass corner. */
-:root.forge-ink-mountain [data-app-shell-main-surface="default"] {
-  border-color: transparent !important;
 }
 /* Settings exposes the wallpaper in both themes; cards retain their material. */
 @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
@@ -284,6 +323,12 @@
     --forge-glass-highlight: none !important;
     --forge-glass-filter: none !important;
     --forge-shell-fill: var(--color-surface, Canvas) !important;
+    --forge-navigation-fill: Canvas !important;
+    --forge-catalog-fill: Canvas !important;
+    --forge-navigation-filter: none !important;
+    --forge-nav-ink: CanvasText !important;
+    --forge-nav-muted: CanvasText !important;
+    --forge-nav-shadow: none !important;
     --forge-shell-filter: none !important;
     --forge-summary-fill: var(--color-surface, Canvas) !important;
   }
@@ -314,6 +359,18 @@
   overflow: clip;
   contain: strict;
   background: var(--forge-paper);
+}
+
+/* The native PageSurface owns its current inset, responsive size and all four
+ * corners. Paint inside that node; never reconstruct the shell with a mask.
+ * The outer frame stays a native surface, including its top/bottom gutters.
+ */
+:root.forge-ink-mountain[data-forge-background-placement="native-page"] body {
+  background-color: var(--color-surface-secondary, Canvas) !important;
+}
+:root.forge-ink-mountain[data-forge-background-placement="native-page"] #wukong-codex-theme-background {
+  position: absolute;
+  border-radius: inherit;
 }
 
 :root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer] {
@@ -377,12 +434,8 @@
   opacity: clamp(.10, calc(.30 - var(--forge-layer-thread-veil, .25) * .25), .25);
 }
 
-:root.forge-ink-mountain[data-forge-settings-veil="true"] [data-forge-background-veil] {
-  opacity: var(
-    --forge-layer-thread-veil,
-    calc(1 - var(--forge-thread-color-retention))
-  );
-}
+/* Settings retains the current surface's veil, including the light-mode veil.
+ * A second settings-only override would visibly darken the same wallpaper. */
 
 :root.forge-ink-mountain #root {
   position: relative;

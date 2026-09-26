@@ -1,25 +1,5 @@
-export const nativeUiBaseline = Object.freeze({
-  source: 'ChatGPT.exe 26.715.2305.0 app.asar',
-  rendererDeviceScaleFactor: 1.25,
-  spacing: 4,
-  toolbarHeight: 46,
-  smallToolbarHeight: 36,
-  paneToolbarHeight: 40,
-  sidebarPreferredWidth: 275,
-  sidebarMinWidth: 240,
-  sidebarMaxWidth: 520,
-  sidebarViewportReserve: 320,
-  sidebarRowHeight: 30,
-  sidebarRowRadius: 10,
-  threadContentMaxWidth: 768,
-  panelPadding: 20,
-  toolbarPadding: 16,
-  composerButtonSize: 28,
-  composerEditorMinHeight: 44,
-  composerMultilineRadius: 25,
-  composerSingleLineRadius: 22
-});
-
+// Synthetic behavior fixture; not a native geometry baseline.
+// Native geometry is verified against installed ASAR CSS in native paint tests.
 export const runtimeFixtureHtml = String.raw`
   <style>
     :root {

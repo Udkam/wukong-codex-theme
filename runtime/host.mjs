@@ -6,20 +6,36 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getBrowserVersion, getTargets, evaluateTarget, isCodexTarget } from './cdp-client.mjs';
 import { payloadFromThemeFile } from './forge-runtime.mjs';
 import {
   ACTIVE_PROBE_EXPRESSION,
   isActiveThemeState,
   isNativeThemeState,
-  makeApplyExpression,
   RESTORE_EXPRESSION,
   THEME_STATE_EXPRESSION
 } from './injection-plan-v13.mjs';
 
 const LIFECYCLE_NAMESPACE = 'WukongCodexTheme';
 const RETAINED_THEME_DIRECTORY = 'wukong-codex-theme';
+export function createRuntimeProvider(modulePath) {
+  let fingerprint;
+  let loaded;
+  return async () => {
+    const source = fs.readFileSync(modulePath);
+    const next = crypto.createHash('sha256').update(source).digest('hex');
+    if (next !== fingerprint) {
+      const runtime = await import(`${pathToFileURL(modulePath).href}?revision=${next}`);
+      if (!runtime.RUNTIME_REVISION || typeof runtime.makeApplyExpression !== 'function') {
+        throw Error('Runtime update is missing its revision or apply contract');
+      }
+      loaded = runtime;
+      fingerprint = next;
+    }
+    return loaded;
+  };
+}
 export const LEGACY_LIFECYCLE_IDS = Object.freeze({
   namespace: 'WukongCodexForge',
   retainedThemeDirectory: 'wukong-codex-forge'
@@ -419,6 +435,7 @@ const writeDisableConfirmation = ({ disableRequest, port, rootPid, targets, stat
 export async function runEventWatcher({
   port,
   expression,
+  runtimeProvider = null,
   disableRequest,
   rootPid,
   markerPath,
@@ -498,6 +515,17 @@ export async function runEventWatcher({
     try {
       do {
         reconcileQueued = false;
+        // Load one coherent module per reconciliation, so repair cannot put an
+        // older cached runtime back after an on-disk update or hot injection.
+        // Removal/disable must remain able to restore the renderer after the
+        // source directory disappears. The loaded restore calls runtime.dispose.
+        const restoring = signals.disableRequested || signals.terminateRequested ||
+          !exists(markerPath) || Boolean(disableRequest && exists(disableRequest));
+        const runtime = runtimeProvider && !restoring ? await runtimeProvider() : null;
+        const activeProbe = runtime
+          ? `(${runtime.ACTIVE_PROBE_EXPRESSION}) && window.__wukongCodexThemeRuntimeV13?.revision === ${JSON.stringify(runtime.RUNTIME_REVISION)}`
+          : ACTIVE_PROBE_EXPRESSION;
+        const stateExpression = runtime?.THEME_STATE_EXPRESSION || THEME_STATE_EXPRESSION;
         const targets = (await targetsFor(port)).filter(targetMatches);
         onProgress({ phase: targets.length ? 'renderer-found' : 'waiting-for-renderer', targets: targets.length });
         const themeMissing = !exists(markerPath);
@@ -523,9 +551,9 @@ export async function runEventWatcher({
             finish(result);
             return;
           }
-          await Promise.all(targets.map(target => evaluate(target, RESTORE_EXPRESSION)));
-          const states = await Promise.all(targets.map(target => evaluate(target, THEME_STATE_EXPRESSION)));
-          if (!states.every(isNativeThemeState)) throw Error('Native renderer state was not verified before lifecycle host exit');
+          await Promise.all(targets.map(target => evaluate(target, runtime?.RESTORE_EXPRESSION || RESTORE_EXPRESSION)));
+          const states = await Promise.all(targets.map(target => evaluate(target, stateExpression)));
+          if (!states.every(runtime?.isNativeThemeState || isNativeThemeState)) throw Error('Native renderer state was not verified before lifecycle host exit');
           const result = {
             reason: disableRequested ? 'disabled-verified' : themeMissing ? 'theme-removed-verified' : 'terminated-verified',
             confirmation: disableRequested ? confirmDisable({
@@ -550,7 +578,7 @@ export async function runEventWatcher({
         }
         const states = [];
         for (const target of targets) {
-          let active = await evaluate(target, ACTIVE_PROBE_EXPRESSION).catch(() => false);
+          let active = await evaluate(target, activeProbe).catch(() => false);
           if (!active) {
             if (targetSettleMs > 0 && !settledTargets.has(target.id)) {
               settledTargets.add(target.id);
@@ -562,12 +590,12 @@ export async function runEventWatcher({
               continue;
             }
             onProgress({ phase: 'renderer-applying', targets: targets.length });
-            await evaluate(target, typeof expression === 'function' ? await expression() : expression);
-            active = await evaluate(target, ACTIVE_PROBE_EXPRESSION).catch(() => false);
+            await evaluate(target, typeof expression === 'function' ? await expression(runtime) : expression);
+            active = await evaluate(target, activeProbe).catch(() => false);
           }
-          states.push(active ? await evaluate(target, THEME_STATE_EXPRESSION) : null);
+          states.push(active ? await evaluate(target, stateExpression) : null);
         }
-        if (states.length && states.every(isActiveThemeState) && !ready) {
+        if (states.length && states.every(runtime?.isActiveThemeState || isActiveThemeState) && !ready) {
           ready = true;
           onProgress({ phase: 'renderer-verified', targets: states.length });
           onReady({ targets: states.length, states });
@@ -1160,7 +1188,8 @@ export async function runHost({
       });
       return result;
     }
-    const expression = () => makeApplyExpression({
+    const runtimeProvider = createRuntimeProvider(path.join(paths.rootPath, 'runtime', 'injection-plan-v13.mjs'));
+    const expression = runtime => runtime.makeApplyExpression({
       styleSheet: fs.readFileSync(paths.stylePath, 'utf8'),
       variables: payloadFromThemeFile(paths.themePath).variables
     });
@@ -1187,6 +1216,7 @@ export async function runHost({
     watcherPromise = runEventWatcher({
       port,
       expression,
+      runtimeProvider,
       disableRequest,
       rootPid,
       markerPath: paths.markerPath,

@@ -1,45 +1,36 @@
-# 最新本地修复验证（2026-09-22）
+# 新 UI 验证（2026-09-27）
 
-当前暂停发行。77 项定向测试全部通过：background-runtime-v13、native-paint-boundary、event-host-contract、lifecycle-contract。新增输入框重新挂载期间健康检查仍通过的回归；保留图片未解码时检查失败的覆盖。
+状态：用户已于 2026-09-27 验收并授权发布 v0.17.0。README 与深浅色实机预览已同步。
 
-实机诊断证据：artifacts/test-runs/native-boundary-20260920/settings-user-repro.json。设置返回后约 0.7 秒，运行时和背景节点同时被旧 v98 替换；因此修复健康检查并更换旧常驻进程。修复后证据见同目录 settings-user-repro-fixed.json：设置中 dark → light → 返回 thread，场景均为 10，sameRuntime 与 sameOverlay 始终为 true。用户反馈“没有问题了”。之后记录到的 10 → 4 → 3 → 10 换图仍保留同一背景层。临时诊断已清除。
+## 自动检查
 
-以下为历史验证记录，不代表本次最新代码全量验收：
+- 从当前受跟踪文件及本轮新增文件导出独立源码，排除本机未跟踪宠物、任务栏和历史材料。依赖使用既有 node_modules；未重新联网安装。
+- 最终发行源码：144 项通过，0 失败，0 跳过，约 83 秒。覆盖背景状态机、原生几何/材质、host 生命周期、还原、打包、场景资源与新 UI 容器。
+- Studio 实机浏览器自动检查通过：全窗口预览、隐藏编辑边界、本地图片、导出及截图。首次运行遇到临时缓存目录错误，改用 Windows 完整路径与独立缓存后重跑通过。
+- 原生主题定义验证、Node 语法检查、git diff --check 通过。
+- 原生 ASAR 来源更新为 26.924.2738.0，并核验 CSS 组件合同；不是单独放宽版本号断言。
+- 新增 PageSurface 重挂载、6 次容器替换保持同一已解码图像、目录 sticky 伪元素、tooltip 配对、流式内联追加不刷新以及运行时模块更新回归。
+- 删除退役 V11/V12 测试及跳过项，迁移有效的侧栏、无障碍、热注入与还原保护。恢复旧方案见 DEVELOPMENT.md。
 
-# Theme validation
+## 实机检查
 
-The current theme preserves native component geometry and semantic text colours. Dark and light settings content surfaces are transparent; cards and sidebars keep their own materials. The light user bubble paints its native surface without adding a blur layer to every message.
+- 当前客户端已注入 v104-native-surface-adaptation。发行包包含最后补充的源码移除还原保护，自动回归通过；本机重启常驻 host 的命令被自动审批策略拦截，该项最新 host 保护尚未在本机常驻进程加载。
+- 检查聊天、首页、设置、Plugins、Skills、资料库和图像页面，以及深浅模式。主题通过临时 DOM 属性切换进行对照，结束后恢复浅色偏好；未修改账号设置。
+- 目录和设置的原生位置、尺寸、字体与圆角无偏移。对话页早期采样有自动 margin 的瞬时计算值差异，但 DOMRect 相同；稳定后复查 1,290 个节点，所有比较字段无差异。
+- 设置中切换 dark/light 再返回：同一 runtime、同一 overlay，renderCount 保持 1，没有重复背景绘制。容器替换的零重解码由独立回归补充。
+- 960×760 响应式视口和 720/1280 宽度组件夹具分别对照原生；视口模拟不等同于手动拖动 Windows 窗口。
+- 目录顶部采用原生标题 ::before，背景沿原生范围和圆角填充；无新增固定侧栏宽高。
+- 发行预览另通过原生外观选项切换深浅模式拍摄，完成后恢复浅色；侧栏示例名称与隐藏头像仅用于截图，随后还原。
 
-## Automated checks
+## 流式文字结论
 
-2026-09-22 manual-entry cleanup: the current working tree reports 157 tests, 150 passed, 0 failed and 7 skipped. This includes loading a retired empty taskbar test file whose deletion was blocked. The final cleanup diff has not yet been revalidated in an isolated theme-only checkout; the earlier isolated result below predates it.
+捕获 21 次原生正文更新，全部保留既有前缀并追加，未观察到重写或节点替换，背景渲染次数稳定。因此尚不能确认用户报告的现象来自原生 UI bug。已移除主题对普通内联 Markdown 的无关扫描；仍需用户在真实长回答中验收。详见 RUNTIME_FINDINGS.md。
 
-A separate checkout of the exact staged theme-only tree was validated using npm ci --ignore-scripts, followed by npm run check: 151 tests, 142 passed, 0 failed, 9 existing legacy tests skipped (7 renderer and 2 historical pet-linker tests). No uncommitted pet changes or private DOM captures are required. The local working tree, including unrelated pet changes, previously reported 153 tests, 146 passed, 0 failed and 7 skipped. The replacement native-boundary suite runs in both colour schemes; no new skip was added to conceal a failing current contract.
+## v0.17.0 运行包
 
-The installed-client contract was re-audited against desktop 26.915.4065.0. Its source hash is locked in native-asar-provenance.json. Old assertions for paper textures, forced text colours and the removed B15 scene were replaced with native geometry, semantic state, restoration and the 16-scene queue contracts.
+独立源码构建：43 个运行文件；最终 ZIP 解压前后逐项 SHA-256 比对。下载校验见发行附件 SHA256SUMS.txt。版本号在 package.json 与 package-lock.json 同步。
 
-## Performance evidence
+用户已完成实机验收并授权发布。本次未额外完全退出正在运行的官方客户端做冷启动；不将完整冷启动计入实机通过项。恢复原生、移除源码与停用路径由自动回归覆盖。
 
-A fixed menu fixture reduced average geometry reads from 72.67 to 13.5 and selector queries from 52.5 to 15 per iteration. This measures runtime work, not real application input latency. Region caching, coalesced invalidation and incremental resize observation are covered by behavioural tests. Real input latency and GPU profiling remain separate acceptance work.
-
-## Startup boundary
-
-The public entry is now project start.cmd only. Manual preparation resolves the current official package without changing the native ChatGPT shortcut or a startup registry value; this is exercised by a Windows test. The previously installed launch supervisor has been stopped and its Run value removed. Native ChatGPT.exe starts normally without automatic injection. Existing unmanaged processes are preserved. This new manual preparation path has not yet had another cold-start acceptance run.
-
-## Remaining visual scope
-
-Electron system menus are outside renderer CSS and remain native. Broad visual acceptance is not implied by automated checks. This update does not publish or change native pet packages.
-
-本轮最终 npm run check：161 项，154 通过、0 失败、7 跳过。默认配置已同步当前 13 张图和雪山优先顺序；开始菜单已有主题快捷方式已指向 start.cmd。未执行发布或删除历史存档。
-
-## 本次远程源码同步验证
-
-2026-09-22：从暂存区导出独立主题源码副本后运行 npm run check，158 项中 149 通过、0 失败、9 项既有跳过。未携带本地宠物修改、退役任务栏测试或未跟踪存档；相比本地全工作区的 161 项计数不同。package.json 与 package-lock.json 版本一致。用户已确认浅色效果和设置往返无问题。本次仅推送源码，不创建发行包或标签。
-
-## 主题专用仓库与简化下载包
-
-2026-09-22：取消跟踪 255 个宠物和旧主题资料文件，工作区原文件前后 SHA-256 一致。独立源码 npm run check：153 项，146 通过、0 失败、7 项既有跳过；Studio 端到端检查通过（修正旧默认素材引用，并移除宠物预览）。下载包导入与中文空格路径测试通过，只有根目录 start.cmd 一个批处理，app 中 13 张活动背景可独立解码装载。未为验证重启正在使用的客户端；本次不创建新版 GitHub Release。
-
-## v0.16.0 正式包
-
-独立源码 npm run check：153 项，146 通过、0 失败、7 跳过。正式 ZIP：43 文件，13 背景，解压前后哈希一致。中文空格解压路径下 manual-start 预检通过，未改动官方快捷方式和开机项；未额外冷启动正在运行的客户端。
+诊断位置：artifacts/new-ui-adaptation-20260927/，已忽略，不上传。
+关键记录：independent-tests.log、candidate.json、live-matrix.json、narrow-live-matrix.json、settings-continuity.json、final-geometry.json、stream-observation.json。

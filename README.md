@@ -1,37 +1,39 @@
 # Wukong Codex Theme
 
-为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生布局、文字颜色和交互；10 张战斗图、3 张风景图，对话默认雪山。
+为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。沿用原生布局与交互，按表面匹配阅读底色；10 张战斗图、3 张风景图，对话默认雪山。
 
-## 实机预览
+## 新版 UI
 
-以下为用户提供的 Windows 桌面客户端实机截图，保留完整原图，未裁剪或合成。侧栏为收起状态。
+**v0.17.0** 适配 Windows Codex **26.924.2738.0**：背景跟随原生页面范围与圆角，双侧栏分别填充材质，设置往返复用已解码背景。资料库、图像、Plugins 和 Skills 的标题与阅读背景同步适配。
 
-**深色主题 · 水墨新对话**
+### 实机预览
 
-![深色新对话：水墨背景与玻璃输入框](docs/previews/dark-battle.png)
+以下截图来自上述版本的真实客户端。侧栏名称已替换为示例、头像已隐藏；未合成或重绘界面。
 
-**浅色主题 · 亢金龙新对话**
+**深色 · 新对话**
 
-![浅色新对话：白龙背景与玻璃输入框](docs/previews/light-battle.png)
+![新版深色界面：原生双侧栏与玻璃输入框](docs/previews/dark-battle.png)
+
+**浅色 · 新对话**
+
+![新版浅色界面：侧栏阅读底与原生圆角](docs/previews/light-battle.png)
 
 <details>
-<summary>查看雪山对话的深浅色对比</summary>
+<summary>查看深浅色设置页</summary>
 
-**浅色主题 · 雪山对话**
+![深色设置页：背景连续、侧栏与卡片独立填充](docs/previews/dark-settings.png)
 
-![浅色主题：雪山背景、对话正文与浅色玻璃输入框](docs/previews/light-thread.png)
-
-**深色主题 · 同一雪山对话**
-
-![深色主题：同一雪山背景、对话正文与深色玻璃输入框](docs/previews/dark-thread.png)
+![浅色设置页：保留背景纹理与文字可读性](docs/previews/light-settings.png)
 
 </details>
+
+详见 [原生容器映射](docs/native-surface-adaptation.md) 与 [验证记录](docs/VALIDATION.md)。原生 UI 后续若改变组件结构，仍可能需要适配。
 
 ## 开始使用
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.16.0 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.16.0/Wukong-Codex-Theme-0.16.0-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.17.0 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.17.0/Wukong-Codex-Theme-0.17.0-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -46,7 +48,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.16.0**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.17.0**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

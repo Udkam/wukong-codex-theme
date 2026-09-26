@@ -34,3 +34,7 @@ docs/agent-runs/native-boundary-20260920/
 /artifacts/asar-ui-audit-*/
 /artifacts/black-myth-ui-shape-audit-*/
 /artifacts/local-yaksha-resource-audit-*/
+
+# Private new-UI diagnostics and local release checks.
+/artifacts/new-ui-adaptation-*/
+/artifacts/release-readiness-*/

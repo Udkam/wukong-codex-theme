@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { commandTimeoutMs, isCodexTarget } from '../runtime/cdp-client.mjs';
-import { isDeferredThemeState } from '../runtime/injection-plan-v13.mjs';
+import { RUNTIME_REVISION, isDeferredThemeState } from '../runtime/injection-plan-v13.mjs';
 import { browserIdentity, isProcessAlive, runWatcher } from '../runtime/watch.mjs';
 
 const read = file => fs.readFileSync(file, 'utf8');
@@ -319,8 +319,8 @@ test('disable is fail-closed and records success only after native-state verific
   assert.match(disable, /--repository/);
   assert.match(disable, /Event lifecycle host did not restore native state/);
   assert.doesNotMatch(disable, /Get-CimInstance|Get-WmiObject|Stop-Process|taskkill/);
-  assert.match(host, /await Promise\.all\(targets\.map\(target => evaluate\(target, RESTORE_EXPRESSION\)\)\)/);
-  assert.match(host, /states\.every\(isNativeThemeState\)/);
+  assert.match(host, /await Promise\.all\(targets\.map\(target => evaluate\(target, runtime\?\.RESTORE_EXPRESSION \|\| RESTORE_EXPRESSION\)\)\)/);
+  assert.match(host, /states\.every\(runtime\?\.isNativeThemeState \|\| isNativeThemeState\)/);
   assert.match(host, /native-restore-failed/);
   assert.match(host, /theme-removed-verified/);
   assert.match(injector, /--assert-native/);
@@ -388,7 +388,7 @@ test('hidden renderer apply settles as an explicit deferred state', () => {
     visibleThemedComposerCount: 1,
     runtimeV12: false,
     runtimeV13: true,
-    runtimeRevision: 'v99-settings-background-continuity'
+    runtimeRevision: RUNTIME_REVISION
   };
   assert.equal(isDeferredThemeState(deferredState), true);
   assert.equal(isDeferredThemeState({ ...deferredState, documentHidden: false }), false);

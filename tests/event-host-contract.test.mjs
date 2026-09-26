@@ -518,6 +518,10 @@ test('removing the repository marker restores the live ChatGPT renderer before t
   const result = await runEventWatcher({
     port: 17773,
     expression: 'APPLY',
+    runtimeProvider: async () => {
+      assert.equal(markerPresent, true, 'Removed source must not be read before native restoration');
+      return null;
+    },
     disableRequest: '',
     rootPid: null,
     markerPath,

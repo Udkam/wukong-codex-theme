@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { chromium } from '@playwright/test';
 import {
+  RUNTIME_REVISION,
   ACTIVE_PROBE_EXPRESSION,
   isActiveThemeState,
   isDeferredThemeState,
@@ -990,54 +991,24 @@ test('V13 still waits for decode when a cached background is already complete', 
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
-test('V13 restores native paint while rebuilding an overlay removed during crossfade', async () => {
+test('decoded background survives overlay removal without decode or replacement', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 760 } });
-  await page.route('http://wukong-overlay-generation.test/**', route => route.fulfill({ body: runtimeFixtureHtml, contentType: 'text/html; charset=utf-8' }));
-  await page.goto('http://wukong-overlay-generation.test/');
-  const nativeMainPaint = await page.locator('main.main-surface').evaluate(element => ({
-    color: getComputedStyle(element).backgroundColor,
-    image: getComputedStyle(element).backgroundImage
-  }));
+  await page.setContent(runtimeFixtureHtml);
   await page.evaluate(expression);
-  await enterThreadState(page);
-  await waitForRuntime(page, 'transition', 6);
-
+  await page.waitForFunction(ACTIVE_PROBE_EXPRESSION);
   await page.evaluate(() => {
-    window.__forgeRepairDecodeResolvers = [];
-    HTMLImageElement.prototype.decode = function () {
-      return new Promise(resolve => {
-        window.__forgeRepairDecodeResolvers.push(resolve);
-      });
-    };
+    window.savedOverlay = document.getElementById('wukong-codex-theme-background');
+    window.savedImage = savedOverlay.querySelector('[data-forge-active="true"] img');
+    window.decodeCalls = 0;
+    HTMLImageElement.prototype.decode = function () { window.decodeCalls++; return Promise.resolve(); };
+    savedOverlay.remove();
   });
-
-  await page.locator('#wukong-codex-theme-background').evaluate(element => element.remove());
-  await page.waitForFunction(() => (
-    document.documentElement.dataset.forgeBackgroundReady !== 'true' &&
-    window.__forgeRepairDecodeResolvers?.length === 1
-  ));
-  assert.equal(await page.locator('html').getAttribute('data-forge-background-ready'), null);
-  assert.deepEqual(
-    await page.locator('main.main-surface').evaluate(element => ({
-      color: getComputedStyle(element).backgroundColor,
-      image: getComputedStyle(element).backgroundImage
-    })),
-    nativeMainPaint
-  );
-
-  await page.evaluate(() => window.__forgeRepairDecodeResolvers.shift()?.());
-  await page.waitForFunction(ACTIVE_PROBE_EXPRESSION, null, { timeout: 5000 });
-  const repaired = await page.evaluate(THEME_STATE_EXPRESSION);
-  assert.equal(repaired.backgroundReady, true);
-  assert.equal(repaired.backgroundLoadedLayerCount, 1);
-  assert.equal(repaired.backgroundTransitioning, false);
-  assert.equal(repaired.preloadInFlight, 0);
-  const coverage = await backgroundCoverage(page);
-  assert.deepEqual(coverage.overlay, coverage.viewport);
-  assert.deepEqual(coverage.active, coverage.viewport);
-  assert.deepEqual(coverage.image, coverage.viewport);
-  assert.deepEqual(coverage.veil, coverage.viewport);
-
+  await page.waitForFunction(() => window.savedOverlay.isConnected);
+  assert.deepEqual(await page.evaluate(() => ({
+    same: document.querySelector('[data-forge-active="true"] img') === savedImage,
+    ready: document.documentElement.dataset.forgeBackgroundReady,
+    decodes: window.decodeCalls
+  })), {same:true, ready:'true', decodes:0});
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
@@ -1993,7 +1964,7 @@ test('V55 persists a lock through hot apply and cancels a stale decode before it
       document.documentElement.dataset.forgeBackgroundReady === 'true';
   }, { mode: baseline.mode, scene: Number(baseline.scene) });
   const reapplied = await page.evaluate(THEME_STATE_EXPRESSION);
-  assert.equal(reapplied.runtimeRevision, 'v99-settings-background-continuity');
+  assert.equal(reapplied.runtimeRevision, RUNTIME_REVISION);
   assert.equal(reapplied.backgroundLocked, true);
   assert.equal(reapplied.lockedMode, baseline.mode);
   assert.equal(reapplied.lockedScene, baseline.scene);

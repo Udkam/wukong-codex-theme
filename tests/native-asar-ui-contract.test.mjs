@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { nativeUiBaseline } from './runtime-fixture.mjs';
+
 
 const require = createRequire(import.meta.url);
 const provenance = JSON.parse(fs.readFileSync(
@@ -124,7 +124,9 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
     '--spacing-token-sidebar:clamp(240px, var(--codex-sidebar-preferred-width,275px)',
     '--radius-token-composer-single-line:calc(var(--spacing) * 5.5)',
     '--composer-layout-surface-background', '--composer-layout-surface-backdrop-filter',
-    'data-composer-surface-variant', '_ComposerLayoutRoot_', '_ComposerLayoutBody_']) {
+    'data-composer-surface-variant', '_ComposerLayoutRoot_', '_ComposerLayoutBody_',
+    '_PageSurface_', '--app-shell-navigation-rail-width',
+    '[data-sticky]:before', '.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']) {
     assert.ok(css.includes(token), 'native CSS contract drift: '+token);
   }
   const userMessage = readMatchingAsset(entries, /user-message-.*\.js$/i, 'data-user-message-bubble');

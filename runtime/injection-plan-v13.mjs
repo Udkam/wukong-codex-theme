@@ -80,7 +80,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-const RUNTIME_REVISION = 'v99-settings-background-continuity';
+export const RUNTIME_REVISION = 'v104-native-surface-adaptation';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -342,12 +342,28 @@ function applyRuntime(payload) {
     state.transitionEndHandler = null;
   };
   const ensureBackground = () => {
-    let overlay = document.getElementById('wukong-codex-theme-background');
+    // The client's page paint node owns insets and corner geometry. Mount our
+    // inert layer inside it instead of reconstructing that shape from pixels.
+    const pageSurface = [...document.querySelectorAll('[data-app-shell-page-surface] [class*="_PageSurface_"]')]
+      .find(element => element.getClientRects().length && getComputedStyle(element).display !== 'none');
+    const host = pageSurface || document.body;
+    root.dataset.forgeBackgroundPlacement = pageSurface ? 'native-page' : 'viewport';
+    // Keep decoded layers across React shell replacement. A detached native
+    // paint host must not force the same large wallpaper through decode again.
+    let overlay = document.getElementById('wukong-codex-theme-background') || state.backgroundOverlay;
     if (overlay && overlay.querySelectorAll(':scope > [data-forge-background-layer]').length !== 2) {
       overlay.remove();
       overlay = null;
     }
-    if (overlay) return overlay;
+    if (overlay) {
+      if (overlay.parentElement !== host) host.prepend(overlay);
+      state.backgroundOverlay = overlay;
+      const activeImage = overlay.querySelector('[data-forge-active="true"] [data-forge-background-image]');
+      if (overlay.dataset.forgeReady === 'true' && activeImage?.dataset.forgeDecoded === 'true' && activeImage.naturalWidth > 0) {
+        root.dataset.forgeBackgroundReady = 'true';
+      }
+      return overlay;
+    }
     delete root.dataset.forgeBackgroundReady;
     clearTransitionControls();
     state.transitionInFlight = false;
@@ -374,7 +390,8 @@ function applyRuntime(payload) {
       layer.append(image, veil);
       overlay.append(layer);
     }
-    document.body.prepend(overlay);
+    host.prepend(overlay);
+    state.backgroundOverlay = overlay;
     state.overlayGeneration += 1;
     return overlay;
   };
@@ -653,14 +670,21 @@ function applyRuntime(payload) {
     // Match object-fit:cover and the image's actual horizontal crop.
     try {
       if (!image?.naturalWidth || !image.naturalHeight) return;
-      const width = innerWidth, height = innerHeight;
+      const bounds = image.getBoundingClientRect();
+      const width = bounds.width, height = bounds.height;
+      if (!width || !height) return;
+      const sidebar = document.querySelector('.sidebar-navigation[class*="_ConversationSidebar_"]');
+      const sidebarBounds = sidebar?.getBoundingClientRect();
+      const stripLeft = Math.max(0, (sidebarBounds?.left ?? bounds.left) - bounds.left);
+      const stripWidth = Math.min(sidebarBounds?.width || width, width - stripLeft);
+      if (stripWidth <= 0) return;
+      const sampleKey = [image.currentSrc, width, height, stripLeft, stripWidth].join('|');
+      if (sampleKey === state.shellSampleKey) return;
       const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
       const position = image.style.objectPosition.split(/\s+/)[0];
       const fraction = position === 'right' ? 1 : position === 'left' ? 0 : position.endsWith('%') ? parseFloat(position) / 100 : .5;
-      const sx = Math.max(0, (image.naturalWidth * scale - width) * fraction / scale);
+      const sx = Math.max(0, (image.naturalWidth * scale - width) * fraction / scale) + stripLeft / scale;
       const sy = Math.max(0, (image.naturalHeight * scale - height) / 2 / scale);
-      const sidebar = document.querySelector('aside.app-shell-left-panel');
-      const stripWidth = sidebar?.getBoundingClientRect().width || 275;
       const canvas = document.createElement('canvas');
       canvas.width = 24; canvas.height = 64;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -669,13 +693,15 @@ function applyRuntime(payload) {
       for (let i = 0; i < pixels.length; i += 4) values.push((.2126*pixels[i] + .7152*pixels[i+1] + .0722*pixels[i+2]) / 255);
       values.sort((a,b) => a-b);
       const low = values[Math.floor(values.length * .15)], high = values[Math.floor(values.length * .85)];
+      const median = values[Math.floor(values.length * .5)];
       const dark = Number((.24 + .54 * high).toFixed(3));
       // Use decoded wallpaper brightness in both themes. Do not assume a
       // white veil: landing has none and thread veils vary by scene.
       const light = Number((.10 + .32 * (1-low)).toFixed(3));
       root.style.setProperty('--forge-shell-dark-alpha', String(dark));
       root.style.setProperty('--forge-shell-light-alpha', String(light));
-      state.shellSample = { dark, light, low, high, samples: values.length };
+      state.shellSample = { dark, light, low, high, median, samples: values.length };
+      state.shellSampleKey = sampleKey;
       state.shellSampleCount = (state.shellSampleCount || 0) + 1;
     } catch { /* CORS or decode failure keeps the readable CSS fallback. */ }
   };
@@ -922,7 +948,7 @@ function applyRuntime(payload) {
     };
   };
   const settingsPageIsActive = () => (
-    [...document.querySelectorAll('.scrollbar-stable.flex-1.overflow-y-auto.p-panel')]
+    [...document.querySelectorAll('[class~="group/settings"], .scrollbar-stable.flex-1.overflow-y-auto.p-panel')]
       .some(layoutPresent)
   );
   const commonAncestor = (first, second) => {
@@ -1684,7 +1710,12 @@ function applyRuntime(payload) {
     root.dataset.forgeSurface = surface;
     root.dataset.forgeSettingsVeil = settingsVeil ? 'true' : 'false';
     root.dataset.forgeMode = mode;
-    ensureBackground();
+    // Set initial paint state before mounting images; otherwise the first veil
+    // transitions from the browser's default opacity instead of its page state.
+    const background = ensureBackground();
+    if (!regions || regions.has('all') || regions.has('sidebar')) {
+      adaptShellToImage(background.querySelector('[data-forge-active="true"] [data-forge-background-image]'));
+    }
     const plannedMarks = new Map();
     const runRegion = (name, collect) => {
       if (!regions || regions.has('all') || regions.has(name) || !regionCache.has(name)) {
@@ -2116,13 +2147,15 @@ function applyRuntime(payload) {
   const originalReplaceState = history.replaceState;
   const notifyRoute = () => window.dispatchEvent(new Event(routeEventName));
   history.pushState = function (...args) {
+    const previousHref = location.href;
     const result = originalPushState.apply(this, args);
-    notifyRoute();
+    if (location.href !== previousHref) notifyRoute();
     return result;
   };
   history.replaceState = function (...args) {
+    const previousHref = location.href;
     const result = originalReplaceState.apply(this, args);
-    notifyRoute();
+    if (location.href !== previousHref) notifyRoute();
     return result;
   };
 
@@ -2137,6 +2170,7 @@ function applyRuntime(payload) {
     '[data-message-author-role]'
   ].join(',');
   const refreshStructureSelector = [
+    '[class~="group/settings"]',
     '[class~="group/application-menu-top-bar"]',
     '[class~="group/application-menu-top-bar"] button[aria-haspopup="menu"][aria-expanded]',
     '.application-menu',
@@ -2248,6 +2282,7 @@ function applyRuntime(payload) {
     );
   };
   const firstPaintStructureSelector = [
+    '[class~="group/settings"]',
     '[data-codex-composer-root]',
     '[data-thread-find-composer="true"]',
     '[data-thread-scroll-footer="true"]',
@@ -2312,7 +2347,15 @@ function applyRuntime(payload) {
   const mutationRegions = records => {
     const regions = new Set();
     for (const record of records) {
-      if (recordTouchesSurfaceSignal(record)) return ['all'];
+      if (recordTouchesSurfaceSignal(record)) {
+        // New turns/streaming mounts do not change the surrounding navigation.
+        // refresh() still invalidates every region on a route/surface change.
+        if (state.lastSurface !== 'thread' || state.lastRouteHref !== location.href) return ['all'];
+        regions.add('composer');
+        regions.add('right');
+        regions.add('page');
+        continue;
+      }
       if (record.type === 'attributes' && record.attributeName === 'aria-expanded' &&
           record.target.matches('button[aria-haspopup]')) {
         regions.add('overlay');
@@ -2333,7 +2376,25 @@ function applyRuntime(payload) {
     return regions.size ? [...regions] : ['all'];
   };
   const observer = new MutationObserver(records => {
+    // React replaces the page paint host when entering/leaving settings.
+    // Reattach decoded layers before the browser paints, not in the delayed
+    // region scan (80-520ms later), which exposes an unthemed frame.
+    if (!state.disposed && state.backgroundOverlay && !state.backgroundOverlay.isConnected) {
+      ensureBackground();
+    }
     const observedRecords = records.filter(record => {
+      // Streaming inline Markdown is entirely owned by React. Its text/span
+      // updates cannot change our paint boundaries. Keep structural cards,
+      // composers and portals on the regular path, including newly mounted ones.
+      const target = record.target instanceof Element ? record.target : record.target?.parentElement;
+      if (state.lastSurface === 'thread' && state.lastRouteHref === location.href &&
+          target?.closest('[data-markdown-text-style]') &&
+          !target.closest('[data-markdown-copy="code-block"]') &&
+          record.type === 'childList' &&
+          [...record.addedNodes, ...record.removedNodes].every(node =>
+            node.nodeType === Node.TEXT_NODE || (node instanceof Element &&
+              node.matches('span, strong, em, b, i, a, br, code') &&
+              !node.querySelector('div, section, button, input, [role], [data-markdown-copy]')))) return false;
       if (
         record.type === 'attributes' &&
         record.attributeName === 'aria-label' &&
@@ -2349,7 +2410,7 @@ function applyRuntime(payload) {
     if (observedRecords.some(record => (
       record.target?.id === 'wukong-codex-theme-background' ||
       [...record.removedNodes].some(node => node.nodeType === Node.ELEMENT_NODE && node.id === 'wukong-codex-theme-background')
-    ))) delete root.dataset.forgeBackgroundReady;
+    )) && !document.getElementById('wukong-codex-theme-background')) delete root.dataset.forgeBackgroundReady;
     const firstPaintStructureMounted = observedRecords.some(recordMountsFirstPaintStructure);
     const composerSignalChanged = observedRecords.some(recordTouchesComposerSignal);
     const otherThemeStructureChanged = observedRecords.some(record => {
@@ -2429,6 +2490,8 @@ function applyRuntime(payload) {
     pendingRegions.clear();
     root.style.removeProperty('--forge-shell-dark-alpha');
     root.style.removeProperty('--forge-shell-light-alpha');
+    delete root.dataset.forgeSidebarInk;
+    delete root.dataset.forgeBackgroundPlacement;
     state.firstPaintRefreshQueued = false;
     window.removeEventListener('popstate', scheduleRouteRefresh);
     window.removeEventListener('hashchange', scheduleRouteRefresh);
@@ -2453,7 +2516,10 @@ function applyRuntime(payload) {
     state.resolveInitialReady = null;
     state.preloadRequests.forEach(request => request.cancel());
     state.preloadRequests.clear();
-    document.querySelectorAll('#wukong-codex-theme-background > [data-forge-background-layer]').forEach(clearLayer);
+    (state.backgroundOverlay || document.getElementById('wukong-codex-theme-background'))
+      ?.querySelectorAll(':scope > [data-forge-background-layer]').forEach(clearLayer);
+    state.backgroundOverlay?.remove();
+    state.backgroundOverlay = null;
     state.routeTimers.forEach(timer => clearTimeout(timer));
     state.routeTimers.clear();
     if (history.pushState === state.patchedPushState) history.pushState = originalPushState;
@@ -2704,6 +2770,8 @@ export const RESTORE_EXPRESSION = `(() => {
   delete document.documentElement.dataset.forgeScene;
   delete document.documentElement.dataset.forgeMode;
   delete document.documentElement.dataset.forgeBackgroundReady;
+  delete document.documentElement.dataset.forgeBackgroundPlacement;
+  delete document.documentElement.dataset.forgeSidebarInk;
   delete document.documentElement.dataset.forgeBackgroundLocked;
   delete document.documentElement.dataset.forgeLandingQuoteVisible;
   delete document.documentElement.dataset.forgeJournalTone;

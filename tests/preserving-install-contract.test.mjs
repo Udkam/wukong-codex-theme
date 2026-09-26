@@ -98,8 +98,8 @@ test('repository removal and manual stop both use verified renderer restoration'
   const disable = read('scripts/disable.ps1');
 
   assert.match(host, /const themeMissing = !exists\(markerPath\)/);
-  assert.match(host, /await Promise\.all\(targets\.map\(target => evaluate\(target, RESTORE_EXPRESSION\)\)\)/);
-  assert.match(host, /states\.every\(isNativeThemeState\)/);
+  assert.match(host, /await Promise\.all\(targets\.map\(target => evaluate\(target, runtime\?\.RESTORE_EXPRESSION \|\| RESTORE_EXPRESSION\)\)\)/);
+  assert.match(host, /states\.every\(runtime\?\.isNativeThemeState \|\| isNativeThemeState\)/);
   assert.match(host, /theme-removed-verified/);
   assert.match(host, /sourceMode: repository \? 'repository-live'/);
   assert.match(disable, /--signal-disable/);

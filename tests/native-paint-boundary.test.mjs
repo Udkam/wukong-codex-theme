@@ -49,35 +49,6 @@ test('light landing removes the veil while thread reading retains it', async () 
   } finally {await browser.close();}
 });
 
-test('full titlebar and sidebar share material while preserving native controls', {skip: !native}, async () => {
-  const browser = await chromium.launch({headless:true});
-  try {
-    const page = await browser.newPage();
-    const topClass = native.css.match(/\.(_ApplicationMenuTopBar_[\w]+)/)[1];
-    await page.setContent(`<style>${native.css}</style><style>:root{--app-shell-animated-left-panel-width:275px;--height-toolbar-sm:36px}</style><div id="layout" class="_Layout_fixture" style="display:flex;flex-direction:column"><div id="bar" class="${topClass}"><button id="control" class="no-drag">Menu</button></div></div>`);
-    const read = () => page.evaluate(() => ['bar','control'].map(id => {
-      const e=document.getElementById(id), s=getComputedStyle(e), r=e.getBoundingClientRect();
-      return {rect:[r.x,r.y,r.width,r.height],color:s.color,radius:s.borderRadius,position:s.position,drag:s.webkitAppRegion};
-    }));
-    const before=await read();
-    await page.addStyleTag({content:theme});
-    await page.evaluate(()=>document.documentElement.classList.add('forge-ink-mountain'));
-    assert.deepEqual(await read(),before);
-    const paint=()=>page.evaluate(()=>{const s=getComputedStyle(document.getElementById('layout'),'::before');return {width:parseFloat(s.width),events:s.pointerEvents,mask:s.maskImage,height:s.height,maskSize:s.maskSize};});
-    assert.equal((await paint()).events,'none');
-    assert.equal((await paint()).width,1280);
-    assert.match((await paint()).maskSize,/^100% 36px, 275px 100%,/);
-    assert.match((await paint()).mask,/radial-gradient/);
-    assert.match((await paint()).mask,/gradient/);
-    assert.equal((await paint()).height,'720px');
-    await page.evaluate(()=>document.documentElement.style.setProperty('--app-shell-animated-left-panel-width','0px'));
-    assert.match((await paint()).maskSize,/^100% 36px, 0px 100%, 0px /);
-    await page.evaluate(()=>document.documentElement.style.setProperty('--app-shell-animated-left-panel-width','500px'));
-    assert.match((await paint()).maskSize,/^100% 36px, 500px 100%,/);
-    assert.deepEqual(await read(),before);
-  } finally {await browser.close();}
-});
-
 test('light user bubbles paint only their native surface without changing geometry or text', {skip: !native}, async () => {
   const browser = await chromium.launch({headless:true});
   try {
@@ -106,7 +77,7 @@ test('adaptive shell samples only committed images and restores its variables', 
   const browser=await chromium.launch({headless:true});
   try {
     const page=await browser.newPage({viewport:{width:1100,height:700}});
-    await page.setContent('<html data-theme="dark"><style>aside{width:275px;height:700px}main{height:700px}</style><aside class="app-shell-left-panel">Sidebar</aside><main><div data-thread-find-target="conversation">Conversation</div></main></html>');
+    await page.setContent('<html data-theme="dark"><style>aside{width:275px;height:700px}main{height:700px}</style><aside class="app-shell-left-panel"><nav class="group/sidebar-rail" style="height:100%">Sidebar</nav></aside><main><div data-thread-find-target="conversation">Conversation</div></main></html>');
     const url=color=>'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="700"><rect width="1100" height="700" fill="${color}"/></svg>`);
     await page.evaluate(makeApplyExpression({styleSheet:theme,variables:`:root.forge-ink-mountain{--forge-scene-count:2;--forge-battle-scenes:0 1;--forge-scenery-scenes:0 1;--forge-bg-0:url("${url('white')}");--forge-bg-1:url("${url('black')}");}`}));
     await page.waitForFunction(()=>window.__wukongCodexThemeRuntimeV13?.shellSampleCount===1);
@@ -120,7 +91,7 @@ test('adaptive shell samples only committed images and restores its variables', 
     assert.equal(after.dark,.24);assert.equal(after.light,.42);
     await page.evaluate(()=>document.documentElement.dataset.theme='light');
     await page.waitForFunction(()=>document.documentElement.dataset.forgeNativeTheme==='light');
-    const paint=await page.locator('aside').evaluate(e=>getComputedStyle(e).backgroundColor);
+    const paint=await page.locator('nav').evaluate(e=>getComputedStyle(e).backgroundColor);
     assert.match(paint,/^rgba\(247, 249, 251, /);
     assert.ok(Math.abs(Number(paint.match(/, ([\d.]+)\)$/)[1])-.42)<1/255);
     assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.shellSampleCount),2);
@@ -136,7 +107,7 @@ test('shell tint bounds white and black wallpaper without changing native text',
     const page=await browser.newPage({viewport:{width:400,height:400}});
     const report=[];
     for(const mode of ['dark','light']) {
-      await page.setContent(`<html class="forge-ink-mountain" data-forge-native-theme="${mode}"><style>body{margin:0;background:${mode==='dark'?'white':'black'}}aside{height:400px;width:300px;color:${mode==='dark'?'#a0a0a0':'#5a5a5a'}}</style><aside class="app-shell-left-panel">Native text</aside></html>`);
+      await page.setContent(`<html class="forge-ink-mountain" data-forge-native-theme="${mode}"><style>body{margin:0;background:${mode==='dark'?'white':'black'}}aside{height:400px;width:300px;color:${mode==='dark'?'#a0a0a0':'#5a5a5a'}}</style><aside class="app-shell-left-panel"><nav class="group/sidebar-rail" style="height:100%">Native text</nav></aside></html>`);
       const before=await page.locator('aside').evaluate(e=>getComputedStyle(e).color);
       await page.addStyleTag({content:theme});
       assert.equal(await page.locator('aside').evaluate(e=>getComputedStyle(e).color),before);
@@ -231,11 +202,11 @@ test('model/permission clicks do not schedule submit follow-up scans', async () 
   } finally {await browser.close();}
 });
 
-test('active paint sheet has no client text, icon, radius or layout replacements', () => {
+test('active paint sheet preserves geometry and limits ink tokens to conversation navigation', () => {
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
-    // Only this non-interactive generated paint layer owns new geometry.
-    if (s === ':root.forge-ink-mountain [class*="_Layout_"]:has(> [class*="_ApplicationMenuTopBar_"])::before') return;
+    if (s === ':root.forge-ink-mountain .sidebar-navigation[class*="_ConversationSidebar_"] nav[class*="_Navigation_"]' &&
+        ['color','text-shadow','--color-text','--color-text-secondary','--color-text-secondary-solid','--color-text-tertiary','--color-background-primary-ghost-hover'].includes(d.prop)) return;
     const owned = /data-forge-title-copy|\.forge-landing|home-icon|#wukong-codex-theme-background|\[data-forge-background-(?:image|veil|layer)\]/.test(s);
     if (owned) return;
     const documentLayer = /:root\.forge-ink-mountain (?:body|#root)$/.test(s);
@@ -291,7 +262,7 @@ test('current client CSS: native geometry/semantic colours, home paint boundarie
     assert.equal(await page.locator('#work [role=textbox]').textContent(), '仍可正常输入');
     // Current SettingsLayout container, with native colour swatches inside it.
     await page.locator('#fixtures').evaluate(e => e.insertAdjacentHTML('beforeend','<div id="settings" class="flex h-full min-h-0 flex-col electron:overflow-hidden electron:bg-surface windows:rounded-tl-lg"><div class="group/settings"><h1 class="text-default">外观</h1><div id="settings-card" class="flex flex-col rounded-2xl overflow-hidden border border-default" style="background-color:var(--color-background-panel,var(--color-background-primary-soft-alpha))"><span class="text-secondary">设置说明</span><button id="swatch" style="background:#007acc;color:white;border-radius:8px">强调色</button></div><div id="theme-preview" data-testid="theme-preview" class="rounded-xl bg-surface">原生代码与色卡预览</div></div></div><div id="summary-mount"><div data-pip-obstacle="thread-summary-panel" class="pointer-events-none absolute" aria-hidden="true"></div><div><div id="environment" class="relative flex max-h-full min-h-0 flex-col overflow-hidden rounded-3xl bg-surface-elevated-secondary electron:elevation-prominent"><section><header id="environment-header" class="sticky top-2 h-7 bg-surface-elevated-secondary text-secondary before:bg-surface-elevated-secondary before:content-[\'\']">环境信息</header><button data-slot="thread-summary-panel-item-button" class="text-default">变更 <span class="text-success">+6,827</span><span class="text-danger">-3,661</span></button><button disabled class="text-tertiary">查看全部</button></section></div></div></div>'));
-    await page.locator('#fixtures').evaluate(e=>e.insertAdjacentHTML('beforeend','<aside id="settings-sidebar" class="app-shell-left-panel"><input id="settings-search"><span class="text-secondary">设置侧栏</span></aside><aside id="conversation-sidebar" class="app-shell-left-panel"><span class="text-secondary">对话侧栏</span></aside>'));
+    await page.locator('#fixtures').evaluate(e=>e.insertAdjacentHTML('beforeend','<aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div id="settings-sidebar" class="sidebar-navigation"><input id="settings-search"><span class="text-secondary">设置侧栏</span></div></aside><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div id="conversation-sidebar" class="sidebar-navigation"><span class="text-secondary">对话侧栏</span></div></aside>'));
     const modeComparisons=[];
     for (const mode of ['dark','light']) {
       await page.evaluate(mode => {const r=document.documentElement;r.classList.remove('forge-ink-mountain','electron-dark','electron-light');r.classList.add('electron-'+mode);r.dataset.theme=mode;},mode);
@@ -300,9 +271,9 @@ test('current client CSS: native geometry/semantic colours, home paint boundarie
       const painted=await read();
       base.forEach((value,i)=>{for(const key of ['color','fill','radius','corner','rect'])assert.deepEqual(painted[i][key],value[key],`${mode} ${value.id||value.tag} ${key}`);});
       const shell=painted.find(x=>x.id==='settings-sidebar');
-      assert.equal(shell.bg,mode==='light'?'rgba(247, 249, 251, 0.88)':'rgba(20, 24, 28, 0.88)');
+      assert.equal(shell.bg,mode==='light'?'rgba(247, 249, 251, 0.6)':'rgba(20, 24, 28, 0.64)');
       assert.equal(shell.image,'none');
-      assert.equal(shell.blur,'blur(8px)');
+      assert.equal(shell.blur,'blur(12px)');
       for (const id of ['settings','conversation-sidebar']) {
         const surface=painted.find(x=>x.id===id);
         for (const key of ['bg','image','blur','shadow']) { const expected=id==='settings'?(key==='bg'?'rgba(0, 0, 0, 0)':'none'):shell[key]; assert.equal(surface[key],expected,`${id} ${mode} ${key}`); }
