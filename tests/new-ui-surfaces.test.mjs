@@ -15,6 +15,40 @@ const theme = fs.readFileSync('runtime/wukong-codex-theme-background-v13.css', '
 const asset = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#708090"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${asset}");}`;
 
+test('thread footer and embedded messaging clear layout paint without clearing controls', async () => {
+  const browser = await chromium.launch({headless:true});
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`<html><style>
+      .plate,.thread-pane,.messaging-root,.card{background:rgb(255,255,255)}
+      .bg-gradient-to-t,._background_fixture_1{background-image:linear-gradient(white,transparent)}
+      .composer-wrap{border-bottom:12px solid white}
+      [data-thread-scroll-footer]{position:relative;padding:16px;border-radius:14px}
+    </style><div id="root"><div data-thread-scroll-footer="true">
+      <div id="plate" aria-hidden="true" class="pointer-events-none plate"></div>
+      <div id="card" class="card">Control</div></div>
+      <div class="messaging-root messaging-embedded"><div class="thread-pane">
+      <div class="composer-wrap"><div class="card">Input</div></div></div></div>
+      <div class="thread-scroll-container"><div id="fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t from-surface"></div></div>
+      <div id="orbit-fade" class="pointer-events-none _background_fixture_1" style="position-anchor:--orbit-messaging-header-fixture"></div>
+      <div id="standalone" class="messaging-root">Standalone</div></div></html>`);
+    const measure = () => page.evaluate(() => [...document.querySelectorAll('#root *')].map(e=>{
+      const r=e.getBoundingClientRect(),s=getComputedStyle(e);return [r.x,r.y,r.width,r.height,s.borderRadius,s.padding,s.borderBottomWidth];
+    }));
+    const native = await measure();
+    await page.addStyleTag({content:theme});
+    for (const mode of ['dark','light']) {
+      await page.evaluate(mode=>{document.documentElement.classList.add('forge-ink-mountain');Object.assign(document.documentElement.dataset,{forgeNativeTheme:mode,forgeBackgroundReady:'true'});},mode);
+      assert.deepEqual(await measure(),native);
+      assert.deepEqual(await page.evaluate(()=>['#plate','.messaging-embedded','.thread-pane'].map(s=>getComputedStyle(document.querySelector(s)).backgroundColor)),Array(3).fill('rgba(0, 0, 0, 0)'));
+      assert.equal(await page.locator('#card').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
+      assert.equal(await page.locator('#standalone').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
+      assert.equal(await page.locator('.composer-wrap').evaluate(e=>getComputedStyle(e).borderBottomColor),'rgba(0, 0, 0, 0)');
+      for(const id of ['fade','orbit-fade'])assert.equal(await page.locator('#'+id).evaluate(e=>getComputedStyle(e).backgroundImage),'none');
+    }
+  } finally {await browser.close();}
+});
+
 test('updated runtime provider replaces cached code and rejects incomplete updates', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wukong-module-'));
   const file = path.join(dir, 'runtime.mjs');

@@ -35,3 +35,13 @@
 脚本同步读取主题开启/关闭时的原生节点，比较位置、宽高、圆角、定位、间距、字号与行高。
 关闭样式期间隐藏主题图片，避免其进入文档流影响基准；在 finally 中恢复，不导航、不修改偏好。
 报告仅包含结构与尺寸，不采集聊天文字。该检查只覆盖当前页面；其他页面仍需分别核对。
+
+## 26.928 增量修复（2026-10-01）
+
+- `data-thread-scroll-footer="true"`：容器自身及直接 `aria-hidden` 装饰层透明，保留内部输入控件。
+- `.thread-scroll-container` 中独立 `aria-hidden`、`pointer-events-none`、`bg-gradient-to-t.from-surface`：仅去掉渐变绘制，不动高度与滚动预留。
+- `.messaging-root.messaging-embedded` 与内部 `.thread-pane`：移除整页纯色背景，消息气泡及拖放提示保持原生。
+- Your dot 使用 `--orbit-messaging-header-*` 原生锚点的装饰背景：移除渐变图像。选择器不依赖 CSS module 哈希或固定像素。
+- `.composer-wrap`：底边改透明，保留原生边框厚度。
+
+当前验证范围见 VALIDATION.md。

@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.924.2738.0.
+/* Native paint boundary, audited against desktop 26.928.2636.0.
  * Native fonts, radii and layout are retained. Navigation uses a translucent
  * reading surface with foreground colours matched to the native theme.
  * Only the existing landing wordmark/quote and inert background own geometry.
@@ -69,6 +69,26 @@
 }
 :root.forge-ink-mountain #root .pointer-events-none.bg-gradient-to-t.from-surface.via-surface {
   background-image: none !important;
+}
+/* The scroll reservation owns a second fade, outside the floating footer. */
+:root.forge-ink-mountain #root .thread-scroll-container [aria-hidden="true"].pointer-events-none.bg-gradient-to-t.from-surface,
+:root.forge-ink-mountain #root .pointer-events-none[style*="--orbit-messaging-header-"][class*="_background_"] {
+  background-image: none !important;
+}
+/* ThreadScrollLayout now paints a separate inert footer plate. Scope to its
+ * semantic owner, including focus mode; never clear cards inside the composer. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"],
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none {
+  background: transparent !important;
+}
+/* Your dot uses the native messaging shell rather than the Codex thread shell.
+ * Clear only layout paint. Preserve message bubbles, menus and drop overlays. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root .messaging-root.messaging-embedded,
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root .messaging-root.messaging-embedded .thread-pane {
+  background: transparent !important;
+}
+:root.forge-ink-mountain #root .messaging-root.messaging-embedded .composer-wrap {
+  border-bottom-color: transparent !important;
 }
 :root.forge-ink-mountain #root header.fixed.h-toolbar :is(
   .text-md.flex.min-w-0.flex-1.items-center,
