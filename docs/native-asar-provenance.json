@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packageName": "OpenAI.Codex",
-  "packageVersion": "26.928.2636.0",
-  "packageDirectoryName": "OpenAI.Codex_26.928.2636.0_x64__2p2nqsd0c76g0",
+  "packageVersion": "26.928.4866.0",
+  "packageDirectoryName": "OpenAI.Codex_26.928.4866.0_x64__2p2nqsd0c76g0",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 540844015,
-  "sha256": "FB7B2EE791BCBDB3C4A6375E9FEC8FB404F3EAFF995F0D293227354B298AFF49",
-  "capturedAt": "2026-10-01",
+  "sizeBytes": 547954491,
+  "sha256": "84FE697418B26A921F8D14090616559498A02F51768FF0BBA69CEFAADF4086F5",
+  "capturedAt": "2026-10-02",
   "captureMode": "read-only installed CSS and native component contract audit"
 }

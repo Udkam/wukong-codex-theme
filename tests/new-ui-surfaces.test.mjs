@@ -49,6 +49,21 @@ test('thread footer and embedded messaging clear layout paint without clearing c
   } finally {await browser.close();}
 });
 
+test('visible empty dot switches landing to scenery while hidden messaging does not', async () => {
+  const browser=await chromium.launch({headless:true});
+  try {
+    const page=await browser.newPage();
+    await page.setContent('<div id="root"><main><h1>What should we build?</h1><div class="messaging-root messaging-embedded" style="display:none"><div class="thread-pane" style="height:200px">Dot</div></div></main></div>');
+    await page.evaluate(makeApplyExpression({styleSheet:theme,variables}));
+    const state=()=>page.evaluate(()=>({surface:document.documentElement.dataset.forgeSurface,mode:document.documentElement.dataset.forgeMode}));
+    assert.deepEqual(await state(),{surface:'landing',mode:'battle'});
+    await page.evaluate(()=>{document.querySelector('.messaging-root').style.display='block';window.__wukongCodexThemeRuntimeV13.refresh();});
+    assert.deepEqual(await state(),{surface:'thread',mode:'scenery'});
+    await page.evaluate(()=>{document.querySelector('.messaging-root').style.display='none';window.__wukongCodexThemeRuntimeV13.refresh();});
+    assert.deepEqual(await state(),{surface:'landing',mode:'battle'});
+  } finally {await browser.close();}
+});
+
 test('updated runtime provider replaces cached code and rejects incomplete updates', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wukong-module-'));
   const file = path.join(dir, 'runtime.mjs');

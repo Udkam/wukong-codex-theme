@@ -4,6 +4,10 @@
 
 ## 新版 UI
 
+**v0.17.2 修复（2026-10-02，已验收）**：进入 dots 对话自动使用风景图队列，包括尚无消息的对话；隐藏的 dots 页面不影响首页战斗图。保留背景锁定优先级。v0.17.2 包含此修改。
+
+![dots 切换至风景队列后的输入区实机截图](docs/previews/dot-scenery-routing.png)
+
 **v0.17.0** 适配 Windows Codex **26.924.2738.0**：背景跟随原生页面范围与圆角，双侧栏分别填充材质，设置往返复用已解码背景。资料库、图像、Plugins 和 Skills 的标题与阅读背景同步适配。
 
 **v0.17.1 修复（2026-10-01，已验收）**：适配 **26.928.2636.0** 新增的聊天底部纯色层、滚动渐变及 Your dot 消息页背景／标题渐变。沿用原生布局，保留输入框玻璃材质和消息控件。v0.17.1 下载包包含本次修复。
@@ -41,7 +45,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.17.1 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.17.1/Wukong-Codex-Theme-0.17.1-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.17.2 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.17.2/Wukong-Codex-Theme-0.17.2-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -56,7 +60,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.17.1**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.17.2**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

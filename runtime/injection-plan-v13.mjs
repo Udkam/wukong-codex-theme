@@ -80,7 +80,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v105-thread-footer-messaging';
+export const RUNTIME_REVISION = 'v106-dot-scenery-routing';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -923,7 +923,10 @@ function applyRuntime(payload) {
   };
   const classifySurface = workspace => {
     const landingTitle = findLandingTitle(workspace);
-    const threadEvidence = [...document.querySelectorAll([
+    // Embedded messaging has its own message markup, including empty dot
+    // conversations. Only the visible pane counts; retained hidden tabs do not.
+    const messagingThread = [...document.querySelectorAll('.messaging-root.messaging-embedded .thread-pane')].find(visible);
+    const threadEvidence = messagingThread || [...document.querySelectorAll([
       '[data-thread-find-target="conversation"]',
       threadSelectors
     ].join(','))].find(element => visible(element) && conversationHasTurns(element));
@@ -2104,7 +2107,7 @@ function applyRuntime(payload) {
     ].join(',')));
     const possibleNavigation = newTask ||
       sidebarNavigation ||
-      target.matches('a[href], [role="treeitem"], [aria-current], [aria-selected]') ||
+      target.matches('a[href], [role="treeitem"], [aria-current], [aria-selected], [data-sidebar-destination]') ||
       target.closest('a[href], [role="treeitem"]');
     if (!possibleNavigation && !composerSubmit) return;
     queueRefreshes(composerSubmit ? [320, 1100] : [360]);
