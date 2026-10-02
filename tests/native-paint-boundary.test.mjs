@@ -43,9 +43,26 @@ test('light landing removes the veil while thread reading retains it', async () 
     await page.evaluate(()=>document.documentElement.dataset.forgeSurface='thread');
     assert.equal(await opacity(),'0.2375');
     await page.evaluate(()=>document.documentElement.dataset.forgeNativeTheme='dark');
-    assert.equal(await opacity(),'0.25');
+    assert.equal(await opacity(),'0.68');
+    assert.equal(await page.locator('[data-forge-background-veil]').evaluate(e=>getComputedStyle(e).backgroundImage),'linear-gradient(rgb(8, 16, 24), rgb(8, 16, 24))');
     await page.evaluate(()=>document.documentElement.dataset.forgeSurface='landing');
     assert.equal(await opacity(),'0');
+  } finally {await browser.close();}
+});
+
+test('reading materials are replaceable theme variables without changing native geometry', async () => {
+  const browser=await chromium.launch({headless:true});
+  try {
+    const page=await browser.newPage();
+    await page.setContent('<html class="forge-ink-mountain" data-forge-native-theme="dark" data-forge-surface="thread"><div data-forge-background-veil></div><div data-thread-find-target="conversation"><div data-markdown-text-style="assistant-message"><a href="#example">Example</a></div></div></html>');
+    if(native) await page.addStyleTag({content:native.css});
+    const rect=()=>page.locator('a').evaluate(e=>{const r=e.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});
+    const baseline=await rect();
+    await page.addStyleTag({content:theme+' :root.forge-ink-mountain{--forge-reading-link:#ffffcc;--forge-reading-min-opacity:.75;--forge-reading-tint:rgb(12,20,28)} [data-forge-background-veil]{transition:none!important}'});
+    assert.deepEqual(await rect(),baseline);
+    assert.equal(await page.locator('a').evaluate(e=>getComputedStyle(e).color),'rgb(255, 255, 204)');
+    assert.equal(await page.locator('[data-forge-background-veil]').evaluate(e=>getComputedStyle(e).opacity),'0.75');
+    assert.equal(await page.locator('[data-forge-background-veil]').evaluate(e=>getComputedStyle(e).backgroundImage),'linear-gradient(rgb(12, 20, 28), rgb(12, 20, 28))');
   } finally {await browser.close();}
 });
 
@@ -202,9 +219,12 @@ test('model/permission clicks do not schedule submit follow-up scans', async () 
   } finally {await browser.close();}
 });
 
-test('active paint sheet preserves geometry and limits ink tokens to conversation navigation', () => {
+test('active paint sheet preserves geometry and scopes ink to navigation and dark conversation', () => {
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
+    const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
+    if (conversation && ['--color-text-secondary','--color-text-tertiary'].includes(d.prop)) return;
+    if (s.includes('[data-forge-native-theme="dark"]') && s.includes('[data-markdown-text-style="assistant-message"] a') && d.prop === 'color') return;
     if (s === ':root.forge-ink-mountain .sidebar-navigation[class*="_ConversationSidebar_"] nav[class*="_Navigation_"]' &&
         ['color','text-shadow','--color-text','--color-text-secondary','--color-text-secondary-solid','--color-text-tertiary','--color-background-primary-ghost-hover'].includes(d.prop)) return;
     const owned = /data-forge-title-copy|\.forge-landing|home-icon|#wukong-codex-theme-background|\[data-forge-background-(?:image|veil|layer)\]/.test(s);

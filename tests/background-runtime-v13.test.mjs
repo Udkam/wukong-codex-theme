@@ -80,7 +80,8 @@ const sequenceFor = mode => activeTheme.background.gallery
   .filter(({ scene }) => mode === 'battle' ? scene.mode.startsWith('battle') : scene.mode === 'scenery')
   .sort((left, right) => left.scene.order - right.scene.order)
   .map(({ index }) => String(index));
-const threadVeilFor = scene => activeTheme.background.gallery[Number(scene)].threadVeil;
+const sceneThreadVeilFor = scene => activeTheme.background.gallery[Number(scene)].threadVeil;
+const threadVeilFor = scene => Math.max(.68, sceneThreadVeilFor(scene));
 let browser;
 let browserServer;
 
@@ -1180,8 +1181,8 @@ test('V13 prefers a visible conversation over an opacity-zero retained home hero
     );
     const veil = active?.querySelector('[data-forge-background-veil]');
     return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - expected) < .001;
-  }, .25);
-  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
+  }, .68);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .68) < .001);
   assert.equal(await page.locator('[data-feature="game-source"]').getAttribute('data-forge-title-copy'), null);
 
   await page.evaluate(RESTORE_EXPRESSION);
@@ -1229,7 +1230,7 @@ test('V51.7 keeps ordinary task, history, hash, and streaming churn on one decod
   await waitForRuntime(page, 'surface', 'thread');
   await page.waitForTimeout(800);
   assert.equal((await currentBackground(page)).mode, 'scenery');
-  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .68) < .001);
 
   const beforeStreaming = await page.evaluate(() => ({
     refreshCount: window.__wukongCodexThemeRuntimeV13.refreshCount,
@@ -1414,9 +1415,9 @@ test('V53 has no timer rotation and automatically selects battle for New Task an
       '#wukong-codex-theme-background [data-forge-background-layer][data-forge-active="true"]'
     );
     const veil = active?.querySelector('[data-forge-background-veil]');
-    return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - .25) < .001;
+    return veil && Math.abs(Number.parseFloat(getComputedStyle(veil).opacity) - .68) < .001;
   });
-  assert.ok(Math.abs((await activeVeilOpacity(page)) - .25) < .001);
+  assert.ok(Math.abs((await activeVeilOpacity(page)) - .68) < .001);
   assert.equal(await page.evaluate(() => window.__forgeIntervalCalls), 0);
   assert.equal(await page.evaluate(() => window.__forgeLongTimeoutCalls), 0);
   assert.equal((await page.evaluate(THEME_STATE_EXPRESSION)).backgroundLoadedLayerCount, 1);
@@ -1507,7 +1508,7 @@ test('V53 follows all 13 active numbered assets and keeps per-scene thread veils
     [expectedScenery[0], expectedScenery[1]].sort()
   );
   for (const layer of transitionVeils) {
-    const expectedVeil = threadVeilFor(layer.scene);
+    const expectedVeil = sceneThreadVeilFor(layer.scene);
     assert.ok(Math.abs(layer.inlineThreadVeil - expectedVeil) < .001);
     assert.ok(Number.isFinite(layer.computedOpacity));
   }

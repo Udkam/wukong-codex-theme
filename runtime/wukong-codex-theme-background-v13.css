@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.928.2636.0.
+/* Native paint boundary, audited against desktop 26.928.4866.0.
  * Native fonts, radii and layout are retained. Navigation uses a translucent
  * reading surface with foreground colours matched to the native theme.
  * Only the existing landing wordmark/quote and inert background own geometry.
@@ -23,6 +23,13 @@
   --forge-nav-hover: rgba(255,255,255,.14);
   --forge-shell-filter: blur(8px);
   --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
+  /* Reading material defaults; custom themes can override these alongside
+   * other forge variables without editing native component selectors. */
+  --forge-reading-secondary: #dce5ed;
+  --forge-reading-tertiary: #ccd8e3;
+  --forge-reading-link: #a8dcff;
+  --forge-reading-tint: rgb(8,16,24);
+  --forge-reading-min-opacity: .68;
 }
 :root.forge-ink-mountain[data-forge-native-theme="light"] {
   --forge-shell-fill: rgba(247, 249, 251, var(--forge-shell-light-alpha, .88));
@@ -146,6 +153,20 @@
   background-image: var(--forge-glass-highlight) !important;
 }
 /* User messages retain the same native paint treatment in both themes. */
+/* Dark conversation ink must remain readable over the scene's bright snow.
+ * Scope semantic tokens to conversation content, leaving syntax and controls
+ * with their native status colours. Links also retain a non-colour cue. */
+:root.forge-ink-mountain[data-forge-native-theme="dark"] [data-thread-find-target="conversation"],
+:root.forge-ink-mountain[data-forge-native-theme="dark"] .messaging-root.messaging-embedded .messages-scroll {
+  --color-text-secondary: var(--forge-reading-secondary);
+  --color-text-tertiary: var(--forge-reading-tertiary);
+}
+:root.forge-ink-mountain[data-forge-native-theme="dark"] [data-markdown-text-style="assistant-message"] a:not(:has([data-oai-writing-block-surface])) {
+  color: var(--forge-reading-link) !important;
+  text-decoration-line: underline;
+  text-decoration-color: color-mix(in srgb, var(--forge-reading-link) 65%, transparent);
+  text-underline-offset: .18em;
+}
 /* Native default Markdown code cards. An opaque reading tint also lets the
  * sticky toolbar cover scrolled code without a second translucent stripe.
  * Preview/hover blocks, syntax colours, selection and geometry stay native. */
@@ -445,6 +466,13 @@
     --forge-layer-thread-veil,
     calc(1 - var(--forge-thread-color-retention))
   );
+}
+
+/* A minimum dark reading tint bounds contrast even on white snow. Reuse the
+ * existing veil so route transitions do not add another composited surface. */
+:root.forge-ink-mountain[data-forge-native-theme="dark"][data-forge-surface="thread"] [data-forge-background-veil] {
+  background-image: linear-gradient(var(--forge-reading-tint), var(--forge-reading-tint)) !important;
+  opacity: max(var(--forge-reading-min-opacity), var(--forge-layer-thread-veil, .25));
 }
 
 /* Light reading uses a white veil with per-scene strength, never the dark

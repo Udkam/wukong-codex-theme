@@ -14,3 +14,5 @@
 - dark-settings.png / light-settings.png：外观设置页。
 
 侧栏名称在截图前临时替换为示例文本，头像隐藏；截图后恢复。图像未合成或重绘。此前旧 UI 的对话预览已移除，Git 历史可查。
+
+2026-10-02 v0.17.3：dark-conversation-contrast.png 为当前样式与真实雪山图片的示例文字浏览器夹具；dark-reading-footer.png 为客户端 26.928.4866.0 原生深色模式下截取的输入区。均不含实际聊天正文。

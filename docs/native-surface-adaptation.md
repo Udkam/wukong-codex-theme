@@ -1,8 +1,7 @@
 # 原生容器与主题材质
 
-核对版本：Windows Codex 26.924.2738.0，2026-09-27。
-依据安装目录 `app/resources/app.asar` 中的
-`webview/assets/app-initial-5ba553174940.css` 与运行中的 DOM。
+核对版本：Windows Codex 26.928.4866.0，2026-10-02。
+依据安装目录 `app/resources/app.asar` 中的活动 CSS、JS 与运行中的 DOM；来源锁定在 `native-asar-provenance.json`。
 
 ## 覆盖规则
 
@@ -45,3 +44,13 @@
 - `.composer-wrap`：底边改透明，保留原生边框厚度。
 
 当前验证范围见 VALIDATION.md。
+
+## 主题替换的适配约定（2026-10-02）
+
+保留背景队列、切换快捷键、跨页复用、玻璃材质、深浅模式和自定义主题功能。原生节点负责布局，主题只替换绘制；读取端不新增另一套侧栏宽高或输入框位置。
+
+本次重新核验页面、主内容、输入框、对话与 embedded messaging 的语义标记以及原生次要／辅助文字变量。链接使用真实 `assistant-message` 内的链接节点；原生包没有 `--color-text-link`，不注入无效的原生变量。
+
+深色阅读材质集中为 `--forge-reading-secondary`、`--forge-reading-tertiary`、`--forge-reading-link`、`--forge-reading-tint`、`--forge-reading-min-opacity`。自定义主题可在生成变量表中覆盖；保持原生选择器与背景队列逻辑不变。默认阅读下限为 .68，各场景更强的遮罩仍保留；浅色仍使用场景参数。
+
+适配回归同时保护变量替换、深浅模式、页面重挂载的图片复用和流式更新不触发整页扫描。组件名片段仅用于缺少语义绘制标记的边界，不包含哈希或版本尺寸。未来若原生删除语义标记，需更新映射；不承诺任意结构重写无需维护。
