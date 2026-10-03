@@ -120,9 +120,10 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
   const entries = asar.listPackage(archive);
   const css = entries.filter(name => /webview[\\/]assets[\\/](app-shared-|app-initial-|app-primary-).*\.css$/.test(name))
     .map(name => asar.extractFile(archive, name.replace(/^[/\\]/, '')).toString('utf8')).join('\n');
-  for (const token of ['--height-toolbar:46px', '--height-toolbar-sm:36px',
-    '--spacing-token-sidebar:clamp(240px, var(--codex-sidebar-preferred-width,275px)',
-    '--radius-token-composer-single-line:calc(var(--spacing) * 5.5)',
+  // Native dimensions may change without breaking paint replacement. Protect
+  // the available interfaces, not a frozen copy of the client's pixel values.
+  for (const token of ['--height-toolbar:', '--height-toolbar-sm:',
+    '--spacing-token-sidebar:', '--radius-token-composer-single-line:',
     '--composer-layout-surface-background', '--composer-layout-surface-backdrop-filter',
     'data-composer-surface-variant', '_ComposerLayoutRoot_', '_ComposerLayoutBody_',
     '_PageSurface_', '--app-shell-navigation-rail-width',

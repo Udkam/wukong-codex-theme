@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.928.4866.0.
+/* Native paint boundary, audited against desktop 26.930.3748.0.
  * Native fonts, radii and layout are retained. Navigation uses a translucent
  * reading surface with foreground colours matched to the native theme.
  * Only the existing landing wordmark/quote and inert background own geometry.
@@ -57,8 +57,6 @@
   webview.bg-surface,
   [data-app-shell-main-surface],
   [data-app-shell-main-content-layout],
-  .app-shell-main-content-frame,
-  .forge-page-content,
   .forge-composer-context,
   [data-composer-utility-bar-scroll-area]
 ) {
@@ -67,18 +65,15 @@
 }
 :root.forge-ink-mountain #root :is(
   [data-app-shell-main-content-top-fade],
-  [class*="MainContentTopFade"],
-  .forge-composer-thread-fade,
-  .forge-composer-progress-fade
+  [class*="MainContentTopFade"]
 ) {
   background: none !important;
   box-shadow: none !important;
 }
-:root.forge-ink-mountain #root .pointer-events-none.bg-gradient-to-t.from-surface.via-surface {
+:root.forge-ink-mountain #root :is([data-thread-scroll-footer="true"], .thread-scroll-container) [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
   background-image: none !important;
 }
-/* The scroll reservation owns a second fade, outside the floating footer. */
-:root.forge-ink-mountain #root .thread-scroll-container [aria-hidden="true"].pointer-events-none.bg-gradient-to-t.from-surface,
+/* The embedded messaging header owns a separate inert anchor-positioned fade. */
 :root.forge-ink-mountain #root .pointer-events-none[style*="--orbit-messaging-header-"][class*="_background_"] {
   background-image: none !important;
 }
@@ -97,18 +92,17 @@
 :root.forge-ink-mountain #root .messaging-root.messaging-embedded .composer-wrap {
   border-bottom-color: transparent !important;
 }
-:root.forge-ink-mountain #root header.fixed.h-toolbar :is(
-  .text-md.flex.min-w-0.flex-1.items-center,
-  .ms-auto.flex.shrink-0.items-center.justify-end
-) {
-  background: transparent !important;
+/* Embedded dots mount the shared composer outside ThreadScrollLayout's footer.
+ * Its inert gradient belongs to the composer and otherwise leaves a dark band
+ * behind the capsule. Preserve the gradient's layout and every input/control. */
+:root.forge-ink-mountain #root .messaging-root.messaging-embedded .composer-wrap [data-codex-composer-root] [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
+  background-image: none !important;
 }
-
-/* Desktop 26.924 SearchablePageLayout/Library toolbar uses a CSS-module shell,
- * not the .sticky utility. Its ::before owns the actual header fill and native
- * scroll inset/corners. Replace that paint only; never change its geometry.
+/* SearchablePageLayout gives its toolbar shell a titlebar inset variable.
+ * Its ::before owns the fill; the variable and sticky state identify that
+ * boundary without CSS-module names, utility order or header dimensions.
  */
-:root.forge-ink-mountain [data-sticky][class*="_shell_"]:has(> [class*="_content_"])::before {
+:root.forge-ink-mountain #root [data-sticky][style*="--app-shell-titlebar-left-inset"]::before {
   background-color: var(--forge-navigation-fill) !important;
   backdrop-filter: var(--forge-navigation-filter) !important;
   -webkit-backdrop-filter: var(--forge-navigation-filter) !important;
@@ -117,7 +111,7 @@
 /* Catalogs keep native ink, including secondary labels. Paint the existing
  * content surface with a stronger reading tint; no measured overlay or blur
  * over the entire scrolling page. Native headers retain their sticky owner. */
-:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-app-shell-main-surface]:has([class*="_shell_"] > [class*="_content_"]) {
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-app-shell-main-surface]:has([data-sticky][style*="--app-shell-titlebar-left-inset"]) {
   background-color: var(--forge-catalog-fill) !important;
 }
 
@@ -189,20 +183,22 @@
     box-shadow: none !important;
   }
 }
-/* First-paint selectors: body portals must not wait for JS marker scans. */
-:root.forge-ink-mountain :is(
+/* First-paint selectors: body portals must not wait for JS marker scans.
+ * Keep the shared material low-specificity so semantic surfaces below can
+ * choose an opaque fill without inheriting an unrelated selector's weight. */
+:root.forge-ink-mountain :where(
   [role="menu"][class*="bg-"],
   [role="listbox"][class*="bg-"]:not([cmdk-list]):not([data-cmdk-list]),
   [role="dialog"][class*="bg-"]:not(:has(img.object-contain)),
   [role="alertdialog"][class*="bg-"],
   [class*="_floatingSurface_"],
-  .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"],
-  .w-80.rounded-xl[class~="bg-surface-elevated-secondary/95"][class*="max-w-"],
+  [data-summary-panel-variant],
+  [data-thread-user-message-navigation-tooltip-preview],
   aside[data-testid="app-shell-floating-left-panel"],
   [data-testid="app-shell-floating-left-panel"] > aside,
-  [class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted),
   [class*="ComposerTopMenuPanel"],
-  .composer-home-top-menu
+  .composer-home-top-menu,
+  :has(> [data-mention-list-scroll-area])
 ) {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
@@ -218,7 +214,7 @@
 /* Tooltip foregrounds can intentionally be inverse even in light mode.
  * Preserve their native fill/ink pairing instead of applying light glass. */
 
-/* Desktop 26.924: the outer aside includes BOTH rail and conversation list.
+/* The outer aside includes BOTH rail and conversation list.
  * The native .sidebar-navigation paints a second 65% surface and owns the
  * 12px start corners. Transfer that old layered material to the rail only.
  * Leave all native border radii, clipping, gutter and divider geometry intact.
@@ -256,7 +252,7 @@
   backdrop-filter: var(--forge-shell-filter) !important;
   -webkit-backdrop-filter: var(--forge-shell-filter) !important;
 }
-:root.forge-ink-mountain [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"]) {
+:root.forge-ink-mountain [class~="electron:bg-surface"]:has([class~="group/settings"]) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
   box-shadow: none !important;
@@ -265,7 +261,7 @@
 }
 /* Settings exposes the wallpaper in both themes; cards retain their material. */
 @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-:root.forge-ink-mountain[data-forge-native-theme] [class~="electron:bg-surface"][class~="windows:rounded-tl-lg"]:has([class~="group/settings"]) {
+:root.forge-ink-mountain[data-forge-native-theme] [class~="electron:bg-surface"]:has([class~="group/settings"]) {
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
@@ -276,12 +272,12 @@
 /* SettingsLayout's direct sticky controls own the unwanted surface band and
  * fade, shared by usage tabs, archived chat search and keyboard shortcuts.
  * Keep the inner controls and sticky geometry native. */
-:root.forge-ink-mountain [class~="group/settings"] > .sticky.z-30.bg-surface {
+:root.forge-ink-mountain [class~="group/settings"] > .sticky {
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
 }
-:root.forge-ink-mountain [class~="group/settings"] > .sticky.z-30.bg-surface::after {
+:root.forge-ink-mountain [class~="group/settings"] > .sticky::after {
   background: none !important;
   box-shadow: none !important;
 }
@@ -289,31 +285,42 @@
  * Paint the real cards without recolouring swatches or the code preview.
  * Cards use tint and highlights without adding GPU blur layers.
  */
-:root.forge-ink-mountain [class~="group/settings"] .flex.flex-col.rounded-2xl:is(
-  [style*="--color-background-panel"],
+:root.forge-ink-mountain [class~="group/settings"] :is(
+  [style*="background"][style*="--color-background-panel"],
   [class~="bg-surface-secondary/92"],
   [class~="dark:bg-surface-secondary/92"]
-) {
+):not([data-testid="theme-preview"], [data-testid="theme-preview"] *) {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
   border-color: var(--forge-glass-edge) !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
+}
+/* Browser site permissions paint each cell, with sticky edge columns and a
+ * sticky two-row head. Use local tokens on its accessible column owner; an
+ * opaque tint prevents moving values from showing through fixed cells. Native
+ * radii, column paging, borders and dropdown states remain component-owned.
+ */
+:root.forge-ink-mountain [class~="group/settings"] table:has([id^="browser-use-site-permissions-column-"]) {
+  --color-background-panel: var(--forge-summary-fill) !important;
+  --color-surface-elevated-secondary: color-mix(in srgb, var(--forge-summary-fill) 92%, var(--forge-nav-ink)) !important;
+  --color-border: var(--forge-glass-edge) !important;
+}
+:root.forge-ink-mountain [class~="group/settings"] table:has([id^="browser-use-site-permissions-column-"]) > thead {
+  background-color: transparent !important;
 }
 /* SummaryPanel's native sticky headers must occlude scrolling rows, including
  * their 8px ::before cap. Use one opaque tint across the card and its headers:
  * nested translucent backdrops create bands and leak text through that cap.
  * Corners, clipping, sticky positions and pseudo-element geometry stay native.
  */
-:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]:has([data-slot="thread-summary-panel-item-button"]) {
+:root.forge-ink-mountain [data-summary-panel-variant] {
   background-color: var(--forge-summary-fill) !important;
   background-image: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]
-  header.sticky.bg-surface-elevated-secondary,
-:root.forge-ink-mountain .rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]
-  header.sticky.bg-surface-elevated-secondary::before {
+:root.forge-ink-mountain [data-summary-panel-variant] header.sticky,
+:root.forge-ink-mountain [data-summary-panel-variant] header.sticky::before {
   background-color: var(--forge-summary-fill) !important;
   background-image: none !important;
   backdrop-filter: none !important;
@@ -326,20 +333,42 @@
   background: transparent !important;
 }
 
-/* Goal/queue strips and resource cards retain their native clipping and corners.
+/* SuggestionList (26.930) is also the composer's Add / Plugins menu. It has
+ * no menu role; its scroll-area hook identifies both floating and top-tray
+ * variants without relying on a generated class or sizing utilities.
+ * Bound the glass opacity for text contrast over bright/dark wallpaper.
+ * Native row opacity otherwise dims the description a second time. */
+:root.forge-ink-mountain :has(> [data-mention-list-scroll-area]) {
+  --color-text: var(--forge-nav-ink) !important;
+  --color-codex-description: var(--forge-nav-muted) !important;
+  --color-text-tertiary: var(--forge-nav-muted) !important;
+  --opacity-menu-row: 1 !important;
+  color: var(--forge-nav-ink) !important;
+  background-color: rgb(from var(--forge-glass-fill) r g b / max(alpha, .94)) !important;
+  background-image: none !important;
+}
+/* The default list's sticky section headers read this native paint token.
+ * An opaque matching tint occludes scrolling rows; expanded tray headings
+ * are already transparent and remain so. Keep native sticky measurement,
+ * scroll margins, selected backgrounds and disabled opacity untouched. */
+:root.forge-ink-mountain [data-mention-list-scroll-area] {
+  --color-surface-elevated-secondary: var(--forge-summary-fill) !important;
+}
+:root.forge-ink-mountain [data-mention-list-scroll-area] :is(
+  [data-list-navigation-item][aria-current="true"],
+  [role="option"][aria-selected="true"],
+  [data-list-navigation-item]:focus-visible
+) {
+  --color-codex-description: var(--forge-nav-ink) !important;
+}
+
+/* Goal/queue strips retain their native clipping and corners.
  * Only the outer strip blurs; inner queue leaves never create extra blur layers.
  */
 :root.forge-ink-mountain :is(
   .forge-composer-panel[class*="bg-"],
   [data-composer-rail-item],
-  .forge-composer-progress-pill[class*="bg-"],
-  .forge-plan-pill[class*="bg-"],
-  .forge-diff-summary[class*="bg-"],
-  .forge-review-card[class*="bg-"],
-  .forge-right-card[class*="bg-"],
-  .forge-right-section[class*="bg-"],
-  .forge-page-card[class*="bg-"],
-  [class*="thread-resource-card-row-padding-x"].overflow-hidden
+  .forge-composer-progress-pill[class*="bg-"]
 ) {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
@@ -354,10 +383,6 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-:root.forge-ink-mountain [class*="thread-resource-card-row-padding-x"] button[class~="bg-surface/70"] {
-  background-color: transparent !important;
-}
-
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
   :root.forge-ink-mountain {
     --forge-glass-fill: var(--color-surface, Canvas) !important;
@@ -372,6 +397,9 @@
     --forge-nav-shadow: none !important;
     --forge-shell-filter: none !important;
     --forge-summary-fill: var(--color-surface, Canvas) !important;
+    --forge-reading-secondary: CanvasText !important;
+    --forge-reading-tertiary: CanvasText !important;
+    --forge-reading-link: LinkText !important;
   }
 }
 
@@ -490,11 +518,6 @@
   z-index: 1;
 }
 
-:root.forge-ink-mountain[data-forge-background-ready="true"] #root > :first-child {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
 :root.forge-ink-mountain[data-forge-background-ready="true"] main.main-surface {
   background-color: transparent !important;
   background-image: none !important;
@@ -508,7 +531,6 @@
 :root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace,
 :root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace.main-surface,
 :root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace [data-app-shell-main-content-layout],
-:root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace .app-shell-main-content-frame,
 :root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace [data-vscode-context*="supportsNewChatMenu"],
 :root.forge-ink-mountain[data-forge-background-ready="true"] .forge-workspace [data-thread-find-target="conversation"] {
   background-color: transparent !important;

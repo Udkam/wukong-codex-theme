@@ -28,7 +28,9 @@ test('thread footer and embedded messaging clear layout paint without clearing c
       <div id="plate" aria-hidden="true" class="pointer-events-none plate"></div>
       <div id="card" class="card">Control</div></div>
       <div class="messaging-root messaging-embedded"><div class="thread-pane">
-      <div class="composer-wrap"><div class="card">Input</div></div></div></div>
+      <div class="composer-wrap"><div data-codex-composer-root>
+        <div id="dot-composer-fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t"></div>
+        <div class="card">Input</div></div></div></div></div>
       <div class="thread-scroll-container"><div id="fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t from-surface"></div></div>
       <div id="orbit-fade" class="pointer-events-none _background_fixture_1" style="position-anchor:--orbit-messaging-header-fixture"></div>
       <div id="standalone" class="messaging-root">Standalone</div></div></html>`);
@@ -44,7 +46,7 @@ test('thread footer and embedded messaging clear layout paint without clearing c
       assert.equal(await page.locator('#card').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
       assert.equal(await page.locator('#standalone').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
       assert.equal(await page.locator('.composer-wrap').evaluate(e=>getComputedStyle(e).borderBottomColor),'rgba(0, 0, 0, 0)');
-      for(const id of ['fade','orbit-fade'])assert.equal(await page.locator('#'+id).evaluate(e=>getComputedStyle(e).backgroundImage),'none');
+      for(const id of ['fade','orbit-fade','dot-composer-fade'])assert.equal(await page.locator('#'+id).evaluate(e=>getComputedStyle(e).backgroundImage),'none');
     }
   } finally {await browser.close();}
 });
@@ -73,6 +75,14 @@ test('updated runtime provider replaces cached code and rejects incomplete updat
     assert.equal(await read(), first);
     fs.writeFileSync(file, 'export const RUNTIME_REVISION="b"; export const makeApplyExpression=()=>"b";', 'utf8');
     assert.equal((await read()).makeApplyExpression(), 'b');
+    const contract=path.join(dir,'native-ui-contract.mjs');
+    fs.writeFileSync(contract,'export const selector="first";','utf8');
+    fs.writeFileSync(file,'import {selector} from "./native-ui-contract.mjs"; export const RUNTIME_REVISION="c"; export const makeApplyExpression=()=>selector;','utf8');
+    assert.equal((await read()).makeApplyExpression(),'first');
+    const beforeMapping = (await read()).SOURCE_FINGERPRINT;
+    fs.writeFileSync(contract,'export const selector="updated";','utf8');
+    assert.equal((await read()).makeApplyExpression(),'updated','a native mapping update must invalidate its imported dependency');
+    assert.notEqual((await read()).SOURCE_FINGERPRINT,beforeMapping,'renderer freshness must change even when the declared revision stays the same');
     fs.writeFileSync(file, 'export const broken=true;', 'utf8');
     await assert.rejects(read(), /missing its revision/);
   } finally { fs.rmSync(dir, { recursive:true }); }
@@ -100,7 +110,7 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
       body{margin:0}:root{--app-shell-titlebar-height:44px;--app-shell-navigation-rail-width:52px;--app-shell-main-surface-top-start-radius:12px;--app-shell-main-surface-top-end-radius:12px}
       #layout{position:relative;height:100vh}aside{position:absolute;top:44px;bottom:4px;display:flex;width:308px}nav.rail{width:52px}.sidebar-navigation{flex:1;border-radius:12px 0 0 12px}
       main{position:absolute;top:44px;bottom:4px;left:308px;right:4px;overflow:auto;border-radius:0 12px 4px 0}.rows{height:1400px}
-    </style><div id="root"><div id="layout" data-app-shell-page-surface><div id="paint" class="${surface}"></div><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><nav class="rail group/sidebar-rail"></nav><div id="sidebar" class="sidebar-navigation"><div class="sidebar-navigation">Navigation</div></div></aside><main data-app-shell-main-surface="default"><div id="header" class="${sticky}" data-sticky><div class="${stickyContent}"><input id="plugins-store-page-search"></div></div><div class="rows"><div data-thread-find-target="conversation"><div data-message-id="fixture"><div data-markdown-text-style="assistant-message"><p id="stream">Streaming</p></div></div></div></div></main></div><div role="tooltip" class="bg-tooltip" style="background:#111;color:white">Tooltip</div></div></html>`);
+    </style><div id="root"><div id="layout" data-app-shell-page-surface><div id="paint" class="${surface}"></div><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><nav class="rail group/sidebar-rail"></nav><div id="sidebar" class="sidebar-navigation"><div class="sidebar-navigation">Navigation</div></div></aside><main data-app-shell-main-surface="default"><div id="header" class="${sticky}" data-sticky style="--app-shell-titlebar-left-inset:0px"><div class="${stickyContent}"><input id="plugins-store-page-search"></div></div><div class="rows"><div data-thread-find-target="conversation"><div data-message-id="fixture"><div data-markdown-text-style="assistant-message"><p id="stream">Streaming</p></div></div></div></div></main></div><div role="tooltip" class="bg-tooltip" style="background:#111;color:white">Tooltip</div></div></html>`);
     const geometry = () => page.evaluate(() => ['paint','sidebar','header'].map(id => {
       const e=document.getElementById(id), r=e.getBoundingClientRect(),s=getComputedStyle(e),p=getComputedStyle(e,'::before');
       return [id,r.x,r.y,r.width,r.height,s.borderRadius,s.position,p.inset,p.borderRadius,p.position];
@@ -149,4 +159,30 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
     await page.waitForTimeout(700);
     assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.refreshCount),await page.evaluate(()=>beforeRefresh),'inline streaming must not rescan the page');
   } finally {await browser.close();}
+});
+
+test('mapping-only hot updates move the wallpaper owner and carry a new renderer fingerprint', async () => {
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'wukong-adapter-update-'));
+  const file=path.join(dir,'injection-plan-v13.mjs');
+  const contract=path.join(dir,'native-ui-contract.mjs');
+  fs.copyFileSync('runtime/injection-plan-v13.mjs',file);
+  const original=fs.readFileSync('runtime/native-ui-contract.mjs','utf8');
+  fs.writeFileSync(contract,original,'utf8');
+  const browser=await chromium.launch({headless:true});
+  try {
+    const page=await browser.newPage();
+    await page.setContent('<style>section{position:relative;height:600px}.paint{position:absolute;inset:0}main{height:400px}</style><div id="root"><section data-app-shell-page-surface><div id="old-paint" class="paint _PageSurface_fixture_1"></div><div id="new-paint" class="paint" data-proof-paint></div><main data-app-shell-main-surface><h1>Home</h1></main></section></div>');
+    const read=createRuntimeProvider(file),first=await read();
+    await page.evaluate(first.makeApplyExpression({styleSheet:theme,variables}));
+    assert.equal(await page.locator('#wukong-codex-theme-background').evaluate(e=>e.parentElement.id),'old-paint');
+    const updated=original.replace("pagePaint: '[class*=\"_PageSurface_\"]'","pagePaint: '[data-proof-paint]'");
+    assert.notEqual(updated,original);
+    fs.writeFileSync(contract,updated,'utf8');
+    const second=await read();
+    assert.equal(second.RUNTIME_REVISION,first.RUNTIME_REVISION);
+    assert.notEqual(second.SOURCE_FINGERPRINT,first.SOURCE_FINGERPRINT);
+    await page.evaluate(second.makeApplyExpression({styleSheet:theme,variables}));
+    assert.equal(await page.locator('#wukong-codex-theme-background').evaluate(e=>e.parentElement.id),'new-paint');
+    assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.sourceFingerprint),second.SOURCE_FINGERPRINT);
+  } finally {await browser.close();fs.rmSync(dir,{recursive:true});}
 });

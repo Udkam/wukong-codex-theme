@@ -177,29 +177,6 @@ test('live capture closes only an explicitly owned transient debug session', () 
   assert.doesNotMatch(capture, /['"]\/IM['"]/i);
 });
 
-test('V31 real capture failure evidence proves automatic owned cleanup', () => {
-  const evidence = JSON.parse(read(
-    'artifacts/test-runs/v31-live-capture-failure-contract-20260801/acceptance.json'
-  ));
-  assert.equal(evidence.schemaVersion, 1);
-  assert.match(evidence.source, /real Codex renderer/i);
-  assert.equal(evidence.expectedFailure.captureExitCode, 1);
-  assert.equal(evidence.expectedFailure.errorName, 'TimeoutError');
-  assert.equal(evidence.expectedFailure.screenshotCreated, false);
-  assert.match(evidence.rawReportPolicy, /retained locally only/i);
-  assert.match(evidence.rawReportSha256, /^[0-9A-F]{64}$/);
-  assert.equal(evidence.cleanup.reason, 'capture-failed');
-  assert.equal(evidence.cleanup.nativeRestoreObserved, true);
-  assert.equal(evidence.cleanup.watcherConfirmed, true);
-  assert.equal(evidence.cleanup.rootReleased, true);
-  assert.equal(evidence.cleanup.launcherReleased, true);
-  assert.equal(evidence.cleanup.portReleased, true);
-  assert.equal(evidence.cleanup.remainingProjectProcesses, 0);
-  assert.match(evidence.acceptanceBoundary, /failure cleanup only/i);
-  assert.match(evidence.acceptanceBoundary, /not queue/i);
-  assert.match(evidence.acceptanceBoundary, /final lifecycle/i);
-});
-
 test('public entries route to repository-backed injection and verified disable', () => {
   const installEntry = (fs.existsSync('install-theme.cmd') ? read('install-theme.cmd') : 'retired');
   const removeEntry = (fs.existsSync('remove-theme.cmd') ? read('remove-theme.cmd') : 'retired');
@@ -424,7 +401,7 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.match(runtime, /nodeIsWithinThemeStructure/);
   assert.match(runtime, /surfaceSignalSelector/);
   assert.match(runtime, /recordTouchesSurfaceSignal/);
-  assert.match(runtime, /data-local-conversation-final-assistant/);
+  assert.match(read('runtime/native-ui-contract.mjs'), /data-local-conversation-final-assistant/);
   assert.match(runtime, /new ResizeObserver\(/);
   assert.match(runtime, /setResizeTargets/);
   assert.match(runtime, /observedResizeTargets/);

@@ -1003,20 +1003,20 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
       const queuePanel = queueCount > 0
         ? `
           <div class="relative min-w-0 overflow-clip text-token-foreground ${compactRowClasses} native-above-composer-row"
-            data-fixture-surface="queued-panel">
-            <div class="vertical-scroll-fade-mask hide-scrollbar flex max-h-[30dvh] flex-col gap-px overflow-x-hidden overflow-y-auto px-3 py-row-y native-queued-message-list">
+            data-composer-rail-item data-fixture-surface="queued-panel">
+            <div class="vertical-scroll-fade-mask hide-scrollbar flex max-h-[30dvh] flex-col gap-px overflow-x-hidden overflow-y-auto native-queued-message-list">
               ${queueItems}
             </div>
           </div>`
         : '';
 
       abovePortal.innerHTML = `
-        <div class="relative col-start-1 row-start-1 h-8 self-end native-progress-host">
+        <div data-in-progress-fixed-content class="relative col-start-1 row-start-1 h-8 self-end native-progress-host">
           <div class="absolute inset-x-0 bottom-1 flex min-h-7 items-center justify-center gap-2 pb-1 native-progress-layer">
             <div class="pointer-events-none absolute inset-x-0 -bottom-1 h-7 bg-gradient-to-t from-token-main-surface-primary to-transparent native-progress-gradient"></div>
             <div class="flex w-full max-w-(--thread-content-max-width) min-w-0 justify-center native-progress-rail">
               <div class="relative z-10 max-w-full min-w-0 overflow-hidden rounded-3xl native-progress-clip">
-                <div class="flex w-max max-w-full min-w-0 items-center gap-2 rounded-3xl border px-3 py-1.5 native-progress-pill"
+                <div class="flex w-max max-w-full min-w-0 items-center gap-2 rounded-3xl border px-3 py-1.5 bg-surface-elevated-secondary native-progress-pill"
                   data-state="active" data-fixture-control="plan">
                   <svg class="icon animate-spin" viewBox="0 0 16 16" aria-hidden="true">
                     <circle cx="8" cy="8" r="5.25" opacity=".28"/>
@@ -1033,11 +1033,11 @@ export const installComposerState = (page, state = 'default') => page.evaluate(
       stackSlot.innerHTML = `
         <div class="relative px-[var(--home-composer-inline-inset)] native-above-stack-inset ${expandedStack ? '' : 'native-collapsed'}"
           data-fixture-stack-mode="${expandedStack ? 'expanded' : 'collapsed'}">
-          <div class="order-2 flex min-w-0 flex-col native-above-composer-stack"
+          <div data-composer-rail class="flex min-w-0 flex-col native-above-composer-stack"
             data-fixture-surface="composer-stack">
             ${queuePanel}
             <div class="relative min-w-0 overflow-clip text-token-foreground ${compactRowClasses} native-above-composer-row"
-              data-fixture-surface="goal-panel">
+              data-composer-rail-item data-fixture-surface="goal-panel">
             <div class="flex items-center justify-between gap-2 px-3 py-row-y native-above-composer-content">
             <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
               <circle cx="8" cy="8" r="5"/>

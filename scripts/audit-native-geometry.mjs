@@ -1,6 +1,7 @@
 // Compare the running client's native geometry with the theme in one synchronous
 // read. No navigation, preference changes, resizing or conversation text capture.
 import { getTargets, isCodexTarget, evaluateTarget } from '../runtime/cdp-client.mjs';
+import { NATIVE_UI_SELECTORS, createNativeUiAdapter } from '../runtime/native-ui-contract.mjs';
 
 const port = Number(process.argv[2]);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw Error('Usage: node scripts/audit-native-geometry.mjs <CDP port>');
@@ -10,16 +11,17 @@ const result = await evaluateTarget(target, `(() => {
   const style = document.getElementById('wukong-codex-theme-style');
   const overlay = document.getElementById('wukong-codex-theme-background');
   if (!style || !overlay || style.disabled) throw Error('An active theme is required');
-  const selectors = {
-    titlebar: '[class*="_ApplicationMenuTopBar_"]',
-    sidebar: 'aside.app-shell-left-panel',
-    rail: 'nav[class~="group/sidebar-rail"]',
-    navigation: '.sidebar-navigation[class*="_ConversationSidebar_"]',
-    page: '[class*="_PageSurface_"]',
-    main: '[data-app-shell-main-surface]',
-    composer: '[data-composer-surface-variant]'
+  const nativeUi = (${createNativeUiAdapter.toString()})(document, ${JSON.stringify(NATIVE_UI_SELECTORS)});
+  const owners = {
+    titlebar: nativeUi.first('[class*="_ApplicationMenuTopBar_"]'),
+    sidebar: nativeUi.sidebar(),
+    rail: nativeUi.first('nav[class~="group/sidebar-rail"]'),
+    navigation: nativeUi.conversationSidebar(),
+    page: nativeUi.pagePaint(),
+    main: nativeUi.workspace(),
+    composer: nativeUi.first('[data-composer-surface-variant]')
   };
-  const panels = Object.entries(selectors).map(([name, selector]) => ({name, element: document.querySelector(selector)}));
+  const panels = Object.entries(owners).map(([name, element]) => ({name, element}));
   const elements = [...new Set(panels.flatMap(({element}) => element ? [element, ...element.querySelectorAll('*')] : []))]
     .filter(e => !e.closest('[data-forge-owned]') && e.getClientRects().length && !(e instanceof SVGElement));
   const measure = e => {

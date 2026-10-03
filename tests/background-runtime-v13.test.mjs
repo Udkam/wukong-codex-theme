@@ -875,7 +875,7 @@ test('V76 paints a collapsed-sidebar hover flyout as readable liquid glass befor
     wrapper.dataset.forgeFloatingSidebarFixture = '';
     wrapper.className = 'pointer-events-auto fixed bottom-0 left-0 z-[42] min-h-0 top-(--height-toolbar-sm)';
     wrapper.innerHTML = `
-      <aside class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-token-main-surface-primary electron:elevation-prominent"
+      <aside data-testid="app-shell-floating-left-panel" data-app-shell-left-panel-appearance="default" class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-token-main-surface-primary electron:elevation-prominent"
         style="width:240px;height:700px;background-color:rgb(30,30,30)">
         <nav class="sidebar-foreground-muted">
           <button data-app-action-sidebar-thread-row>临时任务</button>
@@ -2989,10 +2989,13 @@ test('settings theme switch and return retain the visible background layer', asy
   const before=await currentBackground(page);
   await page.evaluate(()=>{
     window.proofLayer=document.querySelector('[data-forge-background-layer][data-forge-active="true"]');
-    const settings=document.createElement('div');settings.id='settings-proof';settings.className='scrollbar-stable flex-1 overflow-y-auto p-panel';settings.style.cssText='width:400px;height:400px';document.body.append(settings);
+    // SettingsPage owns group/settings in the audited native UI. Its former
+    // scrollbar/padding utility chain is no longer a page identity contract.
+    const settings=document.createElement('div');settings.id='settings-proof';settings.className='group/settings';settings.style.cssText='width:400px;height:400px';document.body.append(settings);
     history.pushState({},'','/settings');
   });
   await page.waitForTimeout(650);
+  assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.settingsPageActive),true);
   await page.evaluate(()=>document.documentElement.dataset.theme='light');
   await page.waitForTimeout(100);
   await page.evaluate(()=>{document.getElementById('settings-proof').remove();history.pushState({},'','/');});

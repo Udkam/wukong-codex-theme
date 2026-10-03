@@ -35,13 +35,6 @@
     ]
   },
   "uiAssets": {
-    "composerMain": "ui/v17/composer-main.webp",
-    "composerStrip": "ui/v17/composer-strip.webp",
-    "composerPill": "ui/v17/composer-pill.webp",
-    "paperTile": "ui/v17/paper-tile.webp",
-    "sidebarLevel1": "ui/v15/sidebar-level1.webp",
-    "sidebarSelected": "ui/v15/sidebar-selected.webp",
-    "sidebarLevel2Hover": "ui/v15/sidebar-level2-hover.webp",
     "landingMark": "ui/v16/landing-wukong-wordmark-light.webp",
     "landingMarkDark": "ui/v16/landing-wukong-wordmark-dark.webp"
   },

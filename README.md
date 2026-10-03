@@ -1,56 +1,39 @@
 # Wukong Codex Theme
 
-为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。沿用原生布局与交互，按表面匹配阅读底色；10 张战斗图、3 张风景图，对话默认雪山。
+为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生交互，按区域替换材质；10 张战斗图、3 张风景图，对话默认雪山。
 
-## 新版 UI
+## 当前源码：原生表面适配重构
 
-**v0.17.3（2026-10-02）** 优化深色对话阅读：浅蓝链接加下划线，提亮次要文字，雪山等明亮背景增加最低阅读遮罩。浅色模式保持原样。
+**v108（2026-10-03，尚未发布）** 对照 Windows Codex **26.930.3748.0** 的原生 UI，集中维护容器识别和材质配置。最新正式下载仍为 **v0.17.3**，不包含本轮未发布修改。
 
-对照当前原生代码核验绘制边界，阅读材质集中为可覆盖的主题变量；保留背景队列、快捷切换、跨页复用、玻璃与自定义主题功能。后续替换材质时无需重写原生容器选择器；原生结构变更仍需核验映射，详见 [适配约定](docs/native-surface-adaptation.md)。
+- **容器随原生变化：** 优先按 `data-*` 所属关系识别壁纸、侧栏、输入区、进度区和摘要面板，减少对固定尺寸、工具类组合及文案的依赖。
+- **主题功能继续保留：** 背景队列、自动场景切换、锁定、前后切换、题字开关、深浅玻璃和设置往返复用均保留。
+- **材质可配置：** 主题 JSON 的 `materials.dark/light` 可调整玻璃填充、模糊、导航与阅读颜色；已有 schemaVersion 3 导出仍可加载。
+- **添加面板：** 分组标题、提示文字与滚动内容使用一致材质，保持原生选择、禁用、滚动和键盘操作。
+- **权限表与 dots：** 浏览器智能体权限表使用配套深浅色底色，保留固定列和横向翻页；dots 输入区后方的装饰渐变已清除。
+- **清理现役源码：** 移除失效注入方案、旧纹理、历史截图断言与重复说明；仍有效的回归保护迁移到当前结构。Git 历史及已发布版本保留。
 
-以下文字预览为当前 CSS 与真实雪山资源的浏览器夹具，使用示例文本，不是实际聊天截图。
+### 当前预览
 
-![深色文字对比度预览](docs/previews/dark-conversation-contrast.png)
+以下为当前客户端的新聊天页和局部截图。新聊天页的侧栏名称已临时替换为示例文本，截图后立即恢复；预览不包含聊天正文。完整来源、模式和验证边界见 [预览说明](docs/previews/README.md)。
 
-![当前客户端深色阅读背景与输入框](docs/previews/dark-reading-footer.png)
+**深色**
 
-**v0.17.2 修复（2026-10-02，已验收）**：进入 dots 对话自动使用风景图队列，包括尚无消息的对话；隐藏的 dots 页面不影响首页战斗图。保留背景锁定优先级。v0.17.2 包含此修改。
+![深色新聊天页](docs/previews/dark-shell.png)
 
-![dots 切换至风景队列后的输入区实机截图](docs/previews/dot-scenery-routing.png)
+![深色输入区](docs/previews/dark-reading-footer.png)
 
-**v0.17.0** 适配 Windows Codex **26.924.2738.0**：背景跟随原生页面范围与圆角，双侧栏分别填充材质，设置往返复用已解码背景。资料库、图像、Plugins 和 Skills 的标题与阅读背景同步适配。
+![深色添加面板](docs/previews/dark-add-menu.png)
 
-**v0.17.1 修复（2026-10-01，已验收）**：适配 **26.928.2636.0** 新增的聊天底部纯色层、滚动渐变及 Your dot 消息页背景／标题渐变。沿用原生布局，保留输入框玻璃材质和消息控件。v0.17.1 下载包包含本次修复。
+**浅色**
 
-### 实机预览
+![浅色新聊天页](docs/previews/light-shell.png)
 
-**26.928 修复后的输入区（2026-10-01）**：当前客户端原生深浅模式切换后截取，展示底部背景连续性；不包含聊天正文。
+![浅色输入区](docs/previews/light-reading-footer.png)
 
-![当前深色输入区：已清除底部遮挡与渐变带](docs/previews/dark-footer-26-928.png)
+![浅色添加面板](docs/previews/light-add-menu.png)
 
-![当前浅色输入区：保留玻璃输入框与连续壁纸](docs/previews/light-footer-26-928.png)
-
-以下全窗口截图为已发布 v0.17.0 在 26.924 上的历史效果，不代表 26.928 修复验收。侧栏名称已替换为示例、头像已隐藏；未合成或重绘界面。
-
-**深色 · 新对话**
-
-![新版深色界面：原生双侧栏与玻璃输入框](docs/previews/dark-battle.png)
-
-**浅色 · 新对话**
-
-![新版浅色界面：侧栏阅读底与原生圆角](docs/previews/light-battle.png)
-
-<details>
-<summary>查看深浅色设置页</summary>
-
-![深色设置页：背景连续、侧栏与卡片独立填充](docs/previews/dark-settings.png)
-
-![浅色设置页：保留背景纹理与文字可读性](docs/previews/light-settings.png)
-
-</details>
-
-详见 [原生容器映射](docs/native-surface-adaptation.md) 与 [验证记录](docs/VALIDATION.md)。原生 UI 后续若改变组件结构，仍可能需要适配。
-
+详细设计见 [原生表面与材质接口](docs/native-surface-adaptation.md)，实机与自动检查结果见 [验证记录](docs/VALIDATION.md)。原生组件若更换语义接口，仍需维护映射；本轮减少的是替换代码对布局细节的依赖。
 ## 开始使用
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
@@ -98,8 +81,8 @@ Wukong-Codex-Theme/
 
 - [开发、测试与打包](docs/DEVELOPMENT.md)
 - [文件结构](docs/FILE_INVENTORY.md)
-- [深浅色设计](docs/THEME_COMPARISON.md)
+- [原生表面与材质接口](docs/native-surface-adaptation.md)
 - [验证记录](docs/VALIDATION.md)
 - [资源来源](docs/ASSET_SOURCES.md)
 
-仓库当前分支仅保留主题。宠物制作资料、旧截图和弃用设计已退出版本跟踪，本地副本保留；Git 历史未重写。
+仓库当前分支仅保留主题。宠物制作资料和旧诊断已建立仓库外恢复档；本地未跟踪副本的删除被自动审批阻止，物理清理尚未完成。详情见 [清理记录](docs/CLEANUP.md)。

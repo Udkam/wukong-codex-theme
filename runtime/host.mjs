@@ -23,14 +23,27 @@ export function createRuntimeProvider(modulePath) {
   let fingerprint;
   let loaded;
   return async () => {
-    const source = fs.readFileSync(modulePath);
-    const next = crypto.createHash('sha256').update(source).digest('hex');
+    const source = fs.readFileSync(modulePath,'utf8');
+    const contractImport = /(['"])\.\/native-ui-contract\.mjs\1/g;
+    const usesContract = /(['"])\.\/native-ui-contract\.mjs\1/.test(source);
+    const contractPath = path.join(path.dirname(modulePath),'native-ui-contract.mjs');
+    const contractSource = usesContract ? fs.readFileSync(contractPath,'utf8') : '';
+    const next = crypto.createHash('sha256').update(source).update('\0').update(contractSource).digest('hex');
     if (next !== fingerprint) {
-      const runtime = await import(`${pathToFileURL(modulePath).href}?revision=${next}`);
+      // ESM parent cache keys do not invalidate static child imports. Bind the
+      // adapter to the same content revision, so a mapping-only update applies.
+      const moduleUrl = usesContract
+        ? 'data:text/javascript;base64,' + Buffer.from(source.replace(contractImport,JSON.stringify(`${pathToFileURL(contractPath).href}?revision=${next}`)),'utf8').toString('base64')
+        : `${pathToFileURL(modulePath).href}?revision=${next}`;
+      const runtime = await import(moduleUrl);
       if (!runtime.RUNTIME_REVISION || typeof runtime.makeApplyExpression !== 'function') {
         throw Error('Runtime update is missing its revision or apply contract');
       }
-      loaded = runtime;
+      loaded = {
+        ...runtime,
+        SOURCE_FINGERPRINT: next,
+        makeApplyExpression: options => runtime.makeApplyExpression({ ...options, sourceFingerprint: next })
+      };
       fingerprint = next;
     }
     return loaded;
@@ -523,7 +536,7 @@ export async function runEventWatcher({
           !exists(markerPath) || Boolean(disableRequest && exists(disableRequest));
         const runtime = runtimeProvider && !restoring ? await runtimeProvider() : null;
         const activeProbe = runtime
-          ? `(${runtime.ACTIVE_PROBE_EXPRESSION}) && window.__wukongCodexThemeRuntimeV13?.revision === ${JSON.stringify(runtime.RUNTIME_REVISION)}`
+          ? `(${runtime.ACTIVE_PROBE_EXPRESSION}) && window.__wukongCodexThemeRuntimeV13?.revision === ${JSON.stringify(runtime.RUNTIME_REVISION)}${runtime.SOURCE_FINGERPRINT ? ` && window.__wukongCodexThemeRuntimeV13?.sourceFingerprint === ${JSON.stringify(runtime.SOURCE_FINGERPRINT)}` : ''}`
           : ACTIVE_PROBE_EXPRESSION;
         const stateExpression = runtime?.THEME_STATE_EXPRESSION || THEME_STATE_EXPRESSION;
         const targets = (await targetsFor(port)).filter(targetMatches);

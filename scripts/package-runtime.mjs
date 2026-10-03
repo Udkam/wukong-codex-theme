@@ -3,12 +3,14 @@ import path from 'node:path';
 import process from 'node:process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { UI_ASSET_KEYS } from '../shared/theme-model.mjs';
 
 const runtimeFiles = [
   'runtime/cdp-client.mjs',
   'runtime/forge-runtime.mjs',
   'runtime/wukong-codex-theme-background-v13.css',
   'runtime/injection-plan-v13.mjs',
+  'runtime/native-ui-contract.mjs',
   'runtime/injector.mjs',
   'runtime/host.mjs',
   'runtime/activate-appx.cs',
@@ -70,7 +72,7 @@ export function packageRuntime({ source, destination, download = false }) {
     active.background?.asset,
     ...(active.background?.gallery || []).map(item => item.asset),
     ...Object.values(active.motifs || {}),
-    ...Object.values(active.uiAssets || {})
+    ...Object.entries(active.uiAssets || {}).filter(([key]) => UI_ASSET_KEYS.includes(key)).map(([,asset])=>asset)
   ].filter(Boolean).map(file => `themes/${file}`);
   const sourceRootReal = fs.realpathSync.native(sourceRoot);
   const selectedFiles = download ? runtimeFiles.filter(file => !['start.cmd', 'README.md', 'PORTABLE-README.txt'].includes(file)) : runtimeFiles;

@@ -1,17 +1,41 @@
 export const PALETTE_KEYS = ['ink', 'lacquer', 'jade', 'gold', 'paper'];
 export const MOTIF_KEYS = ['xiangfeiGourd'];
 export const UI_ASSET_KEYS = [
-  'composerMain',
-  'composerStrip',
-  'composerPill',
-  'paperTile',
-  'sidebarLevel1',
-  'sidebarSelected',
-  'sidebarLevel2Hover',
   'landingMark',
   'landingMarkDark'
 ];
 const OPTIONAL_UI_ASSET_KEYS = new Set(['landingMarkDark']);
+// Accept existing schema-3 exports without loading their retired textures.
+const RETIRED_UI_ASSET_KEYS = ['composerMain','composerStrip','composerPill','paperTile','sidebarLevel1','sidebarSelected','sidebarLevel2Hover'];
+const MATERIAL_COLORS = {
+  glassFill: 'glass-fill', glassEdge: 'glass-edge', shellFill: 'shell-fill',
+  navigationFill: 'navigation-fill', catalogFill: 'catalog-fill',
+  navigationInk: 'nav-ink', navigationMuted: 'nav-muted', navigationHover: 'nav-hover',
+  readingSecondary: 'reading-secondary', readingTertiary: 'reading-tertiary',
+  readingLink: 'reading-link', readingTint: 'reading-tint'
+};
+const MATERIAL_NUMBERS = {glassBlur:32, glassSaturation:2, shellBlur:32, navigationBlur:32, readingMinOpacity:1};
+
+const validateMaterials = materials => {
+  if (!materials || typeof materials !== 'object' || Array.isArray(materials)) throw Error('Invalid materials');
+  for (const [mode, values] of Object.entries(materials)) {
+    if (!['light','dark'].includes(mode) || !values || typeof values !== 'object' || Array.isArray(values)) throw Error('Invalid materials mode');
+    for (const [key, value] of Object.entries(values)) {
+      if (Object.hasOwn(MATERIAL_COLORS,key)) {
+        if (typeof value !== 'string' || !/^#[0-9a-f]{6}(?:[0-9a-f]{2})?$/i.test(value)) throw Error('Invalid materials.'+mode+'.'+key);
+      } else if (!Object.hasOwn(MATERIAL_NUMBERS,key) || !Number.isFinite(value) || value<0 || value>MATERIAL_NUMBERS[key]) {
+        throw Error('Invalid materials.'+mode+'.'+key);
+      }
+    }
+  }
+};
+const materialCss = materials => Object.entries(materials || {}).map(([mode,values]) => {
+  const declarations=Object.entries(MATERIAL_COLORS).filter(([key])=>values[key]!==undefined).map(([key,name])=>`--forge-${name}:${values[key]};`);
+  if(values.glassBlur!==undefined || values.glassSaturation!==undefined) declarations.push(`--forge-glass-filter:blur(${values.glassBlur ?? (mode==='light'?10:12)}px) saturate(${values.glassSaturation ?? (mode==='light'?1.2:1.04)});`);
+  for(const name of ['shell','navigation']) if(values[name+'Blur']!==undefined) declarations.push(`--forge-${name}-filter:blur(${values[name+'Blur']}px);`);
+  if(values.readingMinOpacity!==undefined) declarations.push(`--forge-reading-min-opacity:${values.readingMinOpacity};`);
+  return `:root.forge-ink-mountain[data-forge-native-theme="${mode}"]{${declarations.join('')}}`;
+}).join('');
 
 export const LANDING_HERO_PROFILES = Object.freeze({
   'ink-on-light-flat': Object.freeze({
@@ -111,13 +135,6 @@ const MOTIF_CSS_NAMES = {
 };
 
 const UI_ASSET_CSS_NAMES = {
-  composerMain: 'composer-main',
-  composerStrip: 'composer-strip',
-  composerPill: 'composer-pill',
-  paperTile: 'paper-tile',
-  sidebarLevel1: 'sidebar-level1',
-  sidebarSelected: 'sidebar-selected',
-  sidebarLevel2Hover: 'sidebar-level2-hover',
   landingMark: 'landing-mark',
   landingMarkDark: 'landing-mark-dark'
 };
@@ -261,7 +278,7 @@ export function validateTheme(value) {
     if (!value.uiAssets || typeof value.uiAssets !== 'object' || Array.isArray(value.uiAssets)) {
       throw Error('Invalid uiAssets');
     }
-    const unknownKeys = Object.keys(value.uiAssets).filter(key => !UI_ASSET_KEYS.includes(key));
+    const unknownKeys = Object.keys(value.uiAssets).filter(key => !UI_ASSET_KEYS.includes(key) && !RETIRED_UI_ASSET_KEYS.includes(key));
     if (unknownKeys.length) throw Error('Invalid uiAssets.' + unknownKeys[0]);
     for (const key of UI_ASSET_KEYS) {
       if (OPTIONAL_UI_ASSET_KEYS.has(key) && value.uiAssets[key] === undefined) continue;
@@ -270,6 +287,7 @@ export function validateTheme(value) {
       }
     }
   }
+  if(value.materials!==undefined) validateMaterials(value.materials);
   const a = value.accessibility;
   if (!['workbench', 'high-read'].includes(a.preset) || typeof a.reducedMotion !== 'boolean') {
     throw Error('Invalid accessibility');
@@ -289,7 +307,7 @@ export function validateTheme(value) {
 export function makeTheme(overrides = {}) {
   const next = clone(DEFAULT_THEME);
   for (const [key, value] of Object.entries(overrides)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) Object.assign(next[key], value);
+    if (value && typeof value === 'object' && !Array.isArray(value)) next[key]=Object.assign(next[key] || {}, value);
     else next[key] = value;
   }
   return validateTheme(next);
@@ -389,5 +407,5 @@ export function cssFor(theme, assetInput = '', motifInput = {}, uiAssetInput = {
     `--forge-landing-intensity:${b.landingIntensity};--forge-companion-size:${c.size}px;` +
     `--forge-companion-enabled:${c.enabled ? 1 : 0};` +
     `--forge-motion:${a.reducedMotion || c.motion === 'still' ? '0ms' : '5200ms'}}` +
-    sceneRules;
+    sceneRules + materialCss(theme.materials);
 }

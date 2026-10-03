@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { cssFor, validateTheme } from '../shared/theme-model.mjs';
+import { cssFor, validateTheme, UI_ASSET_KEYS } from '../shared/theme-model.mjs';
 
 export { DEFAULT_THEME, cssFor, makeTheme, validateTheme } from '../shared/theme-model.mjs';
 
@@ -216,7 +216,7 @@ export function resolveThemeMotifs(themePath, theme) {
 export function resolveThemeUiAssets(themePath, theme) {
   if (!theme.uiAssets) return {};
   let totalBytes = 0;
-  return Object.fromEntries(Object.entries(theme.uiAssets).map(([key, relativeAsset]) => {
+  return Object.fromEntries(Object.entries(theme.uiAssets).filter(([key]) => UI_ASSET_KEYS.includes(key)).map(([key, relativeAsset]) => {
     const encoded = assetDataUrl(themePath, relativeAsset, {
       maximumPixels: MAX_DECORATION_PIXELS,
       label: `Theme UI asset ${key}`

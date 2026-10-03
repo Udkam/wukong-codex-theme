@@ -1,8 +1,6 @@
-/*
- * V13 keeps V12's native-layout background scope, replaces its scene
- * lifecycle, and applies the explicitly approved landing-title/icon skin.
- * V4–V12 stay in the repository as retained implementation history.
- */
+import { NATIVE_UI_SELECTORS, createNativeUiAdapter } from './native-ui-contract.mjs';
+
+/* Scene lifecycle and theme decoration are independent of native paint mapping. */
 export const MARK_CLASSES = [
   'forge-topbar',
   'forge-topbar-menu-item',
@@ -80,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v107-dark-conversation-ink';
+export const RUNTIME_REVISION = 'v108-native-surface-adapter';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -94,10 +92,12 @@ const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV12'
 ];
 
-function applyRuntime(payload) {
+function applyRuntime(payload, createAdapter) {
   const root = document.documentElement;
   const runtimeKey = payload.runtimeKey;
   const markClasses = payload.markClasses;
+  const selectors = payload.nativeSelectors;
+  const nativeUi = createAdapter(document, selectors);
   const detectNativeTheme = () => {
     if (root.classList.contains('electron-light')) return 'light';
     if (root.classList.contains('electron-dark')) return 'dark';
@@ -261,62 +261,7 @@ function applyRuntime(payload) {
     return element;
   };
   const textOf = element => (element?.textContent || '').replace(/\s+/g, ' ').trim();
-  const visible = element => {
-    if (!(element instanceof Element)) return false;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 1 || rect.height <= 1) return false;
-    for (let cursor = element; cursor && cursor !== document.documentElement; cursor = cursor.parentElement) {
-      const computed = getComputedStyle(cursor);
-      if (
-        cursor.hidden ||
-        cursor.getAttribute('aria-hidden') === 'true' ||
-        cursor.hasAttribute('inert') ||
-        computed.display === 'none' ||
-        computed.visibility === 'hidden' ||
-        Number.parseFloat(computed.opacity || '1') <= .01
-      ) return false;
-    }
-    return true;
-  };
-  const layoutPresent = element => {
-    if (!(element instanceof Element)) return false;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 1 || rect.height <= 1) return false;
-    for (let cursor = element; cursor && cursor !== document.documentElement; cursor = cursor.parentElement) {
-      const computed = getComputedStyle(cursor);
-      if (
-        cursor.hidden ||
-        cursor.hasAttribute('inert') ||
-        computed.display === 'none' ||
-        computed.visibility === 'hidden'
-      ) return false;
-    }
-    return true;
-  };
-  const structurallyMounted = element => {
-    if (!(element instanceof Element) || !element.isConnected) return false;
-    for (let cursor = element; cursor && cursor !== document.documentElement; cursor = cursor.parentElement) {
-      const computed = getComputedStyle(cursor);
-      if (
-        cursor.hidden ||
-        cursor.hasAttribute('inert') ||
-        computed.display === 'none' ||
-        computed.visibility === 'hidden'
-      ) return false;
-    }
-    return true;
-  };
-  const largeAncestor = (start, predicate) => {
-    let element = start;
-    let match = null;
-    while (element && element !== document.body) {
-      const rect = element.getBoundingClientRect();
-      if (predicate(rect, element)) match = element;
-      element = element.parentElement;
-    }
-    return match;
-  };
-
+  const { visible, layoutPresent, structurallyMounted } = nativeUi;
   const createBackgroundImage = () => {
     const image = document.createElement('img');
     image.dataset.forgeBackgroundImage = '';
@@ -344,8 +289,7 @@ function applyRuntime(payload) {
   const ensureBackground = () => {
     // The client's page paint node owns insets and corner geometry. Mount our
     // inert layer inside it instead of reconstructing that shape from pixels.
-    const pageSurface = [...document.querySelectorAll('[data-app-shell-page-surface] [class*="_PageSurface_"]')]
-      .find(element => element.getClientRects().length && getComputedStyle(element).display !== 'none');
+    const pageSurface = nativeUi.pagePaint();
     const host = pageSurface || document.body;
     root.dataset.forgeBackgroundPlacement = pageSurface ? 'native-page' : 'viewport';
     // Keep decoded layers across React shell replacement. A detached native
@@ -673,7 +617,7 @@ function applyRuntime(payload) {
       const bounds = image.getBoundingClientRect();
       const width = bounds.width, height = bounds.height;
       if (!width || !height) return;
-      const sidebar = document.querySelector('.sidebar-navigation[class*="_ConversationSidebar_"]');
+      const sidebar = nativeUi.conversationSidebar();
       const sidebarBounds = sidebar?.getBoundingClientRect();
       const stripLeft = Math.max(0, (sidebarBounds?.left ?? bounds.left) - bounds.left);
       const stripWidth = Math.min(sidebarBounds?.width || width, width - stripLeft);
@@ -897,12 +841,7 @@ function applyRuntime(payload) {
     'New task', 'New chat', 'Start a new chat'
   ];
   const exactNewTask = label => newTaskLabels.some(item => label === item || label.startsWith(`${item} `));
-  const threadSelectors = [
-    '[data-virtualized-turn-content]',
-    '[data-local-conversation-final-assistant]',
-    '[data-message-author-role]',
-    '[data-content-search-turn-key]'
-  ].join(',');
+  const threadSelectors = selectors.turns;
   const conversationHasTurns = element => {
     if (!(element instanceof Element)) return false;
     if (element.matches(threadSelectors)) return true;
@@ -916,7 +855,7 @@ function applyRuntime(payload) {
      * Detect the layout node instead of waiting for paint; otherwise the skin
      * only appears after an unrelated resize schedules another refresh.
      */
-    const stable = [...scope.querySelectorAll('[data-feature="game-source"]')].find(layoutPresent);
+    const stable = nativeUi.first(selectors.landing, scope, layoutPresent);
     if (stable) return stable;
     return [...scope.querySelectorAll('h1, h2, .heading-xl')]
       .find(element => layoutPresent(element) && landingTitlePattern.test(textOf(element)));
@@ -925,9 +864,9 @@ function applyRuntime(payload) {
     const landingTitle = findLandingTitle(workspace);
     // Embedded messaging has its own message markup, including empty dot
     // conversations. Only the visible pane counts; retained hidden tabs do not.
-    const messagingThread = [...document.querySelectorAll('.messaging-root.messaging-embedded .thread-pane')].find(visible);
+    const messagingThread = nativeUi.first(selectors.messaging);
     const threadEvidence = messagingThread || [...document.querySelectorAll([
-      '[data-thread-find-target="conversation"]',
+      selectors.conversation,
       threadSelectors
     ].join(','))].find(element => visible(element) && conversationHasTurns(element));
     /*
@@ -950,10 +889,7 @@ function applyRuntime(payload) {
       landingTitle: surface === 'landing' ? landingTitle : null
     };
   };
-  const settingsPageIsActive = () => (
-    [...document.querySelectorAll('[class~="group/settings"], .scrollbar-stable.flex-1.overflow-y-auto.p-panel')]
-      .some(layoutPresent)
-  );
+  const settingsPageIsActive = nativeUi.settingsActive;
   const commonAncestor = (first, second) => {
     if (!(first instanceof Element) || !(second instanceof Element)) return null;
     let cursor = first;
@@ -992,16 +928,7 @@ function applyRuntime(payload) {
       mark(leafMatch(landingSubtitlePattern), 'forge-landing-subtitle');
     }
   };
-  const findWorkspace = () => {
-    let workspace = document.querySelector('[role="main"], main');
-    if (workspace && visible(workspace)) return workspace;
-    const anchor = document.querySelector('[data-thread-find-target="conversation"], [data-vscode-context*="supportsNewChatMenu"]');
-    workspace = largeAncestor(anchor, rect => rect.width >= innerWidth * .42 && rect.height >= innerHeight * .58);
-    if (workspace && visible(workspace)) return workspace;
-    return largeAncestor(document.elementFromPoint(innerWidth * .52, innerHeight * .5), rect => (
-      rect.width >= innerWidth * .42 && rect.height >= innerHeight * .58 && rect.width < innerWidth * .92
-    ));
-  };
+  const findWorkspace = nativeUi.workspace;
   const setResizeTargets = targets => {
     const next = [...new Set(targets.filter(Boolean))];
     if (
@@ -1049,17 +976,6 @@ function applyRuntime(payload) {
       .forEach(element => mark(element, 'forge-topbar-menu-item'));
     return [topbar, taskbar].filter(Boolean);
   };
-  const compactPaintSurface = (element, boundary, minimumWidth) => {
-    let cursor = element;
-    let match = null;
-    while (cursor && cursor !== boundary && cursor !== document.body) {
-      const rect = cursor.getBoundingClientRect();
-      if (rect.height >= 20 && rect.height <= 56 && rect.width >= minimumWidth) match = cursor;
-      if (rect.height > 72) break;
-      cursor = cursor.parentElement;
-    }
-    return match;
-  };
   const markComposerSurfaces = () => {
     /*
      * The native adapter owns editability and can temporarily render the
@@ -1076,15 +992,12 @@ function applyRuntime(payload) {
       'textarea',
       '[data-placeholder]'
     ].join(', ');
-    const composerSurfaceSelector = [
-      '.composer-surface-chrome',
-      '[data-composer-surface-variant]'
-    ].join(', ');
+    const composerSurfaceSelector = selectors.composerSurface;
     let composerRoot = null;
     let editor = null;
     let surface = null;
     for (const candidateRoot of document.querySelectorAll(
-      '[data-codex-composer-root]'
+      selectors.composer
     )) {
       if (!visible(candidateRoot)) continue;
       for (const candidateSurface of candidateRoot.querySelectorAll(composerSurfaceSelector)) {
@@ -1143,58 +1056,8 @@ function applyRuntime(payload) {
      * Grouping every navigation target promotes the whole composer root and
      * destroys the native context geometry.
      */
-    const navigationSelector = [
-      '[data-composer-navigation-target="workspace-project"]',
-      '[data-composer-navigation-target="environment"]',
-      '[data-composer-navigation-target="run-location"]',
-      '[data-composer-navigation-target="branch"]',
-      '[data-composer-navigation-target="starting-state"]'
-    ].join(', ');
-    const threadUtilityTokens = [
-      'flex',
-      'flex-wrap',
-      'items-center',
-      'gap-2',
-      'overflow-visible',
-      'pr-2',
-      'pl-2'
-    ];
-    const homeUtilityTokens = [
-      'flex',
-      'flex-nowrap',
-      'items-center',
-      'gap-2',
-      'overflow-hidden'
-    ];
-    const homeScrollArea = [
-      ...(composerComponent?.querySelectorAll(
-        '[data-composer-utility-bar-scroll-area]'
-      ) || [])
-    ].find(visible) || null;
-    const homeContext = homeScrollArea
-      ? [homeScrollArea.parentElement, homeScrollArea]
-        .find(element => (
-          element &&
-          element !== composerRoot &&
-          hasClassTokens(element, homeUtilityTokens)
-        )) || null
-      : null;
-    const threadContext = [
-      ...(composerComponent?.querySelectorAll('div') || [])
-    ].find(element => (
-      element !== composerRoot &&
-      element !== surface &&
-      visible(element) &&
-      hasClassTokens(element, threadUtilityTokens) &&
-      element.querySelector(navigationSelector)
-    )) || null;
-    const context = homeContext || threadContext;
-    if (
-      context &&
-      context !== composerRoot &&
-      context !== surface &&
-      context.getBoundingClientRect().height <= 64
-    ) {
+    const context = nativeUi.utilityContext(composerRoot, surface);
+    if (context && context !== composerRoot && context !== surface) {
       const contextRect = context.getBoundingClientRect();
       const surfaceRect = surface.getBoundingClientRect();
       /*
@@ -1228,214 +1091,27 @@ function applyRuntime(payload) {
     const aboveComposerPortals = aboveComposerPortal
       ? [aboveComposerPortal]
       : [];
-    const nativePanelRow = panel => (
-      structurallyMounted(panel) &&
-      hasClassTokens(panel, [
-        'relative',
-        'min-w-0',
-        'overflow-clip',
-        'text-token-foreground'
-      ])
-    );
-    const panelStacks = [
-      ...(composerRoot.querySelectorAll(
-        '.order-2.flex.min-w-0.flex-col'
-      ) || [])
-    ].filter(stack => (
-      structurallyMounted(stack) &&
-      !aboveComposerPortal?.contains(stack) &&
-      [...stack.children].some(nativePanelRow)
-    ));
+    const panelStacks = nativeUi.all(selectors.composerRail, composerRoot)
+      .filter(structurallyMounted);
     panelStacks.forEach(stack => mark(stack, 'forge-composer-panel-stack'));
-    const panelCandidates = panelStacks.flatMap(stack => (
-      [...stack.children].filter(nativePanelRow)
-    ));
+    const panelCandidates = nativeUi.all(selectors.composerRailItem, composerRoot)
+      .filter(element => structurallyMounted(element) && element.getAttribute('data-composer-rail-item') !== 'exiting');
     panelCandidates.forEach(panel => mark(panel, 'forge-composer-panel'));
-    const queuedListTokens = [
-      'vertical-scroll-fade-mask',
-      'hide-scrollbar',
-      'flex',
-      'max-h-[30dvh]',
-      'flex-col',
-      'gap-px',
-      'overflow-x-hidden',
-      'overflow-y-auto',
-      'px-3',
-      'py-row-y'
-    ];
-    const queuedMessageRowTokens = [
-      'group',
-      'flex',
-      'min-w-0',
-      'items-center',
-      'justify-between',
-      'gap-2',
-      'py-0.5',
-      'text-sm'
-    ];
-    const queuedLists = panelCandidates.flatMap(panel => (
-      [...panel.querySelectorAll('div')].filter(element => (
-        structurallyMounted(element) &&
-        hasClassTokens(element, queuedListTokens)
-      ))
-    ));
-    const queuedItems = queuedLists.flatMap(list => (
-      [...list.children].filter(item => (
-        structurallyMounted(item) &&
-        item.classList.contains('overflow-visible') &&
-        [...item.querySelectorAll('div')].some(row => (
-          structurallyMounted(row) &&
-          hasClassTokens(row, queuedMessageRowTokens)
-        ))
-      ))
-    ));
+    // Queued rows have no own identity attribute. The native scroll-mask class
+    // is used only within a composer rail item, without padding/font tokens.
+    const queuedLists = panelCandidates.flatMap(panel => nativeUi.all('.vertical-scroll-fade-mask', panel));
+    const queuedItems = queuedLists.flatMap(list => [...list.children]
+      .filter(item => structurallyMounted(item) && item.classList.contains('overflow-visible')));
     queuedItems.forEach(item => mark(item, 'forge-composer-queue-item'));
 
-    /*
-     * ChatGPT.exe 26.715.2305.0 mounts the composer beneath an official
-     * data-thread-scroll-footer. Its first child is a pointer-transparent,
-     * full-footer gradient whose only job is to blend the native solid main
-     * surface into the thread. Once the thread background is photographic,
-     * that paint-only child becomes the unrelated black carrier visible
-     * around the paper stack. Clear the inner gradient only: the sticky
-     * footer, its obstacle layer and every native hit box stay untouched.
-     */
-    const threadScrollFooter = composerRoot.closest(
-      '[data-thread-scroll-footer="true"]'
-    );
-    const threadFadeHost = threadScrollFooter
-      ? [...threadScrollFooter.children].find(child => (
-          layoutPresent(child) &&
-          hasClassTokens(child, [
-            'pointer-events-none',
-            'absolute',
-            'inset-x-0',
-            'bottom-0',
-            'z-0',
-            'flex',
-            'h-full',
-            'w-full',
-            'justify-center',
-            'pt-4'
-          ]) &&
-          child.childElementCount === 1
-        )) || null
-      : null;
-    const threadFadePaint = threadFadeHost?.firstElementChild || null;
-    const nativeThreadFadePaint = (
-      threadFadePaint &&
-      hasClassTokens(threadFadePaint, [
-        'z-0',
-        'h-full',
-        'bg-gradient-to-t'
-      ]) &&
-      [...threadFadePaint.classList].some(token => (
-        token === 'from-token-main-surface-primary' ||
-        token === 'extension:from-token-bg-primary'
-      ))
-        ? threadFadePaint
-        : null
-    );
-    if (nativeThreadFadePaint) {
-      mark(nativeThreadFadePaint, 'forge-composer-thread-fade');
-    }
-
-    const planPattern = /(?:第\s*\d+\s*\/\s*\d+\s*步|step\s*\d+\s*\/\s*\d+)/i;
-    const diffPattern = /(?:\d+\s*个文件(?:已)?(?:更改|修改)|\d+\s*files?\s+changed)/i;
-    const progressHosts = aboveComposerPortals.flatMap(portal => (
-      [...portal.children].filter(child => (
-        visible(child) &&
-        child.classList.contains('relative') &&
-        child.classList.contains('col-start-1') &&
-        child.classList.contains('row-start-1') &&
-        child.classList.contains('h-8') &&
-        child.classList.contains('self-end')
-      ))
-    ));
-    const progressFadeTokens = [
-      'pointer-events-none',
-      'absolute',
-      'inset-x-0',
-      '-bottom-1',
-      'h-7',
-      'bg-gradient-to-t',
-      'from-token-main-surface-primary',
-      'to-transparent'
-    ];
-    const nativeProgressFade = (host, child) => {
-      if (!layoutPresent(child)) return false;
-      if (hasClassTokens(child, progressFadeTokens)) return true;
-
-      /*
-       * ChatGPT.exe keeps this paint-only fade either directly below the
-       * source-backed progress host or one level down inside its Motion
-       * wrapper. Its Tailwind color/direction tokens have changed between
-       * packaged builds, so identify that single paint layer by the native
-       * geometry and interaction contract instead of by palette classes. The
-       * sibling that owns the pill remains interactive and cannot satisfy it.
-       */
-      const hostRect = host.getBoundingClientRect();
-      const rect = child.getBoundingClientRect();
-      const style = getComputedStyle(child);
-      const horizontalInset = Math.max(
-        Math.abs(rect.left - hostRect.left),
-        Math.abs(rect.right - hostRect.right)
-      );
-      const nearHostBottom = (
-        rect.top <= hostRect.bottom + 8 &&
-        rect.bottom >= hostRect.bottom - 8
-      );
-      return (
-        style.position === 'absolute' &&
-        style.pointerEvents === 'none' &&
-        child.childElementCount === 0 &&
-        horizontalInset <= 2 &&
-        rect.height >= 16 &&
-        rect.height <= 48 &&
-        nearHostBottom
-      );
-    };
-    const progressFades = progressHosts.flatMap(host => {
-      const candidates = [
-        ...host.children,
-        ...[...host.children].flatMap(child => [...child.children])
-      ];
-      return candidates.filter(child => nativeProgressFade(host, child));
-    }).filter((fade, index, fades) => fades.indexOf(fade) === index);
-    progressFades.forEach(fade => mark(fade, 'forge-composer-progress-fade'));
-    const progressPills = progressHosts.map(host => {
-      const descendants = [host, ...host.querySelectorAll('*')].filter(element => {
-        if (!visible(element)) return false;
-        const rect = element.getBoundingClientRect();
-        const text = textOf(element);
-        return (
-          rect.height >= 24 &&
-          rect.height <= 56 &&
-          rect.width > 1 &&
-          rect.width <= surface.getBoundingClientRect().width &&
-          (planPattern.test(text) || diffPattern.test(text))
-        );
-      });
-      return descendants.find(element => hasClassTokens(element, [
-        'flex',
-        'w-max',
-        'max-w-full',
-        'min-w-0',
-        'items-center',
-        'gap-2',
-        'rounded-3xl',
-        'border',
-        'px-3',
-        'py-1.5'
-      ])) || null;
-    }).filter((pill, index, pills) => pill && pills.indexOf(pill) === index);
-    progressPills.forEach(pill => {
-      const text = textOf(pill);
-      mark(pill, 'forge-composer-progress-pill');
-      if (planPattern.test(text)) mark(pill, 'forge-plan-pill');
-      if (diffPattern.test(text)) mark(pill, 'forge-diff-summary');
-
-    });
+    const progressHosts = aboveComposerPortals.flatMap(portal => nativeUi.all(selectors.progress, portal))
+      .filter(visible);
+    // The packaged AboveComposerFixedContentSurface owns this native paint
+    // token. Scope it to the published progress portal; text and row dimensions
+    // are intentionally not part of its identity (translations/zoom may vary).
+    const progressPills = progressHosts.flatMap(host => nativeUi.all('.bg-surface-elevated-secondary', host))
+      .filter(visible);
+    progressPills.forEach(pill => mark(pill, 'forge-composer-progress-pill'));
 
     return [
       composerRoot,
@@ -1444,8 +1120,6 @@ function applyRuntime(payload) {
       context,
       ...panelStacks,
       ...panelCandidates,
-      nativeThreadFadePaint,
-      ...progressFades,
       ...progressPills
     ];
   };
@@ -1453,14 +1127,13 @@ function applyRuntime(payload) {
     // SummaryPanel.Content now renders a FloatingSurface island. The PIP
     // obstacle is an empty sibling, so never use it as a query scope.
     // Static CSS owns first paint; markers only report component coverage.
-    const cards = [...document.querySelectorAll(
-      '.rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]'
-    )].filter(card => layoutPresent(card) && card.querySelector('[data-slot^="thread-summary-panel-item"]'));
+    const cards = nativeUi.all(selectors.summary)
+      .filter(layoutPresent);
     const targets = [];
     for (const card of cards) {
       mark(card, 'forge-right-panel');
       targets.push(card);
-      card.querySelectorAll('[data-slot="thread-summary-panel-item"], [data-slot="thread-summary-panel-item-button"], [data-slot="thread-summary-panel-item-link"]')
+      card.querySelectorAll(selectors.summaryRows)
         .forEach(row => { mark(row, 'forge-right-row'); targets.push(row); });
     }
     return targets;
@@ -1485,176 +1158,20 @@ function applyRuntime(payload) {
     return targets;
   };
   const markPageSurfaces = () => {
-    /*
-     * Settings, browser/file workspaces and other entered application pages
-     * use a full-viewport main surface instead of the thread main. Detect the
-     * source token and viewport ownership, then map its inner main-surface and
-     * semantic cards without relying on a localized page title.
-     */
-    const pageLayoutPresent = element => {
-      if (!(element instanceof Element)) return false;
-      const rect = element.getBoundingClientRect();
-      const computed = getComputedStyle(element);
-      /*
-       * Electron keeps application subpages below an `invisible` portal
-       * carrier and restores visibility on the mounted child. Visibility is
-       * overridable, unlike display:none; checking every ancestor therefore
-       * rejected the page that is actually painted on screen.
-       */
-      return rect.width > 1 && rect.height > 1 &&
-        computed.display !== 'none' && computed.visibility !== 'hidden';
-    };
-    const fullPageRoots = [...document.querySelectorAll(
-      'main.bg-token-main-surface-primary'
-    )].filter(element => {
-      if (!pageLayoutPresent(element)) return false;
-      const rect = element.getBoundingClientRect();
-      return rect.width >= innerWidth * .82 && rect.height >= innerHeight * .82 &&
-        textOf(element).length > 3;
-    });
-    const enteredWorkspaceRoots = [...document.querySelectorAll('main.main-surface')]
-      .filter(element => {
-        if (!pageLayoutPresent(element)) return false;
-        const rect = element.getBoundingClientRect();
-        if (rect.width < innerWidth * .42 || rect.height < innerHeight * .5) return false;
-        if (element.querySelector([
-          '[data-thread-find-target="conversation"]',
-          '[data-feature="game-source"]',
-          '[data-testid="home-icon"]',
-          '[data-codex-composer-root]',
-          '[data-thread-find-composer="true"]'
-        ].join(','))) return false;
-        return textOf(element).length > 3;
-      });
-    const pageRoots = [...new Set([...fullPageRoots, ...enteredWorkspaceRoots])];
-    const targets = [];
-    for (const pageRoot of pageRoots) {
+    // These marks report the native region. Static CSS paints its actual
+    // material owner on the first frame; no viewport ratios, localized text or
+    // guessed rounded/bordered cards participate in page identity.
+    const targets = nativeUi.all(selectors.main).filter(layoutPresent);
+    for (const pageRoot of targets) {
       mark(pageRoot, 'forge-page-surface');
-      targets.push(pageRoot);
-      const settingsScroller = pageRoot.querySelector(
-        '.scrollbar-stable.flex-1.overflow-y-auto.p-panel'
-      );
-      const scheduledSearch = pageRoot.querySelector('#scheduled-page-search');
-      const pageRect = pageRoot.getBoundingClientRect();
-      if (settingsScroller && pageLayoutPresent(settingsScroller)) {
-        mark(pageRoot, 'forge-settings-page');
-        const settingsShell = pageRoot.parentElement?.closest(
-          'main.no-drag.flex.h-full.min-h-0.flex-col'
-        );
-        if (settingsShell && pageLayoutPresent(settingsShell)) {
-          mark(settingsShell, 'forge-settings-page');
-          targets.push(settingsShell);
-        }
-      }
-      if (scheduledSearch && pageLayoutPresent(scheduledSearch)) {
-        mark(pageRoot, 'forge-scheduled-page');
-        /*
-         * The scheduler's search field is nested in a wide sticky layout
-         * carrier.  The carrier's utility tokens change between desktop
-         * releases, so follow the actual input upward and mark only the first
-         * short, near-page-width ancestor.  This avoids styling the input
-         * itself and removes the otherwise detached full-width band.
-         */
-        let searchBand = null;
-        for (
-          let candidate = scheduledSearch.parentElement;
-          candidate && candidate !== pageRoot;
-          candidate = candidate.parentElement
-        ) {
-          if (!pageLayoutPresent(candidate)) continue;
-          const rect = candidate.getBoundingClientRect();
-          if (
-            rect.width >= pageRect.width * .74 &&
-            rect.height >= 38 &&
-            rect.height <= 120
-          ) {
-            searchBand = candidate;
-            break;
-          }
-        }
-        if (searchBand) {
-          mark(searchBand, 'forge-page-search-band');
-          targets.push(searchBand);
-        }
-      }
-      const contentCandidates = [...pageRoot.querySelectorAll(
-        ':is(.main-surface, .bg-token-main-surface-primary)'
-      )]
-        .filter(element => {
-          if (!pageLayoutPresent(element)) return false;
-          const rect = element.getBoundingClientRect();
-          return element !== pageRoot &&
-            rect.width >= Math.max(320, pageRect.width * .28) &&
-            rect.height >= pageRect.height * .5;
-        });
-      const primaryContent = contentCandidates.find(element => (
-        element !== pageRoot &&
-        element.classList.contains('h-full') &&
-        element.tagName !== 'MAIN'
-      )) || contentCandidates.at(-1) || null;
-      const contentSurfaces = [...new Set([
-        ...(primaryContent ? [primaryContent] : []),
-        ...contentCandidates.filter(element => (
-          element.classList.contains('bg-token-main-surface-primary') ||
-          element.classList.contains('main-surface')
-        ))
-      ])];
-      for (const content of contentSurfaces) {
-        mark(content, 'forge-page-content');
-        targets.push(content);
-        const cards = [...content.querySelectorAll(
-          ':is(div, section, article)[class*="rounded"][class~="border"]'
-        )].filter(element => {
-          if (!pageLayoutPresent(element)) return false;
-          const rect = element.getBoundingClientRect();
-          return rect.width >= 260 && rect.height >= 44 && rect.height <= innerHeight * .78;
-        });
-        cards.forEach(card => mark(card, 'forge-page-card'));
-        targets.push(...cards);
-
-        /*
-         * A page can place a normal text input directly inside a tall editor
-         * group.  `closest(div)` promoted that whole group to a 700 px search
-         * bar on Scheduled Tasks.  Only a compact, direct input shell is a
-         * page search surface; large editors remain owned by their page card.
-         */
-        const searchSurfaces = [...content.querySelectorAll(
-          'input[class*="text-token-input-foreground"]'
-        )].map(input => input.parentElement).filter(surface => {
-          if (!pageLayoutPresent(surface)) return false;
-          const rect = surface.getBoundingClientRect();
-          return rect.width >= 120 && rect.height >= 24 && rect.height <= 64;
-        });
-        searchSurfaces.forEach(surface => mark(surface, 'forge-page-search'));
-        targets.push(...searchSurfaces);
-      }
+      const settings = nativeUi.first(selectors.settings, pageRoot, layoutPresent);
+      if (settings && !settings.closest(selectors.overlay)) mark(pageRoot, 'forge-settings-page');
     }
     return targets;
   };
   const markPageSearchBands = () => {
-    const targets = [];
-    for (const search of document.querySelectorAll(
-      '#scheduled-page-search, #plugins-store-page-search'
-    )) {
-      if (!layoutPresent(search)) continue;
-      for (
-        let candidate = search.parentElement;
-        candidate && candidate !== document.body;
-        candidate = candidate.parentElement
-      ) {
-        if (!layoutPresent(candidate)) continue;
-        const rect = candidate.getBoundingClientRect();
-        if (
-          rect.width >= innerWidth * .7 &&
-          rect.height >= 38 &&
-          rect.height <= 120
-        ) {
-          mark(candidate, 'forge-page-search-band');
-          targets.push(candidate);
-          break;
-        }
-      }
-    }
+    const targets = nativeUi.all(selectors.catalogHeader).filter(layoutPresent);
+    targets.forEach(header => mark(header, 'forge-page-search-band'));
     return targets;
   };
   const floatingSidebarShellSelector = [
@@ -1662,12 +1179,11 @@ function applyRuntime(payload) {
     '[data-testid="app-shell-floating-left-panel"] > aside',
     '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)'
   ].join(',');
-  const sidebarShellSelector = [floatingSidebarShellSelector, 'aside.app-shell-left-panel'].join(',');
+  const sidebarShellSelector = [floatingSidebarShellSelector, selectors.sidebar].join(',');
   const markSidebarSurfaces = () => {
     // Native rows own their paint. Only track mounted shells; measuring every
     // button and text Range served the retired selected-row design.
-    const sidebar = [...document.querySelectorAll(floatingSidebarShellSelector)].find(layoutPresent) ||
-      [...document.querySelectorAll('aside.app-shell-left-panel')].find(layoutPresent);
+    const sidebar = nativeUi.sidebar();
     if (!sidebar) return [];
     mark(sidebar, 'forge-sidebar');
     mark(sidebar, 'forge-sidebar-shell');
@@ -1827,6 +1343,7 @@ function applyRuntime(payload) {
   const storedSceneState = readSceneState();
   const state = {
     revision: payload.runtimeRevision,
+    sourceFingerprint: payload.sourceFingerprint,
     observer: null,
     resizeObserver: null,
     observedResizeTargets: [],
@@ -2163,26 +1680,34 @@ function applyRuntime(payload) {
   };
 
   const surfaceSignalSelector = [
-    '[data-feature="game-source"]',
-    '[data-testid="home-icon"]',
-    '[data-vscode-context*="supportsNewChatMenu"]',
-    '[data-thread-find-target="conversation"]',
-    '[data-virtualized-turn-content]',
-    '[data-content-search-turn-key]',
-    '[data-local-conversation-final-assistant]',
-    '[data-message-author-role]'
+    selectors.landing,
+    selectors.homeIcon,
+    selectors.messaging,
+    selectors.messagingRoot,
+    selectors.main,
+    selectors.mainContent,
+    selectors.pageShell,
+    selectors.conversationHost,
+    selectors.conversation,
+    selectors.turns
   ].join(',');
   const refreshStructureSelector = [
-    '[class~="group/settings"]',
+    selectors.settings,
+    selectors.catalogHeader,
+    selectors.sidebar,
+    selectors.composerRail,
+    selectors.composerRailItem,
+    selectors.progress,
+    selectors.summary,
     '[class~="group/application-menu-top-bar"]',
     '[class~="group/application-menu-top-bar"] button[aria-haspopup="menu"][aria-expanded]',
     '.application-menu',
-    '[data-thread-find-composer]',
-    '[data-thread-scroll-footer="true"]',
-    '[data-codex-composer-root]',
-    '[data-above-composer-portal]',
-    '.composer-surface-chrome',
-    '[data-composer-navigation-target]',
+    selectors.composerFind,
+    selectors.footer,
+    selectors.composer,
+    selectors.composerPortal,
+    selectors.composerSurface,
+    selectors.composerNavigation,
     '[data-pip-obstacle="thread-summary-panel"]',
     '[data-slot^="thread-summary-panel-"]',
     '[role="menu"]',
@@ -2196,16 +1721,10 @@ function applyRuntime(payload) {
     '[role="option"]',
     '[data-composer-overlay-floating-ui="true"]',
     '.composer-home-top-menu',
-    ':is(div, section).flex.max-w-full.flex-col.overflow-hidden.rounded-lg[class~="bg-token-dropdown-background/50"][class*="--turn-diff-row-padding-y"]',
-    'main.bg-token-main-surface-primary',
-    'main.bg-token-main-surface-primary .main-surface',
-    'main.main-surface .bg-token-main-surface-primary',
-    'main.main-surface input[class*="text-token-input-foreground"]',
     '#scheduled-page-search',
     '#plugins-store-page-search',
     '.app-shell-left-panel',
     '[data-testid="app-shell-floating-left-panel"]',
-    '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)',
     '[data-app-action-sidebar-scroll]',
     '[data-app-action-sidebar-section]',
     '[data-app-action-sidebar-section-heading]',
@@ -2244,26 +1763,25 @@ function applyRuntime(payload) {
     return node.matches(refreshStructureSelector) || Boolean(node.closest(refreshStructureSelector));
   };
   const composerBoundarySelector = [
-    '[data-codex-composer-root]',
-    '[data-thread-find-composer="true"]',
-    '[data-thread-scroll-footer="true"]',
-    '.composer-surface-chrome',
-    '[data-above-composer-portal]'
+    selectors.composer,
+    selectors.composerFind,
+    selectors.footer,
+    selectors.composerSurface,
+    selectors.composerPortal
   ].join(',');
   const composerSignalSelector = [
-    '[data-codex-composer-root]',
-    '[data-thread-scroll-footer="true"]',
-    '.composer-surface-chrome',
-    '[data-above-composer-portal]',
-    '[data-composer-utility-bar-scroll-area]',
-    '[data-composer-navigation-target]',
+    selectors.composerRail,
+    selectors.composerRailItem,
+    selectors.progress,
+    selectors.composer,
+    selectors.footer,
+    selectors.composerSurface,
+    selectors.composerPortal,
+    selectors.utilityScroll,
+    selectors.composerNavigation,
     '[data-composer-overlay-floating-ui="true"]',
     '.composer-home-top-menu',
-    '.order-2.flex.min-w-0.flex-col',
-    '.relative.min-w-0.overflow-clip.text-token-foreground',
-    '.vertical-scroll-fade-mask.hide-scrollbar.flex.max-h-\\[30dvh\\].flex-col.gap-px.overflow-x-hidden.overflow-y-auto.px-3.py-row-y',
-    '.relative.col-start-1.row-start-1.h-8.self-end',
-    '.flex.w-max.max-w-full.min-w-0.items-center.gap-2.rounded-3xl.border.px-3.py-1\\.5',
+    '[data-composer-rail-item] .vertical-scroll-fade-mask',
     'button.size-token-button-composer'
   ].join(',');
   const nodeTouchesComposerSignal = node => (
@@ -2285,13 +1803,18 @@ function applyRuntime(payload) {
     );
   };
   const firstPaintStructureSelector = [
-    '[class~="group/settings"]',
-    '[data-codex-composer-root]',
-    '[data-thread-find-composer="true"]',
-    '[data-thread-scroll-footer="true"]',
-    '.composer-surface-chrome',
-    '[data-above-composer-portal]',
-    '[data-composer-utility-bar-scroll-area]',
+    selectors.settings,
+    selectors.sidebar,
+    selectors.composerRail,
+    selectors.composerRailItem,
+    selectors.progress,
+    selectors.summary,
+    selectors.composer,
+    selectors.composerFind,
+    selectors.footer,
+    selectors.composerSurface,
+    selectors.composerPortal,
+    selectors.utilityScroll,
     '[data-composer-navigation-target="workspace-project"]',
     '[data-composer-navigation-target="environment"]',
     '[data-composer-navigation-target="run-location"]',
@@ -2299,11 +1822,10 @@ function applyRuntime(payload) {
     '[data-composer-navigation-target="starting-state"]',
     '[data-composer-overlay-floating-ui="true"]',
     '.composer-home-top-menu',
-    ':is(div, section).flex.max-w-full.flex-col.overflow-hidden.rounded-lg[class~="bg-token-dropdown-background/50"][class*="--turn-diff-row-padding-y"]',
     '[data-pip-obstacle="thread-summary-panel"]',
     '.app-shell-left-panel',
     '[data-testid="app-shell-floating-left-panel"]',
-    '[class~="fixed"][class~="left-0"] > aside:has(nav.sidebar-foreground-muted)'
+    selectors.floatingSidebar
   ].join(',');
   const nodeMountsFirstPaintStructure = node => (
     node.nodeType === Node.ELEMENT_NODE &&
@@ -2344,7 +1866,7 @@ function applyRuntime(payload) {
     if (node.closest('[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"], [role="tooltip"], [class*="ComposerTopMenuPanel"]')) return 'overlay';
     if (node.closest(composerBoundarySelector)) return 'composer';
     if (node.closest(sidebarShellSelector)) return 'sidebar';
-    if (node.closest('.rounded-3xl.bg-surface-elevated-secondary[class~="electron:elevation-prominent"]')) return 'right';
+    if (node.closest(selectors.summary)) return 'right';
     return null;
   };
   const mutationRegions = records => {
@@ -2465,11 +1987,15 @@ function applyRuntime(payload) {
       'aria-expanded',
       'aria-label',
       'aria-disabled',
+      'aria-hidden',
       'disabled',
       'hidden',
       'inert',
       'title',
       'data-state',
+      'data-composer-rail-item',
+      'data-composer-rail-placement',
+      'data-summary-panel-variant',
       'data-disabled',
       'data-app-action-sidebar-thread-active',
       'data-app-action-sidebar-project-collapsed'
@@ -2564,39 +2090,25 @@ export function makeStyleUpdateExpression({ styleSheet, variables }) {
   })()`;
 }
 
-export function makeApplyExpression({ styleSheet, variables }) {
+export function makeApplyExpression({ styleSheet, variables, sourceFingerprint = null }) {
   const payload = JSON.stringify({
     styleSheet,
     variables,
     markClasses: MARK_CLASSES,
     runtimeKey: RUNTIME_KEY,
     runtimeRevision: RUNTIME_REVISION,
-    retiredRuntimeKeys: RETIRED_RUNTIME_KEYS
+    sourceFingerprint,
+    retiredRuntimeKeys: RETIRED_RUNTIME_KEYS,
+    nativeSelectors: NATIVE_UI_SELECTORS
   });
-  return `(${applyRuntime.toString()})(${payload})`;
+  return `(${applyRuntime.toString()})(${payload}, ${createNativeUiAdapter.toString()})`;
 }
 
 export const THEME_STATE_EXPRESSION = `(() => {
   const overlay = document.getElementById('wukong-codex-theme-background');
   const activeLayer = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]') || null;
   const activeImage = activeLayer?.querySelector('[data-forge-background-image]') || null;
-  const visible = element => {
-    if (!(element instanceof Element)) return false;
-    const rect = element.getBoundingClientRect();
-    if (rect.width <= 1 || rect.height <= 1) return false;
-    for (let cursor = element; cursor && cursor !== document.documentElement; cursor = cursor.parentElement) {
-      const computed = getComputedStyle(cursor);
-      if (
-        cursor.hidden ||
-        cursor.getAttribute('aria-hidden') === 'true' ||
-        cursor.hasAttribute('inert') ||
-        computed.display === 'none' ||
-        computed.visibility === 'hidden' ||
-        Number.parseFloat(computed.opacity || '1') <= .01
-      ) return false;
-    }
-    return true;
-  };
+  const visible = (${createNativeUiAdapter.toString()})(document, ${JSON.stringify(NATIVE_UI_SELECTORS)}).visible;
   const nativeComposerFrames = [
     ...document.querySelectorAll(
       '[data-thread-find-composer="true"] :is(.composer-surface-chrome, [data-composer-surface-variant])'

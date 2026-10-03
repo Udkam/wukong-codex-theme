@@ -26,6 +26,7 @@ docs/agent-runs/native-boundary-20260920/
 /scripts/install-native-pets.ps1
 /scripts/native-pet-release-policy.mjs
 /scripts/prepare-native-pets.mjs
+/scripts/rebuild-bajie-v3-motion.py
 /tests/native-pets-contract.test.mjs
 /docs/RELEASE_0.9.0.md
 /docs/RELEASE_0.10.0.md

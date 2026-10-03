@@ -1,18 +1,11 @@
-# 实机预览
+# 当前预览
 
-2026-10-02：dot-scenery-routing.png 为客户端 26.928.4866.0 从首页进入 dots、风景背景切换完成后的输入区截图，无聊天正文；运行时 v106，已验收。
+2026-10-03，Windows Codex 26.930.3748.0，运行时 v108-native-surface-adapter。
 
-## 当前源码：26.928 修复
+- dark-reading-footer.png / light-reading-footer.png：当前客户端的 dots composer-wrap，按原生边界截取底部 65px 内的输入控件与壁纸，不含聊天正文和附件内容。
+- dark-add-menu.png / light-add-menu.png：当前客户端实际打开“添加文件等内容”后，按 data-mention-list-scroll-area 截取滚动区。展示添加与插件标题、选中项和说明文字。
+- dark-shell.png / light-shell.png：当前客户端的空白新聊天页。为保护隐私，截图前临时把侧栏项目及聊天名称替换为“示例 N”，隐藏个人头像，截图后立即恢复；未替换页面布局、背景或材质。
 
-2026-10-01，Windows Codex 26.928.2636.0。dark-footer-26-928.png / light-footer-26-928.png 是原生外观选项切换后的实际输入区域截图，展示白／黑遮挡层与渐变带已移除。按原生 footer 范围截取，不包含聊天正文；截图后恢复浅色及原对话。未重绘图像。
+两种模式均通过原生外观设置切换，结束后恢复原深色模式与原对话。截图未重绘或合成；截图中的插件品牌属于原生菜单内容。预览不代表全部页面完成用户验收。
 
-## 历史发行：v0.17.0
-
-来源：Windows Codex 26.924.2738.0，2026-09-27；使用客户端原生外观模式切换，完成后恢复原浅色设置及对话。
-
-- dark-battle.png / light-battle.png：新对话页。
-- dark-settings.png / light-settings.png：外观设置页。
-
-侧栏名称在截图前临时替换为示例文本，头像隐藏；截图后恢复。图像未合成或重绘。此前旧 UI 的对话预览已移除，Git 历史可查。
-
-2026-10-02 v0.17.3：dark-conversation-contrast.png 为当前样式与真实雪山图片的示例文字浏览器夹具；dark-reading-footer.png 为客户端 26.928.4866.0 原生深色模式下截取的输入区。均不含实际聊天正文。
+旧 UI 预览已退出当前分支，可从 Git 历史或已发布版本查看。当前验证范围见 ../VALIDATION.md。
