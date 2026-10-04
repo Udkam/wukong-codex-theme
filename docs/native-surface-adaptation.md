@@ -1,6 +1,6 @@
 # 原生 UI 与主题替换接口
 
-核对客户端：Windows Codex 26.930.3748.0，2026-10-03。依据安装包的活动 CSS/JS，来源哈希见 native-asar-provenance.json。本文件统一现役设计、材质配置和覆盖边界；历史方案从 Git 查询。
+核对客户端：Windows Codex 26.930.3930.0，2026-10-04。依据安装包的活动 CSS/JS，来源哈希见 native-asar-provenance.json。本文件统一现役设计、材质配置和覆盖边界；历史方案从 Git 查询。
 
 ## 分层
 

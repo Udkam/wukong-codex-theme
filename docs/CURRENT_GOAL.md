@@ -1,13 +1,13 @@
 # 当前目标与发行状态
 
-更新：2026-10-03。最新正式发行版为 [v0.17.3](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.17.3)，对应发行说明见 [RELEASE_0.17.3.md](RELEASE_0.17.3.md)。
+更新：2026-10-04。当前版本为 [v0.18.0](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.0)，发行说明见 [RELEASE_0.18.0.md](RELEASE_0.18.0.md)。本轮用户已明确要求检查后同步发行。
 
-本轮为 **v108 适配重构与仓库清理，尚未发布新版本**。依据 Windows Codex 26.930.3748.0 的活动原生 CSS/JS，对比全部主题替换内容，在保留背景队列、切换快捷键、跨页复用、玻璃材质、深浅模式、首页装饰和自定义主题功能的前提下，减少对尺寸、工具类及组件层级的依赖。
+运行时 v108-native-surface-adapter 保留背景队列、切换快捷键、跨页复用、玻璃材质、深浅模式、首页装饰和自定义主题功能。对照 Windows Codex 26.930.3930.0 的活动 CSS/JS，按原生语义标记及实际绘制归属维护适配，减少尺寸、工具类和组件层级依赖。
 
-语义选择器与绘制归属集中到 `runtime/native-ui-contract.mjs`；颜色、模糊和阅读衬底从主题 `materials` 配置生成。旧 schemaVersion 3 主题继续兼容，七项退役纸张与侧栏纹理不再参与解码。完整范围和兼容边界见 [原生 UI 与主题替换接口](native-surface-adaptation.md)。
+语义映射集中于 runtime/native-ui-contract.mjs，材质和阅读颜色从主题 materials 配置生成。旧 schemaVersion 3 导出继续兼容；退役纸张和侧栏纹理不再加载。完整范围见 [原生表面与材质接口](native-surface-adaptation.md)。
 
-旧注入方案、历史截图专测、退役素材和重复文档已从当前源码移除，有效保护迁移到现役行为测试。Git 历史、既有标签和已发布版本保留。宠物、旧诊断及 Archives 存档已集中到仓库外的待手动删除目录，见 [清理记录](CLEANUP.md)。
+检查记录区分实机、自动回归、包校验与未执行范围，见 [验证记录](VALIDATION.md)。README、六张实机预览、版本和发行说明随运行包同步；源码与已发布包均使用本轮适配内容。
 
-本轮已注入本机，独立源码 154 项回归及 Studio 检查通过，候选包解压哈希一致。当前等待用户对重构后界面验收；实际页面检查与未执行项目见 [验证记录](VALIDATION.md)。按已授权范围同步源码仓库，正式发行仍遵循固定流程。
+旧方案、专用旧测试与重复文案已清理，有效保护迁移；Git 历史和既有版本保留。宠物、旧诊断及 Archives 存档的手动删除范围见 [清理记录](CLEANUP.md)。
 
-用户入口仍为 `start.cmd`。后续更新遵循 [固定更新与发布流程](DEVELOPMENT.md)。
+用户入口为 start.cmd。后续更新遵循 [固定更新与发布流程](DEVELOPMENT.md)。

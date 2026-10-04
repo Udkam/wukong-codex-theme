@@ -2,9 +2,9 @@
 
 为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生交互，按区域替换材质；10 张战斗图、3 张风景图，对话默认雪山。
 
-## 当前源码：原生表面适配重构
+## v0.18.0：原生表面适配重构
 
-**v108（2026-10-03，尚未发布）** 对照 Windows Codex **26.930.3748.0** 的原生 UI，集中维护容器识别和材质配置。最新正式下载仍为 **v0.17.3**，不包含本轮未发布修改。
+**v0.18.0（2026-10-04，运行时 v108）** 对照 Windows Codex **26.930.3930.0** 的原生 UI，集中维护容器识别和材质配置。本版运行包包含本轮适配与修复。
 
 - **容器随原生变化：** 优先按 `data-*` 所属关系识别壁纸、侧栏、输入区、进度区和摘要面板，减少对固定尺寸、工具类组合及文案的依赖。
 - **主题功能继续保留：** 背景队列、自动场景切换、锁定、前后切换、题字开关、深浅玻璃和设置往返复用均保留。
@@ -38,7 +38,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.17.3 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.17.3/Wukong-Codex-Theme-0.17.3-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.0 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.0/Wukong-Codex-Theme-0.18.0-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -53,7 +53,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.17.3**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.18.0**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 
@@ -85,4 +85,4 @@ Wukong-Codex-Theme/
 - [验证记录](docs/VALIDATION.md)
 - [资源来源](docs/ASSET_SOURCES.md)
 
-仓库当前分支仅保留主题。宠物制作资料、旧诊断和 Archives 存档已按用户要求移出原位置，集中到一个待手动删除目录；自动审批阻止永久删除，最终由用户整目录删除。详情见 [清理记录](docs/CLEANUP.md)。
+仓库当前分支仅保留主题。宠物制作资料、旧诊断和 Archives 存档已退出当前源码和运行包；本轮复查原归档目录与此前待手动删除目录均已不存在。历史迁移与本机清理记录见 [清理记录](docs/CLEANUP.md)。

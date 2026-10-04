@@ -1,6 +1,6 @@
 # 当前预览
 
-2026-10-03，Windows Codex 26.930.3748.0，运行时 v108-native-surface-adapter。
+2026-10-04，Windows Codex 26.930.3930.0，运行时 v108-native-surface-adapter。
 
 - dark-reading-footer.png / light-reading-footer.png：当前客户端的 dots composer-wrap，按原生边界截取底部 65px 内的输入控件与壁纸，不含聊天正文和附件内容。
 - dark-add-menu.png / light-add-menu.png：当前客户端实际打开“添加文件等内容”后，按 data-mention-list-scroll-area 截取滚动区。展示添加与插件标题、选中项和说明文字。
