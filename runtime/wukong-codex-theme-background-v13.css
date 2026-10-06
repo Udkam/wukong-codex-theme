@@ -185,13 +185,16 @@
 }
 /* First-paint selectors: body portals must not wait for JS marker scans.
  * Keep the shared material low-specificity so semantic surfaces below can
- * choose an opaque fill without inheriting an unrelated selector's weight. */
+ * choose an opaque fill without inheriting an unrelated selector's weight.
+ * FloatingSurface's radius class is also used on QuickChat's drag frame.
+ * Only its native background carrier owns paint; the positioning frame must
+ * remain transparent, including when the header expands. */
 :root.forge-ink-mountain :where(
   [role="menu"][class*="bg-"],
   [role="listbox"][class*="bg-"]:not([cmdk-list]):not([data-cmdk-list]),
   [role="dialog"][class*="bg-"]:not(:has(img.object-contain)),
   [role="alertdialog"][class*="bg-"],
-  [class*="_floatingSurface_"],
+  [class*="_floatingSurface_"]:is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
   [data-summary-panel-variant],
   [data-thread-user-message-navigation-tooltip-preview],
   aside[data-testid="app-shell-floating-left-panel"],

@@ -25,6 +25,7 @@ const native = (() => {
     return { css, source, permissionsCss, permissionsSource,
       permissionsClass: permissionsCss.match(/\.(_table_[\w]+)\{/)[1],
       suggestionClass: css.match(/\.(_suggestionMenu_[\w]+)\{/)[1],
+      floatingClass: css.match(/\.(_floatingSurface_[\w]+)\{/)[1],
       topTrayClass: css.match(/\.(_ComposerTopMenuPanel_[\w]+)\[/)[1] };
   } catch { return null; }
 })();
@@ -59,6 +60,50 @@ test('browser permissions use local cell materials and retain native paging, sti
       await page.close();
     }
   } finally {await browser.close();}
+});
+
+test('floating quick chat paints only the native carrier, preserving its drag frame and both sizes', {
+  skip: !native && 'Requires the installed native UI CSS'
+}, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) {
+      const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+      await page.setContent(`<html data-theme="${mode}"><head><style>${native.css}</style><style>
+        body{margin:0}#frame{position:absolute;right:12px;bottom:12px;width:572px;height:50px}
+        #paint{position:absolute;left:6px;top:0;width:560px;height:44px}
+        #frame[data-expanded]{height:106px}#frame[data-expanded] #paint{height:100px}
+        #other{position:absolute;left:10px;top:10px;width:120px;height:60px}
+      </style></head><body>
+        <div id="frame" data-quick-chat-drag-handle="true" data-pip-obstacle="quick-chat" class="${native.floatingClass}">
+          <div id="paint" class="${native.floatingClass} bg-surface-elevated-secondary"></div>
+          <input aria-label="Message" style="position:relative;margin:10px">
+        </div><div id="other" class="${native.floatingClass} bg-surface-canvas"></div>
+      </body></html>`);
+      const measure = () => page.locator('#frame,#paint,#other,input').evaluateAll(nodes => nodes.map(e => {
+        const s=getComputedStyle(e),r=e.getBoundingClientRect();return {rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,padding:s.padding,position:s.position};
+      }));
+      const before=await measure();
+      await page.locator('#frame').evaluate(e=>e.dataset.expanded='true');
+      const expanded=await measure();
+      await page.addStyleTag({content:theme});
+      await page.evaluate(mode=>{document.documentElement.classList.add('forge-ink-mountain');document.documentElement.dataset.forgeNativeTheme=mode;},mode);
+      assert.deepEqual(await measure(),expanded);
+      const paint = id => page.locator(id).evaluate(e=>{const s=getComputedStyle(e);return {bg:s.backgroundColor,image:s.backgroundImage,blur:s.backdropFilter,shadow:s.boxShadow};});
+      assert.deepEqual(await paint('#frame'),{bg:'rgba(0, 0, 0, 0)',image:'none',blur:'none',shadow:'none'});
+      for (const id of ['#paint','#other']) {
+        const material=await paint(id);
+        assert.notEqual(material.bg,'rgba(0, 0, 0, 0)');
+        assert.match(material.blur,/blur/);
+        assert.match(material.image,/linear-gradient/);
+      }
+      await page.locator('#frame').evaluate(e=>delete e.dataset.expanded);
+      assert.deepEqual(await measure(),before);
+      await page.getByRole('textbox',{name:'Message'}).fill('Still editable');
+      assert.equal(await page.getByRole('textbox',{name:'Message'}).inputValue(),'Still editable');
+      await page.close();
+    }
+  } finally { await browser.close(); }
 });
 
 test('Add suggestion groups use one reading material in both modes without changing native row states', {

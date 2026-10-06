@@ -1,5 +1,13 @@
 # 当前预览
 
+## 浮动输入框修正预览
+
+2026-10-06，Windows Codex 26.930.4958.0，运行时 v109-floating-paint-owner，随 v0.18.1 发行。
+
+dark-floating-composer.png / light-floating-composer.png：实际打开客户端空白浏览器标签页、进入完整视图，截取右下角收起状态的快速聊天输入框及周围 12px；不含聊天正文、标题及侧栏名称。两种模式通过原生外观设置切换，检查后关闭临时标签页并恢复原模式及原对话。
+
+## v0.18.0 发行预览
+
 2026-10-04，Windows Codex 26.930.3930.0，运行时 v108-native-surface-adapter。
 
 - dark-reading-footer.png / light-reading-footer.png：当前客户端的 dots composer-wrap，按原生边界截取底部 65px 内的输入控件与壁纸，不含聊天正文和附件内容。
