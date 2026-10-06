@@ -20,7 +20,7 @@ Windows ZIP 为 4,052,496 字节，37 个必要文件；解压后与构建目录
 
 用该 ZIP 解压的注入器执行恢复原生，verified=true；随后同包重新注入，verified=true、deferred=false。最终实读 document.hidden=false、backgroundReady=true、v109-floating-paint-owner。首次检查误选 avatar-overlay 页面导致等待超时，改为准确定位主页面后通过；未将检查目标错误写成产品缺陷。本轮没有主动重启客户端，也未执行完整冷启动、完整卸载或新流式重载采样。
 
-发行后回读 Release 与资产，并回下载核验 ZIP 和 SHA256SUMS.txt。清理重复副本与保留的最小本机证据见 CLEANUP.md。
+已回读 GitHub Release：v0.18.1 为 Latest，非草稿、非预发行，两个资产均已上传。重新下载的 ZIP 与 SHA256SUMS.txt 分别与本地正式文件 SHA-256 完全一致；远程 ZIP 大小同为 4,052,496 字节。清理重复副本与保留的最小本机证据见 CLEANUP.md。
 
 ## v0.18.0 发行验证
 
