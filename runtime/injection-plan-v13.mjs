@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v110-command-surface-owner';
+export const RUNTIME_REVISION = 'v111-dots-header-owner';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',

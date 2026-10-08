@@ -32,7 +32,7 @@ test('thread footer and embedded messaging clear layout paint without clearing c
         <div id="dot-composer-fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t"></div>
         <div class="card">Input</div></div></div></div></div>
       <div class="thread-scroll-container"><div id="fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t from-surface"></div></div>
-      <div id="orbit-fade" class="pointer-events-none _background_fixture_1" style="position-anchor:--orbit-messaging-header-fixture"></div>
+      <div id="orbit-fade" aria-hidden="true" class="pointer-events-none _background_fixture_1" style="position-anchor:--orbit-messaging-header-fixture"></div>
       <div id="standalone" class="messaging-root">Standalone</div></div></html>`);
     const measure = () => page.evaluate(() => [...document.querySelectorAll('#root *')].map(e=>{
       const r=e.getBoundingClientRect(),s=getComputedStyle(e);return [r.x,r.y,r.width,r.height,s.borderRadius,s.padding,s.borderBottomWidth];
@@ -47,6 +47,83 @@ test('thread footer and embedded messaging clear layout paint without clearing c
       assert.equal(await page.locator('#standalone').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
       assert.equal(await page.locator('.composer-wrap').evaluate(e=>getComputedStyle(e).borderBottomColor),'rgba(0, 0, 0, 0)');
       for(const id of ['fade','orbit-fade','dot-composer-fade'])assert.equal(await page.locator('#'+id).evaluate(e=>getComputedStyle(e).backgroundImage),'none');
+    }
+  } finally {await browser.close();}
+});
+
+test('native dots floating header paint follows its inert anchor contract across class and portal changes', {
+  skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
+}, async () => {
+  const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
+  const css = asar.listPackage(archive).filter(x => /webview[\\/]assets[\\/]app-(?:initial|shared)-.*\.css$/.test(x))
+    .map(x => asar.extractFile(archive, x.slice(1)).toString('utf8')).join('\n');
+  // Discover the two actual native paint hosts; keep the fixture independent of
+  // the theme selector so a native rename/removal fails the contract audit.
+  const nativeGradient = css.match(/\.(_background_[\w]+),\.(_floatingHeader_[\w]+)\{background-image:[^}]+\}/);
+  assert.ok(nativeGradient, 'Native dots floating header paint must be re-audited');
+  const [, legacyClass, floatingClass] = nativeGradient;
+  const renamedClass = 'future-header-material';
+  const renamedPaint = nativeGradient[0].replaceAll(legacyClass, renamedClass).replaceAll(floatingClass, renamedClass);
+  const browser = await chromium.launch({headless:true});
+  try {
+    const page = await browser.newPage({viewport:{width:1280,height:760}});
+    await page.setContent(`<html data-theme="dark"><style>${css}</style><style>${renamedPaint}
+      :root{--spacing:4px;--color-surface:rgb(24,24,24)}
+      :root[data-theme="light"]{--color-surface:rgb(250,250,250)}
+      body{margin:0}#root{position:relative;margin:24px;height:540px}
+      #viewport{height:360px;overflow:auto}.messaging-root{height:900px;padding-top:36px}
+      #anchor{anchor-name:--orbit-messaging-header-a;width:80%;height:60px}
+      .test-fade{position:absolute;top:anchor(bottom);left:anchor(left);width:anchor-size(width);min-height:16px}
+      .${renamedClass}{height:96px}#interaction{height:48px}
+      #call{background:rgb(44,55,66);border:2px solid rgb(88,99,110);padding:8px;border-radius:50%}
+      #placeholder,#ordinary,#outside-root{width:160px;height:24px}
+    </style><div id="root"><main id="viewport"><div class="messaging-root messaging-embedded">
+      <div id="anchor"></div><div id="ordinary" class="${floatingClass}"></div>
+    </div></main><div id="portal" data-main-content-layout>
+      <div id="legacy-fade" aria-hidden="true" class="pointer-events-none test-fade ${legacyClass}" style="position-anchor:--orbit-messaging-header-a"></div>
+      <div id="floating-fade" aria-hidden="true" class="pointer-events-none test-fade ${floatingClass}" style="position-anchor: --orbit-messaging-header-a;"></div>
+      <div id="renamed-fade" aria-hidden="true" class="pointer-events-none test-fade ${renamedClass}" style="opacity: 0.8; position-anchor:   --orbit-messaging-header-a; z-index: 2;"></div>
+      <div id="placeholder" aria-hidden="true" class="pointer-events-none ${floatingClass}" style="anchor-name:--orbit-messaging-header-placeholder"></div>
+      <div id="interaction" aria-hidden="false" class="pointer-events-none test-fade ${floatingClass}" style="position-anchor:--orbit-messaging-header-a"><button id="call">Call</button></div>
+      <div id="hidden-profile" aria-hidden="true" class="pointer-events-none test-fade ${floatingClass}" style="position-anchor:--orbit-messaging-header-a"><button>Profile</button></div>
+      <div id="other-anchor" aria-hidden="true" class="pointer-events-none test-fade ${floatingClass}" style="position-anchor:--unrelated-header-a"></div>
+      <div id="no-inert-marker" aria-hidden="true" class="test-fade ${floatingClass}" style="position-anchor:--orbit-messaging-header-a"></div>
+    </div></div><div id="outside-root" aria-hidden="true" class="pointer-events-none ${floatingClass}" style="position-anchor:--orbit-messaging-header-a"></div></html>`);
+    await page.addStyleTag({content:theme});
+    const cleared = ['legacy-fade','floating-fade','renamed-fade'];
+    const preserved = ['placeholder','interaction','hidden-profile','other-anchor','no-inert-marker','ordinary','outside-root','call'];
+    const capture = () => page.evaluate(() => Object.fromEntries([...document.querySelectorAll('[id]')].map(element => {
+      const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+      return [element.id, {
+        geometry:[rect.x,rect.y,rect.width,rect.height,style.position,style.padding,style.borderWidth,style.borderRadius,style.font,style.opacity,style.pointerEvents,style.positionAnchor,style.anchorName],
+        paint:[style.backgroundImage,style.backgroundColor,style.color,style.boxShadow,style.backdropFilter]
+      }];
+    })));
+    assert.equal(await page.locator('#portal').evaluate(element => !!element.closest('.messaging-root')),false,
+      'native floating paint is portalled outside the messaging subtree');
+    for (const mode of ['dark','light']) for (const width of [720,1280]) for (const scroll of [0,160]) {
+      await page.setViewportSize({width,height:760});
+      await page.evaluate(({mode,scroll}) => {
+        const root = document.documentElement;
+        root.classList.remove('forge-ink-mountain');
+        Object.assign(root.dataset,{theme:mode,forgeNativeTheme:mode,forgeBackgroundReady:'true'});
+        document.getElementById('viewport').scrollTop=scroll;
+      },{mode,scroll});
+      // CSS anchor positioning catches up with a scroll at the next frame.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const native = await capture();
+      for (const id of [...cleared,...preserved.filter(id=>id!=='call')]) {
+        assert.match(native[id].paint[0],/^linear-gradient\(/, `${mode}/${width}/${scroll}: ${id} must start with native gradient paint`);
+      }
+      await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const themed = await capture();
+      for (const id of Object.keys(native)) assert.deepEqual(themed[id].geometry,native[id].geometry,`${mode}/${width}/${scroll}: ${id} geometry must stay native`);
+      for (const id of cleared) {
+        assert.equal(themed[id].paint[0],'none',`${mode}/${width}/${scroll}: ${id} clears native dots fade`);
+        assert.deepEqual(themed[id].paint.slice(1),native[id].paint.slice(1),`${id} changes only background-image`);
+      }
+      for (const id of preserved) assert.deepEqual(themed[id].paint,native[id].paint,`${mode}/${width}/${scroll}: ${id} paint is not an inert dots fade`);
     }
   } finally {await browser.close();}
 });

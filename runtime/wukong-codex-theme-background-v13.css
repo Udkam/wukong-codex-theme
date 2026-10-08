@@ -73,8 +73,11 @@
 :root.forge-ink-mountain #root :is([data-thread-scroll-footer="true"], .thread-scroll-container) [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
   background-image: none !important;
 }
-/* The embedded messaging header owns a separate inert anchor-positioned fade. */
-:root.forge-ink-mountain #root .pointer-events-none[style*="--orbit-messaging-header-"][class*="_background_"] {
+/* Dots portal an empty, hidden paint leaf to the main content layout. The
+ * anchor is its stable owner; CSS-module names change between header variants.
+ * :empty excludes the profile and call controls sharing this anchor, including
+ * the profile's temporarily aria-hidden state. Keep native geometry intact. */
+:root.forge-ink-mountain #root .pointer-events-none[aria-hidden="true"][style*="position-anchor:"][style*="--orbit-messaging-header-"]:empty {
   background-image: none !important;
 }
 /* ThreadScrollLayout now paints a separate inert footer plate. Scope to its

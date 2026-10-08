@@ -1,5 +1,27 @@
 # 当前适配验证
 
+## v0.18.3 Dots 标题渐变（2026-10-08）
+
+客户端 26.1002.7124.0，运行时 v111-dots-header-owner。实机复现顶部横向深色渐变：原生 header 组件实际使用 floatingHeader 样式变体，原规则仅匹配 background 类名。两个变体均在活动共享 CSS 中存在，旧手写夹具未覆盖实际使用的变体。
+
+修复根据动态 orbit-messaging-header 锚点、position-anchor、pointer-events-none、aria-hidden=true 和空叶节点识别装饰层，只清除 background-image。原生通过 portal 把该层放在主内容布局内，所以规则不要求它位于 messaging-root 后代。头像根在资料面板打开时也会 aria-hidden=true，空叶限制保护它与通话控件。未修改原生尺寸、定位、滚动预留、头像和消息交互。
+
+实机在正常标题状态下，深色比较 694 个、浅色比较 472 个非 SVG 节点；两模式各检查顶端、中部、底部滚动位置，rect、padding、圆角、position、字号、行高及边框宽度均无差异。节点数量随原生异步内容及虚拟化变化。装饰层在原生状态有 linear-gradient，主题状态为 none。通过原生资料开关实际打开和关闭面板，同锚点交互容器误匹配为 0；没有发起通话或发送消息。最终主窗口 dark、v111、backgroundReady=true、document.hidden=false。
+
+新增原生 ASAR 合同直接分析当前标题 JSX、锚点、portal 和材质类映射，再关联真实 CSS 的渐变声明。动态夹具使用真实样式，覆盖模块类重命名、样式属性顺序与空格、portal、交互叶隔离、两种宽度及滚动状态。更新旧夹具的惰性标记，避免仅复制旧选择器便报告通过。
+
+初次实机脚本在已经打开的资料面板上等待“打开”按钮超时，随后按实际原生“显示/隐藏个人资料”开关完成检查；未将检查流程问题写成主题缺陷。两张新预览仅截取标题区域，临时隐藏聊天内容的绘制以保护隐私，截图后恢复。
+
+用户已授权修复后发布。本轮未执行完整冷启动、卸载或新的流式文字重载专项检查。
+
+精确发行索引导出的独立源码 npm run check：159/159 通过，0 失败、0 跳过，约 53.9 秒；Studio E2E 通过。首次把隔离测试临时目录放在独立源码内部，打包边界保护使 2 项失败（其余 157 项通过）；改为源码外的本轮专用临时目录后全量通过，未修改运行代码或测试断言。后续仅补写发行记录，运行与打包输入保持一致。
+
+正式 ZIP 为 4,052,818 字节、37 个必要文件；解压后与构建目录逐文件 SHA-256 一致，版本为 0.18.3／v111。SHA-256：
+
+`f258fa5b1a87cfe506427b059e0bc78f090f2e4d2843e39caa0f3f11702663ff`
+
+用正式 ZIP 解压的注入器恢复原生，verified=true；随后同包重新注入，verified=true、deferred=false。主页面实读 v111-dots-header-owner、backgroundReady=true、document.hidden=false。
+
 ## v0.18.2 搜索与共用浮层（2026-10-08）
 
 客户端 26.1002.7124.0，运行时 v110-command-surface-owner。只读核对安装包中命令菜单、通用 Dialog、Popover、旧版 Popover、确认和语音变体的 JS/CSS。cmdk-dialog 是透明定位框，cmdk-root 才有原生底色；此前 role+bg 子串选择器误中 bg-transparent，且遗漏真正的内容根。新规则按绘制载体覆盖，托盘嵌入根保留透明。

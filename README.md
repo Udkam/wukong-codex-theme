@@ -2,6 +2,16 @@
 
 为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生交互，按区域替换材质；10 张战斗图、3 张风景图，对话默认雪山。
 
+## v0.18.3：Dots 标题渐变修复
+
+2026-10-08，运行时 **v111-dots-header-owner**，核对客户端 **26.1002.7124.0**。Dots 页面顶部的黑色／白色遮带来自原生浮动标题的装饰渐变，旧选择器只识别了另一种背景类。本版改为按动态标题锚点、空节点和无障碍装饰状态识别绘制层，覆盖通过 portal 移出的标题背景，保留头像、资料入口、通话按钮及原生滚动布局。
+
+![深色 Dots 标题](docs/previews/dark-dots-header.png)
+
+![浅色 Dots 标题](docs/previews/light-dots-header.png)
+
+本版预览来自真实客户端，不包含私人聊天正文。深浅模式下已检查顶部、中部、底部滚动及资料开关状态；回归保护同时检查安装包中的真实标题结构与原生 CSS，并在语义接口变化时要求重新核对，减少仅靠旧夹具通过检查却遗漏当前组件的情况。实际检查范围与发行结果见 [验证记录](docs/VALIDATION.md) 和 [发行说明](docs/RELEASE_0.18.3.md)。
+
 ## v0.18.2：搜索与共用浮层修复
 
 2026-10-08，运行时 **v110-command-surface-owner**，核对客户端 **26.1002.7124.0**。搜索聊天、文件搜索和共用命令列表现在由实际内容根节点绘制玻璃，透明定位外框保持原生；同时补齐 Popover、确认和专用语音选择器的组件背景。搜索使用更浓的深浅色阅读底色，保留原生键盘导航、列表滚动和尺寸。
@@ -35,7 +45,7 @@
 
 ### 基础适配预览（v0.18.0）
 
-以下为 2026-10-04 的基础适配新聊天页和局部截图；本轮新增的浮动输入框实机预览见上方。新聊天页的侧栏名称已临时替换为示例文本，截图后立即恢复；预览不包含聊天正文。完整来源、模式和验证边界见 [预览说明](docs/previews/README.md)。
+以下为 2026-10-04 的基础适配新聊天页和局部截图；后续版本的修复预览按版本列于上方。新聊天页的侧栏名称已临时替换为示例文本，截图后立即恢复；预览不包含聊天正文。完整来源、模式和验证边界见 [预览说明](docs/previews/README.md)。
 
 **深色**
 
@@ -58,7 +68,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.2 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.2/Wukong-Codex-Theme-0.18.2-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.3 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.3/Wukong-Codex-Theme-0.18.3-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -73,7 +83,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.2**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.18.3**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

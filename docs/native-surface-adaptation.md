@@ -6,6 +6,8 @@
 
 2026-10-08 补充核对 26.1002.7124.0 的 Command / Dialog / Popover 共用组件，来源记录已更新。cmdk-dialog 定位壳保持透明；cmdk-root/data-cmdk-root 是搜索与选择列表的材质载体。无 bg 工具类的 Popover、确认和专用语音变体按原生组件边界补齐，嵌入托盘后代不重复绘制。
 
+同日 v0.18.3 / v111-dots-header-owner 复核 Dots 浮动标题：原生装饰渐变使用另一种模块背景变体，旧类名子串选择器未覆盖。现按标题动态锚点与空惰性节点识别绘制层，详情见下方 Dots 标题合同。
+
 ## 分层
 
 - runtime/native-ui-contract.mjs：集中语义选择器、可见性和容器归属。优先 data 属性；缺少语义属性的绘制叶节点保留限定范围的组件回退。
@@ -29,7 +31,7 @@
 | 进度区 | data-in-progress-fixed-content 内绘制叶 | 不再依赖 h-8、字号或进度文案 |
 | 摘要、环境、变更面板 | data-summary-panel-variant、summary item slot | 卡片及 sticky 标题共用不透明底，遮挡滚动文字 |
 | 顶底渐变 | thread footer、scroll container、main-content-top-fade | 仅清除装饰节点绘制，保留布局预留 |
-| dots 标题 | orbit header 锚点装饰叶 | 清除标题渐变及共享 composer 内的底部装饰渐变，保留锚点定位 |
+| dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
 | 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
@@ -37,6 +39,16 @@
 | 消息预览 | data-thread-user-message-navigation-tooltip-preview | 不再依赖 w-80 / max-width 类 |
 | Markdown 代码 | code-block 与原生绘制 token | 代码和 sticky 工具栏共用不透明底，语法颜色保留 |
 | 首页字标、题字 | home icon、landing title | 主题自有装饰，可快捷键关闭并还原，不重写对话正文 |
+
+## Dots 标题合同
+
+原生标题在当前安装包中将装饰背景、头像和通话控件分别挂载。背景与通话控件可能通过 portal 移入 `data-app-shell-main-content-layout`，所以绘制规则不依赖 `.messaging-root` 后代关系，也不使用模块类名、固定高度或 `top` 数值识别背景。
+
+标题渐变的现役识别条件为：`position-anchor` 指向 `--orbit-messaging-header-` 动态锚点，同时具有 `pointer-events-none`、`aria-hidden="true"` 和 `:empty`。规则只清除该叶节点的 `background-image`，原生锚点定位、覆盖范围、滚动预留和堆叠关系继续生效。
+
+`:empty` 是控件隔离条件：打开资料页时，头像容器也会使用同一锚点并切换到 `aria-hidden="true"`，但仍带有头像与交互子节点；通话控件同样有子节点。它们不能仅因共享锚点被当作背景处理。
+
+`tests/native-asar-ui-contract.test.mjs` 读取实际安装包中的标题组件，解析动态锚点、装饰叶、交互兄弟和 portal，并关联真实 CSS 的渐变声明。几何和材质回归使用该原生结构，同时覆盖深浅模式、滚动位置及资料开关状态。接口漂移时先重新核对原生代码，不把旧夹具的通过结果当作当前组件已经覆盖。
 
 ## 材质配置
 
@@ -64,6 +76,6 @@
 
 可见性允许原生 portal 子节点恢复 visibility，同时排除隐藏、inert 和透明保留页。PageSurface 重挂载复用已解码图片，设置往返不主动重建壁纸。区域缓存、有界导航探针及流式更新过滤继续生效。
 
-host 对主模块和适配依赖共同计算指纹，并用于 renderer 新鲜度判定，映射单独更新也能加载。回归检查接口和实际行为，不把原生工具栏、侧栏尺寸锁成旧数值；漂移夹具改变尺寸、工具类、层级和页面可见状态，验证替换归属。
+host 对主模块和适配依赖共同计算指纹，并用于 renderer 新鲜度判定，映射单独更新也能加载。回归检查接口和实际行为，不把原生工具栏、侧栏尺寸锁成旧数值；漂移夹具改变尺寸、工具类、层级和页面可见状态，验证替换归属。夹具需要与安装包中的实际组件合同关联；存在 portal、资料开关或浮动变体的组件，还需检查这些变体的绘制归属。
 
 减少动态、减少透明度、强制色彩与还原功能保留。原生语义标记也可能变更，未来彻底重写组件时仍需维护映射。系统菜单和其他进程窗口不属于 renderer CSS。源码核对、夹具和实机范围分别记录于 VALIDATION.md。

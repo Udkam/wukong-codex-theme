@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { parseAst } from 'rollup/parseAst';
 
 
 const require = createRequire(import.meta.url);
@@ -136,4 +137,68 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
   assert.ok(settings, 'native settings layout contract must remain explicit');
   // Pixel/geometry/semantic colour equivalence is checked by the browser-based
   // native-paint-boundary test against this same installed CSS, at two widths.
+});
+
+test('native Dots header exposes an empty decorative anchor surface separate from controls', {
+  skip: skipReason
+}, () => {
+  const entries = asar.listPackage(archive);
+  const header = readMatchingAsset(entries, /header-.*\.js$/i, '--orbit-messaging-header-');
+  const drift = 'native Dots header contract drifted; re-audit its anchor, portal and paint ownership';
+  assert.ok(header, drift);
+
+  // Use the parser already supplied by Vite to inspect actual JSX calls. This
+  // survives minified variable names and property ordering; a hand-written DOM
+  // fixture alone cannot detect a native background/floating-header variant.
+  const nodes = [];
+  const visit = node => {
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.type === 'string') nodes.push(node);
+    for (const value of Object.values(node)) {
+      if (Array.isArray(value)) value.forEach(visit);
+      else if (value && typeof value === 'object') visit(value);
+    }
+  };
+  visit(parseAst(header));
+  const keyName = key => key?.name ?? key?.value;
+  const property = (node, name) => node?.type === 'ObjectExpression'
+    ? node.properties.find(item => item.type === 'Property' && keyName(item.key) === name)?.value
+    : undefined;
+  const templateText = node => node?.type === 'TemplateLiteral'
+    ? node.quasis.map(part => part.value.cooked).join(' ')
+    : node?.type === 'Literal' ? String(node.value) : '';
+  const anchors = new Set(nodes.filter(node => node.type === 'VariableDeclarator' &&
+    templateText(node.init).startsWith('--orbit-messaging-header-')).map(node => node.id.name));
+  assert.ok(anchors.size, drift);
+  const nativeDivs = nodes.filter(node => node.type === 'CallExpression' &&
+    templateText(node.arguments[0]) === 'div' && node.arguments[1]?.type === 'ObjectExpression')
+    .map(node => node.arguments[1]);
+  const anchored = nativeDivs.filter(props => anchors.has(property(property(props, 'style'), 'positionAnchor')?.name));
+  const isTrue = node => node?.type === 'Literal' && node.value === true ||
+    node?.type === 'UnaryExpression' && node.operator === '!' && node.argument?.value === 0;
+  const decorative = anchored.filter(props => isTrue(property(props, 'aria-hidden')) &&
+    templateText(property(props, 'className')).split(/\s+/).includes('pointer-events-none') &&
+    !property(props, 'children'));
+  assert.ok(decorative.length, drift);
+  assert.ok(anchored.some(props => property(props, 'children')), `${drift}: interactive header siblings missing`);
+  assert.ok(header.includes('data-app-shell-main-content-layout') && header.includes('createPortal'),
+    `${drift}: header decoration may leave the messaging-root subtree`);
+
+  const shared = readMatchingAsset(entries, /app-shared-.*\.js$/i, 'floatingHeader');
+  const css = entries.filter(name => /webview[\\/]assets[\\/]app-shared-.*\.css$/.test(name))
+    .map(name => asar.extractFile(archive, listedPathToArchivePath(name)).toString('utf8')).join('\n');
+  assert.ok(shared, drift);
+  const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const props of decorative) {
+    const className = property(props, 'className');
+    const moduleKeys = (className.expressions || []).filter(node => node.type === 'MemberExpression')
+      .map(node => keyName(node.property));
+    const nativeClasses = moduleKeys.flatMap(key => [...shared.matchAll(new RegExp(`\\b${escape(key)}:([\\w$]+)`, 'g'))]
+      .flatMap(match => [...shared.matchAll(new RegExp(`${escape(match[1])}=[\x60"']([^\x60"']+)[\x60"']`, 'g'))]
+        .map(binding => binding[1])));
+    assert.ok(nativeClasses.some(name => [...css.matchAll(/([^{}]+)\{([^{}]+)\}/g)]
+      .some(rule => new RegExp(`\\.${escape(name)}(?![\\w-])`).test(rule[1]) &&
+        /background-image:\s*linear-gradient\(/.test(rule[2]))),
+    `${drift}: empty anchor surface no longer owns the native gradient`);
+  }
 });
