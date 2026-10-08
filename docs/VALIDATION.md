@@ -16,6 +16,8 @@ Windows ZIP 为 4,052,713 字节，37 个必要文件；解压后与构建目录
 
 使用该 ZIP 解压的注入器实际恢复原生，verified=true；随后同包重新注入，verified=true、deferred=false。准确定位主页面后实读 document.hidden=false、backgroundReady=true、v110-command-surface-owner。用户已明确授权发布。本轮未执行冷启动、完整卸载或流式重载专项检查。
 
+已回读 GitHub Release：v0.18.2 为 Latest，非草稿、非预发行，ZIP 与 SHA256SUMS.txt 均已上传。重新下载两个资产，其 SHA-256 分别与本地正式文件完全一致；远程 ZIP 大小同为 4,052,713 字节。发行标签对应修复提交 470228b，后续仅补充发行与清理记录。临时副本清理及最小本机证据范围见 CLEANUP.md。
+
 
 ## v0.18.1 浮动输入框修正（2026-10-06）
 

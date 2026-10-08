@@ -1,6 +1,6 @@
 # 当前目标与发行状态
 
-更新：2026-10-08。当前版本为 [v0.18.2](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.2)，发行说明见 [RELEASE_0.18.2.md](RELEASE_0.18.2.md)。本轮已获得用户明确发布授权。
+更新：2026-10-08。当前正式版本为 [v0.18.2](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.2)，已设为 GitHub Latest。运行包与校验文件均已上传、回下载核对一致；同一正式包已完成本机恢复原生与重新注入。发行说明见 [RELEASE_0.18.2.md](RELEASE_0.18.2.md)。
 
 运行时 v110-command-surface-owner 修正搜索窗口的实际绘制归属，并补齐共用命令根、Popover、确认及专用语音选择表面。透明定位框和输入框嵌入列表不重复绘制玻璃。原生来源为 Windows Codex 26.1002.7124.0；两张深浅色实机搜索预览已同步。
 
