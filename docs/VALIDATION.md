@@ -22,6 +22,8 @@
 
 用正式 ZIP 解压的注入器恢复原生，verified=true；随后同包重新注入，verified=true、deferred=false。主页面实读 v111-dots-header-owner、backgroundReady=true、document.hidden=false。
 
+GitHub 已回读 v0.18.3 为 Latest，非草稿、非预发行，两个资产均 uploaded。远程回下载 ZIP 为 4,052,818 字节，ZIP 与 SHA256SUMS.txt 的 SHA-256 分别与本地正式文件一致。发行标签对应修复提交 014b189，后续仅补写发行验证及清理记录。
+
 ## v0.18.2 搜索与共用浮层（2026-10-08）
 
 客户端 26.1002.7124.0，运行时 v110-command-surface-owner。只读核对安装包中命令菜单、通用 Dialog、Popover、旧版 Popover、确认和语音变体的 JS/CSS。cmdk-dialog 是透明定位框，cmdk-root 才有原生底色；此前 role+bg 子串选择器误中 bg-transparent，且遗漏真正的内容根。新规则按绘制载体覆盖，托盘嵌入根保留透明。

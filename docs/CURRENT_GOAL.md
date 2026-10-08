@@ -1,6 +1,6 @@
 # 当前目标与发行状态
 
-更新：2026-10-08。本轮修复版本为 v0.18.3，用户已授权定位修复后发布。发行说明见 [RELEASE_0.18.3.md](RELEASE_0.18.3.md)，发行验证进度见 [验证记录](VALIDATION.md)。
+更新：2026-10-08。当前正式版本为 [v0.18.3](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.3)，已设为 GitHub Latest。运行包和校验文件回下载一致，同一正式包已完成本机恢复原生与重新注入。发行说明见 [RELEASE_0.18.3.md](RELEASE_0.18.3.md)，完整范围见 [验证记录](VALIDATION.md)。
 
 运行时 v111-dots-header-owner 按 Dots 的原生标题锚点识别空惰性渐变层，移除对易变模块类名的依赖，并保护共用锚点的头像和通话控件。原生来源为 Windows Codex 26.1002.7124.0；深浅模式、滚动与资料面板检查完成，两张标题实机预览已同步。原生 ASAR 合同与真实 CSS 回归覆盖标题结构漂移。
 
