@@ -190,10 +190,14 @@
  * Only its native background carrier owns paint; the positioning frame must
  * remain transparent, including when the header expands. */
 :root.forge-ink-mountain :where(
-  [role="menu"][class*="bg-"],
-  [role="listbox"][class*="bg-"]:not([cmdk-list]):not([data-cmdk-list]),
-  [role="dialog"][class*="bg-"]:not(:has(img.object-contain)),
-  [role="alertdialog"][class*="bg-"],
+  [role="menu"][class*="bg-"]:not([class~="bg-transparent"]),
+  [role="listbox"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-list]):not([data-cmdk-list]),
+  [role="dialog"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-dialog]):not(:has(img.object-contain)),
+  [role="alertdialog"][class*="bg-"]:not([class~="bg-transparent"]),
+  [cmdk-root], [data-cmdk-root],
+  [data-slot="popover-content"],
+  [role="dialog"][class*="_Popover_"],
+  .codex-dialog:is([class*="_chatgptConfirmationSurface_"], [class*="_voicePickerSurface_"]),
   [class*="_floatingSurface_"]:is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
   [data-summary-panel-variant],
   [data-thread-user-message-navigation-tooltip-preview],
@@ -210,6 +214,19 @@
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
 }
+/* Command menus paint their semantic root, not the transparent dialog. This
+ * also covers standalone project/branch/action pickers using the same root.
+ * Keep a dense reading tint over wallpaper; preserve native sizes and states. */
+:root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]):not([class*="ComposerTopMenuPanel"] *) {
+  --color-text: var(--forge-nav-ink) !important;
+  --color-text-secondary: var(--forge-nav-muted) !important;
+  --color-text-tertiary: var(--forge-nav-muted) !important;
+  --color-codex-description: var(--forge-nav-muted) !important;
+  color: var(--forge-nav-ink) !important;
+  background-color: rgb(from var(--forge-glass-fill) r g b / max(alpha, .94)) !important;
+  background-image: none !important;
+}
+
 /* A role describes behaviour, not the paint surface. Unstyled tooltip/dialog
  * positioning wrappers must remain native and transparent. In particular the
  * navigation preview paints its own rounded child, never the outer tooltip.
@@ -334,6 +351,9 @@
 }
 :root.forge-ink-mountain [class*="ComposerTopMenuPanel"] :is([cmdk-root], [data-cmdk-root]) {
   background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* SuggestionList (26.930) is also the composer's Add / Plugins menu. It has

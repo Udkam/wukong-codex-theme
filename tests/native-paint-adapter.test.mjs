@@ -22,7 +22,11 @@ const native = (() => {
     const source = read(entries.find(entry => /webview[\\/]assets[\\/]app-initial-.*\.js$/.test(entry)));
     const permissionsCss = read(entries.find(entry => /webview[\\/]assets[\\/]browser-use-policy-site-permissions-.*\.css$/.test(entry)));
     const permissionsSource = read(entries.find(entry => /webview[\\/]assets[\\/]browser-use-policy-site-permissions-.*\.js$/.test(entry)));
-    return { css, source, permissionsCss, permissionsSource,
+    const popoverCss = read(entries.find(entry => /webview[\\/]assets[\\/]popover-.*\.css$/.test(entry)));
+    return { css, source, permissionsCss, permissionsSource, popoverCss,
+      popoverClass: popoverCss.match(/\.(_Popover_[\w]+)\{/)[1],
+      confirmationClass: css.match(/\.(_chatgptConfirmationSurface_[\w]+)\{/)[1],
+      voicePickerClass: css.match(/\.(_voicePickerSurface_[\w]+)\{/)[1],
       permissionsClass: permissionsCss.match(/\.(_table_[\w]+)\{/)[1],
       suggestionClass: css.match(/\.(_suggestionMenu_[\w]+)\{/)[1],
       floatingClass: css.match(/\.(_floatingSurface_[\w]+)\{/)[1],
@@ -147,6 +151,143 @@ test('Add suggestion groups use one reading material in both modes without chang
       await page.close();
     }
   } finally {await browser.close();}
+});
+
+test('command surfaces paint their content once and retain native input, list and row states', {
+  skip: !native && 'Requires the installed native UI CSS'
+}, async () => {
+  assert.match(native.css, /\[cmdk-root\],\[data-cmdk-root\]/);
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) {
+      const page = await browser.newPage({ viewport: { width: 1100, height: 1000 }, colorScheme: mode });
+      await page.setContent(`<html data-theme="${mode}" data-codex-window-type="electron"><head><style>${native.css}</style><style>
+        body{margin:0;padding:20px;background:linear-gradient(90deg,#000,#fff)}
+        #search{position:relative;inset:auto;transform:none;width:540px;max-width:none}
+        #results{height:170px;max-height:170px}#standalone,#alias,#tray{width:360px;margin-top:20px}
+        #transparent-menu,#transparent-dialog,#transparent-alert{width:250px;height:30px}
+      </style></head><body>
+        <div id="search" role="dialog" cmdk-dialog class="codex-dialog command-menu-dialog global-command-menu-dialog bg-transparent">
+          <div id="search-surface" cmdk-root>
+            <input id="query" cmdk-input role="combobox" aria-label="Search fixture" placeholder="Search chats">
+            <div id="results" cmdk-list role="listbox" aria-label="Results">
+              <div cmdk-group><div id="heading" cmdk-group-heading class="text-tertiary">Chats</div><div cmdk-group-items>
+                <div id="normal" cmdk-item role="option" aria-selected="false" data-command-menu-has-results="true">Normal <span id="description" class="text-codex-description">Project name</span></div>
+                <div id="selected" cmdk-item role="option" aria-selected="true" data-selected="true">Selected result</div>
+                <div id="disabled" cmdk-item role="option" aria-disabled="true" data-disabled="true">Unavailable result</div>
+                <div id="loading" cmdk-item role="option" data-command-menu-loading="true" aria-selected="true">Loading</div>
+                ${Array.from({ length: 12 }, (_, index) => `<div cmdk-item role="option">Result ${index + 1}</div>`).join('')}
+              </div></div>
+            </div>
+          </div>
+        </div>
+        <div id="transparent-menu" role="menu" class="bg-transparent">Positioning menu</div>
+        <div id="transparent-dialog" role="dialog" class="bg-transparent">Positioning dialog</div>
+        <div id="transparent-alert" role="alertdialog" class="bg-transparent">Positioning alert</div>
+        <div id="painted-dialog" role="dialog" class="bg-surface-elevated-secondary">Ordinary dialog</div>
+        <div id="image-dialog" role="dialog" class="bg-surface-elevated-secondary"><img class="object-contain" alt="Preview"></div>
+        <div id="standalone" cmdk-root><input cmdk-input aria-label="Standalone command"><div cmdk-list><div cmdk-item>Independent command menu</div></div></div>
+        <div id="alias" data-cmdk-root><input cmdk-input aria-label="Alias command"><div data-cmdk-list>Alternate attribute</div></div>
+        <div id="tray" class="${native.topTrayClass}" data-composer-expanded-top-tray><div id="tray-command" cmdk-root><div cmdk-list>Add menu</div></div></div>
+      </body></html>`);
+      const measure = () => page.locator('body *').evaluateAll(nodes => nodes.map(node => {
+        const s = getComputedStyle(node), r = node.getBoundingClientRect();
+        return { id: node.id, rect: [r.x, r.y, r.width, r.height], radius: s.borderRadius,
+          padding: s.padding, font: s.font, border: s.borderWidth, position: s.position,
+          overflow: s.overflow, tabIndex: node.tabIndex,
+          disabled: node.getAttribute('aria-disabled'), selected: node.getAttribute('aria-selected') };
+      }));
+      const material = id => page.locator(id).evaluate(node => {
+        const s = getComputedStyle(node);
+        return { background: s.backgroundColor, image: s.backgroundImage, blur: s.backdropFilter, shadow: s.boxShadow };
+      });
+      const states = () => page.locator('#normal,#selected,#disabled,#loading').evaluateAll(nodes => nodes.map(node => {
+        const s = getComputedStyle(node);
+        return { id: node.id, opacity: s.opacity, cursor: s.cursor, background: s.backgroundColor };
+      }));
+      const before = await measure(), nativeStates = await states();
+      const imagePreview = await material('#image-dialog');
+      await page.addStyleTag({ content: theme });
+      await page.evaluate(mode => {
+        document.documentElement.classList.add('forge-ink-mountain');
+        document.documentElement.dataset.forgeNativeTheme = mode;
+      }, mode);
+      assert.deepEqual(await measure(), before, `${mode}: native geometry and attributes`);
+      assert.deepEqual(await states(), nativeStates, `${mode}: selected, disabled and loading row paint`);
+      for (const id of ['#search', '#transparent-menu', '#transparent-dialog', '#transparent-alert', '#query', '#results', '#tray-command']) {
+        assert.deepEqual(await material(id), {
+          background: 'rgba(0, 0, 0, 0)', image: 'none', blur: 'none', shadow: 'none'
+        }, `${mode}: ${id} must not create a second material layer`);
+      }
+      for (const id of ['#search-surface', '#standalone', '#alias', '#painted-dialog', '#tray']) {
+        const paint = await material(id);
+        assert.notEqual(paint.background, 'rgba(0, 0, 0, 0)', `${mode}: ${id} visible fill`);
+        assert.match(paint.blur, /blur\(/, `${mode}: ${id} glass owner`);
+      }
+      assert.deepEqual(await material('#image-dialog'), imagePreview, `${mode}: image preview retains native paint`);
+      const ink = await page.locator('#search-surface').evaluate(node => {
+        const s = getComputedStyle(node);
+        return { primary: s.color, secondary: s.getPropertyValue('--color-codex-description').trim(), tertiary: s.getPropertyValue('--color-text-tertiary').trim() };
+      });
+      assert.equal(ink.primary, mode === 'dark' ? 'rgb(244, 240, 232)' : 'rgb(24, 32, 25)');
+      assert.notEqual(ink.secondary, '');
+      assert.notEqual(ink.tertiary, '');
+      await page.getByRole('combobox', { name: 'Search fixture' }).focus();
+      await page.keyboard.type('Theme search');
+      assert.equal(await page.locator('#query').inputValue(), 'Theme search');
+      assert.equal(await page.locator('#query').evaluate(node => node === document.activeElement), true);
+      await page.locator('#results').evaluate(node => { node.scrollTop = node.scrollHeight; });
+      assert.ok(await page.locator('#results').evaluate(node => node.scrollTop) > 0, 'Native result list remains scrollable');
+      await page.close();
+    }
+  } finally { await browser.close(); }
+});
+
+test('semantic and module popup carriers receive glass without painting their positioning wrappers', {
+  skip: !native && 'Requires the installed native UI CSS'
+}, async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) {
+      const page = await browser.newPage({ viewport: { width: 1100, height: 1000 }, colorScheme: mode });
+      await page.setContent(`<html data-theme="${mode}"><head><style>${native.css}\n${native.popoverCss}</style><style>
+        body{margin:20px;background:linear-gradient(90deg,#000,#fff)}
+        #fixture{display:flex;flex-direction:column;gap:20px;align-items:flex-start}
+        .codex-dialog{position:relative;inset:auto;transform:none;width:360px}
+      </style></head><body><div id="fixture">
+        <div id="positioner" data-radix-popper-content-wrapper><div id="slot-popup" data-slot="popover-content" class="bg-surface rounded-xl border border-default"><button>Popover action</button></div></div>
+        <div id="transition"><div id="module-popup" role="dialog" class="${native.popoverClass}"><input aria-label="Popover input"></div></div>
+        <div id="confirmation" role="dialog" class="codex-dialog ${native.confirmationClass}"><button class="text-danger">Destructive action</button></div>
+        <div id="voice-picker" role="dialog" class="codex-dialog ${native.voicePickerClass}"><button aria-pressed="true">Selected voice</button></div>
+        <div id="unrelated-popover" class="${native.popoverClass}">Outside popup role</div>
+        <div id="unrelated-confirmation" class="${native.confirmationClass}">Outside dialog surface</div>
+      </div></body></html>`);
+      const read = () => page.locator('#fixture,#fixture *').evaluateAll(nodes => nodes.map(node => {
+        const s = getComputedStyle(node), r = node.getBoundingClientRect();
+        return { id: node.id, geometry: [r.x, r.y, r.width, r.height, s.borderRadius, s.borderWidth, s.padding, s.font, s.overflow, s.transform, s.position],
+          color: s.color, background: s.backgroundColor, image: s.backgroundImage, blur: s.backdropFilter, shadow: s.boxShadow };
+      }));
+      const before = await read();
+      await page.addStyleTag({ content: theme });
+      await page.evaluate(mode => { document.documentElement.classList.add('forge-ink-mountain'); document.documentElement.dataset.forgeNativeTheme = mode; }, mode);
+      const after = await read();
+      before.forEach((node, index) => {
+        assert.deepEqual(after[index].geometry, node.geometry, `${mode}: ${node.id} native geometry`);
+        assert.equal(after[index].color, node.color, `${mode}: ${node.id} native control colours`);
+      });
+      for (const id of ['positioner', 'transition', 'unrelated-popover', 'unrelated-confirmation']) {
+        assert.deepEqual(after.find(node => node.id === id), before.find(node => node.id === id), `${mode}: ${id} is not a theme carrier`);
+      }
+      for (const id of ['slot-popup', 'module-popup', 'confirmation', 'voice-picker']) {
+        const material = after.find(node => node.id === id);
+        assert.notEqual(material.background, 'rgba(0, 0, 0, 0)', `${mode}: ${id} visible fill`);
+        assert.match(material.blur, /blur\(/, `${mode}: ${id} glass surface`);
+      }
+      await page.getByRole('textbox', { name: 'Popover input' }).fill('Still editable');
+      assert.equal(await page.getByRole('textbox', { name: 'Popover input' }).inputValue(), 'Still editable');
+      await page.close();
+    }
+  } finally { await browser.close(); }
 });
 
 // Deliberately change native sizing utilities while retaining the public DOM

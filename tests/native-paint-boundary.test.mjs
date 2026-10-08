@@ -229,6 +229,8 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
         ['color','text-shadow','--color-text','--color-text-secondary','--color-text-secondary-solid','--color-text-tertiary','--color-background-primary-ghost-hover'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain :has(> [data-mention-list-scroll-area])' &&
         ['color','--color-text','--color-codex-description','--color-text-tertiary'].includes(d.prop)) return;
+    if (s === ':root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]):not([class*="ComposerTopMenuPanel"] *)' &&
+        ['color','--color-text','--color-text-secondary','--color-text-tertiary','--color-codex-description'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain [data-mention-list-scroll-area]' && d.prop === '--color-surface-elevated-secondary') return;
     if (s.startsWith(':root.forge-ink-mountain [data-mention-list-scroll-area] :is(') && d.prop === '--color-codex-description') return;
     if (s === ':root.forge-ink-mountain [class~="group/settings"] table:has([id^="browser-use-site-permissions-column-"])' &&

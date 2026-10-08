@@ -4,6 +4,8 @@
 
 2026-10-06 补充核对 26.930.4958.0 的 FloatingSurface / QuickChat 绘制归属，当前来源记录已更新。其圆角类可用于透明定位框；仅带原生 bg-surface-elevated-secondary 或 bg-surface-canvas 材质的载体参与玻璃替换，快速聊天的外框保持透明。
 
+2026-10-08 补充核对 26.1002.7124.0 的 Command / Dialog / Popover 共用组件，来源记录已更新。cmdk-dialog 定位壳保持透明；cmdk-root/data-cmdk-root 是搜索与选择列表的材质载体。无 bg 工具类的 Popover、确认和专用语音变体按原生组件边界补齐，嵌入托盘后代不重复绘制。
+
 ## 分层
 
 - runtime/native-ui-contract.mjs：集中语义选择器、可见性和容器归属。优先 data 属性；缺少语义属性的绘制叶节点保留限定范围的组件回退。
@@ -31,7 +33,7 @@
 | 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
-| 菜单、对话框、下拉 | role 与实际绘制面、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | 绘制面用玻璃，位置包装器透明；tooltip 保留反色配对；添加列表局部文字变量、行透明度与 sticky 分组底色配套 |
+| 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、popover-content、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 定位层不绘制；命令根与添加列表使用浓阅读底色；嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |
 | 消息预览 | data-thread-user-message-navigation-tooltip-preview | 不再依赖 w-80 / max-width 类 |
 | Markdown 代码 | code-block 与原生绘制 token | 代码和 sticky 工具栏共用不透明底，语法颜色保留 |
 | 首页字标、题字 | home icon、landing title | 主题自有装饰，可快捷键关闭并还原，不重写对话正文 |

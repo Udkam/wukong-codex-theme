@@ -2,6 +2,16 @@
 
 为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生交互，按区域替换材质；10 张战斗图、3 张风景图，对话默认雪山。
 
+## v0.18.2：搜索与共用浮层修复
+
+2026-10-08，运行时 **v110-command-surface-owner**，核对客户端 **26.1002.7124.0**。搜索聊天、文件搜索和共用命令列表现在由实际内容根节点绘制玻璃，透明定位外框保持原生；同时补齐 Popover、确认和专用语音选择器的组件背景。搜索使用更浓的深浅色阅读底色，保留原生键盘导航、列表滚动和尺寸。
+
+![深色搜索窗口](docs/previews/dark-search-menu.png)
+
+![浅色搜索窗口](docs/previews/light-search-menu.png)
+
+预览来自真实客户端，列表标题已临时脱敏为示例文字；截图后恢复。修复已完成本机检查并按用户授权随 v0.18.2 运行包发行。范围和证据见 [验证记录](docs/VALIDATION.md) 与 [发行说明](docs/RELEASE_0.18.2.md)。
+
 ## v0.18.1：浮动输入框边缘修正
 
 2026-10-06，运行时 **v109-floating-paint-owner**。核对客户端 **26.930.4958.0** 的右下角快速聊天组件：原生圆角类同时用于定位外框和实际背景层。主题现只替换原生带底色的背景层，避免透明外框被重复绘制成厚边，保留原生尺寸、位置、圆角和展开交互。本轮已注入本机，随 v0.18.1 运行包发行。
@@ -48,7 +58,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.1 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.1/Wukong-Codex-Theme-0.18.1-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.2 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.2/Wukong-Codex-Theme-0.18.2-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -63,7 +73,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.1**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.18.2**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

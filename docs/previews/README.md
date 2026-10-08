@@ -1,5 +1,12 @@
 # 当前预览
 
+## v0.18.2 搜索窗口预览
+
+2026-10-08，Windows Codex 26.1002.7124.0，运行时 v110-command-surface-owner。
+
+dark-search-menu.png / light-search-menu.png：实际打开侧栏搜索，按原生 cmdk-root 边界截取。为保护隐私，截图前临时替换列表中的聊天与项目名称为示例文字，截图后立即恢复；未重绘背景、材质或控件。两种模式均通过原生外观设置切换，检查后恢复深色及原聊天。
+
+
 ## 浮动输入框修正预览
 
 2026-10-06，Windows Codex 26.930.4958.0，运行时 v109-floating-paint-owner，随 v0.18.1 发行。
