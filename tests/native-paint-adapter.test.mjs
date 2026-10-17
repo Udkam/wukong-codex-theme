@@ -28,6 +28,7 @@ const native = (() => {
       confirmationClass: css.match(/\.(_chatgptConfirmationSurface_[\w]+)\{/)[1],
       voicePickerClass: css.match(/\.(_voicePickerSurface_[\w]+)\{/)[1],
       permissionsClass: permissionsCss.match(/\.(_table_[\w]+)\{/)[1],
+      permissionsViewportClass: permissionsCss.match(/\.(_viewport_[\w]+)\{/)?.[1],
       suggestionClass: css.match(/\.(_suggestionMenu_[\w]+)\{/)[1],
       floatingClass: css.match(/\.(_floatingSurface_[\w]+)\{/)[1],
       topTrayClass: css.match(/\.(_ComposerTopMenuPanel_[\w]+)\[/)[1] };
@@ -38,14 +39,21 @@ test('browser permissions use local cell materials and retain native paging, sti
   skip: !native && 'Requires the installed native UI CSS'
 }, async () => {
   assert.match(native.permissionsSource, /browser-use-site-permissions-column-\$\{e\}/);
+  assert.ok(native.permissionsViewportClass, 'native permissions viewport owner drifted');
+  assert.match(native.permissionsSource, /\(`table`,\{ref:[^,]+,className:[\w$]+\.table,"data-page-size":[^,]+,onScroll:/,
+    'native permissions scrolling must remain owned by the table, not its tbody');
+  const headingClass=native.permissionsSource.match(/\(`thead`,\{ref:[^,]+,className:`([^`]+)`/)?.[1];
+  assert.ok(headingClass, 'native permissions header contract drifted');
   const browser=await chromium.launch({headless:true});
   try {
     for(const mode of ['dark','light']) {
       const page=await browser.newPage({viewport:{width:850,height:600}});
-      const table=(id,semantic=true)=>`<table id="${id}" class="${native.permissionsClass}" data-page-size="2" style="grid-template-columns:160px repeat(4,240px) 48px;scroll-padding-inline:160px 48px">
-        <thead class="sticky bg-surface"><tr class="text-secondary"><th>Website</th><th ${semantic?'id="browser-use-site-permissions-column-origin"':''}>Browsing</th><th>Download</th><th>Upload</th><th>CDP</th><th><button disabled aria-label="Previous">Back</button><button aria-label="Next">Next</button></th></tr>
+      // Match the native two-column page: table is the horizontal scroller,
+      // while tbody/tr inherit the table grid and retain sticky edge cells.
+      const table=(id,semantic=true)=>`<div class="${native.permissionsViewportClass}"><table id="${id}" class="${native.permissionsClass}" data-page-size="2" style="grid-template-columns:calc(var(--spacing) * 48) repeat(4,calc((100% - calc(var(--spacing) * 48) - calc(var(--spacing) * 14)) / 2)) calc(var(--spacing) * 14);scroll-padding-inline:calc(var(--spacing) * 48) calc(var(--spacing) * 14)">
+        <thead class="${headingClass}"><tr class="text-secondary"><th>Website</th><th ${semantic?'id="browser-use-site-permissions-column-origin"':''}>Browsing</th><th>Download</th><th>Upload</th><th>CDP</th><th><button disabled aria-label="Previous">Back</button><button aria-label="Next">Next</button></th></tr>
         <tr><td>Default</td>${Array.from({length:4},()=>'<td><button aria-haspopup="menu" aria-expanded="false" class="bg-primary-soft-alpha border border-default text-default">Ask</button></td>').join('')}<td></td></tr></thead>
-        <tbody><tr><td>Example</td><td>Ask</td><td>Ask</td><td>Ask</td><td>Ask</td><td><button aria-label="Delete">Delete</button></td></tr></tbody></table>`;
+        <tbody><tr><td>Example</td><td>Ask</td><td>Ask</td><td>Ask</td><td>Ask</td><td><button aria-label="Delete">Delete</button></td></tr></tbody></table></div>`;
       await page.setContent(`<html data-theme="${mode}"><head><style>${native.css}\n${native.permissionsCss}</style><style>body{margin:20px;background:linear-gradient(90deg,#fff,#000)}.group\\/settings{width:700px}button{padding:4px}</style></head><body><div class="group/settings">${table('permissions')}${table('unrelated',false)}</div></body></html>`);
       const read=()=>page.locator('table,thead,tbody,tr,td,th,button').evaluateAll(es=>es.map(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,position:s.position,overflow:s.overflow,grid:s.gridTemplateColumns,border:s.borderWidth,font:s.font,color:s.color,disabled:e.disabled,tabIndex:e.tabIndex,expanded:e.getAttribute('aria-expanded')};}));
       const before=await read();
@@ -57,8 +65,12 @@ test('browser permissions use local cell materials and retain native paging, sti
       const fill=await page.locator('#permissions td').first().evaluate(e=>getComputedStyle(e).backgroundColor);
       assert.equal(fill,mode==='dark'?'color(srgb 0.25098 0.298039 0.345098)':'color(srgb 0.968627 0.976471 0.984314)');
       assert.equal(await page.locator('#permissions thead').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
-      await page.locator('#permissions tbody').evaluate(e=>{e.scrollLeft=200;});
-      assert.ok(await page.locator('#permissions tbody').evaluate(e=>e.scrollLeft)>0);
+      const edgeCells=()=>page.locator('#permissions tbody td:first-child,#permissions tbody td:last-child').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return [r.x,r.width];}));
+      const edges=await edgeCells();
+      await page.locator('#permissions').evaluate(e=>{e.scrollLeft=e.scrollWidth-e.clientWidth;});
+      assert.ok(await page.locator('#permissions').evaluate(e=>e.scrollLeft)>0);
+      assert.equal(await page.locator('#permissions tbody').evaluate(e=>e.scrollLeft),0);
+      assert.deepEqual(await edgeCells(),edges,'native edge columns stay pinned while the table pages');
       await page.locator('#permissions button[aria-haspopup="menu"]').first().focus();
       assert.equal(await page.locator('#permissions button[aria-haspopup="menu"]').first().evaluate(e=>e===document.activeElement),true);
       await page.close();
@@ -114,6 +126,12 @@ test('Add suggestion groups use one reading material in both modes without chang
   skip: !native && 'Requires the installed native UI CSS'
 }, async () => {
   assert.match(native.source, /data-mention-list-scroll-area/);
+  // SuggestionList renders unavailable entries as non-interactive aria-disabled
+  // divs. A disabled button is a different native component and paint state.
+  const disabledRowClass=[...native.source.matchAll(/\(`div`,\{"aria-disabled":`true`,className:`([^`]+)`/g)]
+    .map(match=>match[1]).find(className=>className.includes('--suggestion-menu-item-padding'));
+  assert.ok(disabledRowClass, 'native unavailable suggestion row contract drifted');
+  assert.ok(disabledRowClass.split(/\s+/).includes('opacity-50'), 'native unavailable row opacity drifted');
   const browser = await chromium.launch({ headless: true });
   try {
     for (const mode of ['dark', 'light']) {
@@ -126,11 +144,11 @@ test('Add suggestion groups use one reading material in both modes without chang
         <div><div id="heading" class="sticky top-0 bg-surface-elevated-secondary">Add</div>
           <button id="normal" data-list-navigation-item style="opacity:var(--opacity-menu-row,.75)">Files <span id="description" class="text-codex-description">Choose local documents</span></button>
           <button id="selected" data-list-navigation-item aria-current="true" class="bg-menu-item-highlighted">Selected <span class="text-codex-description">Current row</span></button>
-          <button id="disabled" disabled class="opacity-50">Unavailable</button>
+          <div id="disabled" aria-disabled="true" class="${disabledRowClass}" data-plugin-impression-id="unavailable">Unavailable</div>
         </div><div><div class="sticky top-0 bg-surface-elevated-secondary">Plugins</div><button data-list-navigation-item>Example plugin</button></div>
       </div></div><div id="unrelated" class="sticky bg-surface-elevated-secondary">Unrelated heading</div></body></html>`);
-      const readGeometry = () => page.locator('#menu,#list,button,.sticky').evaluateAll(nodes => nodes.map(e => {
-        const s=getComputedStyle(e),r=e.getBoundingClientRect();return {rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,position:s.position,padding:s.padding,disabled:e.disabled,tabIndex:e.tabIndex};
+      const readGeometry = () => page.locator('#menu,#list,button,[aria-disabled],.sticky').evaluateAll(nodes => nodes.map(e => {
+        const s=getComputedStyle(e),r=e.getBoundingClientRect();return {rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,position:s.position,padding:s.padding,disabled:e.disabled,ariaDisabled:e.getAttribute('aria-disabled'),tabIndex:e.tabIndex};
       }));
       const before=await readGeometry();
       const unrelated=await page.locator('#unrelated').evaluate(e=>getComputedStyle(e).backgroundColor);
@@ -145,6 +163,8 @@ test('Add suggestion groups use one reading material in both modes without chang
       assert.equal(await page.locator('#description').evaluate(e=>getComputedStyle(e).color),mode==='dark'?'rgb(208, 210, 211)':'rgb(48, 58, 50)');
       assert.equal(await page.locator('#normal').evaluate(e=>getComputedStyle(e).opacity),'1');
       assert.equal(await page.locator('#disabled').evaluate(e=>getComputedStyle(e).opacity),'0.5');
+      assert.equal(await page.locator('#disabled').getAttribute('aria-disabled'),'true');
+      assert.equal(await page.locator('#disabled').evaluate(e=>e.tabIndex),-1);
       assert.equal(await page.locator('#unrelated').evaluate(e=>getComputedStyle(e).backgroundColor),unrelated);
       await page.locator('#normal').focus();
       assert.equal(await page.locator('#normal').evaluate(e=>e===document.activeElement),true);
@@ -364,27 +384,6 @@ test('semantic paint survives utility changes and preserves positioning wrappers
       assert.equal(await page.locator('input').inputValue(), 'Still editable');
       await page.close();
     }
-  } finally {
-    await browser.close();
-  }
-});
-
-test('thread fade removal stays inside the native scroll or footer owner', async () => {
-  const browser = await chromium.launch({ headless: true });
-  try {
-    const page = await browser.newPage();
-    await page.setContent(`<html class="forge-ink-mountain" data-forge-background-ready="true"><head><style>
-      .paint { height: 20px; background: linear-gradient(#333, transparent); }
-    </style></head><body><div id="root">
-      <div data-thread-scroll-footer="true"><div id="footer" aria-hidden="true" class="paint pointer-events-none bg-gradient-to-t"></div></div>
-      <div class="thread-scroll-container"><div id="reservation" aria-hidden="true" class="paint pointer-events-none bg-gradient-to-t"></div></div>
-      <div role="dialog"><div id="dialog" aria-hidden="true" class="paint pointer-events-none bg-gradient-to-t from-surface via-surface"></div></div>
-    </div></body></html>`);
-    await page.addStyleTag({ content: theme });
-    const paints = await page.locator('.paint').evaluateAll(nodes => nodes.map(node => ({ id: node.id, image: getComputedStyle(node).backgroundImage })));
-    assert.equal(paints.find(node => node.id === 'footer').image, 'none');
-    assert.equal(paints.find(node => node.id === 'reservation').image, 'none');
-    assert.match(paints.find(node => node.id === 'dialog').image, /linear-gradient/);
   } finally {
     await browser.close();
   }

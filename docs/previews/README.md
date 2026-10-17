@@ -1,5 +1,13 @@
 # 当前预览
 
+## v0.18.4 底部修复预览（2026-10-17）
+
+dark-thread-footer-current.png / light-thread-footer-current.png 与 dark-dots-footer-current.png / light-dots-footer-current.png：Windows Codex 26.1013.4894.0，运行时 v113-native-footer-paint。实机分别打开普通对话和 Dots，切换原生深浅模式后截取消息滚动区同宽的底部 180 CSS px。仅临时隐藏消息、草稿和附件内容的绘制以保护隐私，保留背景装饰、输入框、控件的原生可见状态和布局；截图后恢复，结束时恢复深色及当前任务。不是合成或夹具截图。
+
+## 本轮合并的浏览器专项预览（修正阶段 v112）
+
+2026-10-17，安装客户端 26.1013.4894.0（包内 26.1013.40934）。browser-portal-before.png / browser-portal-after.png 来自同一实际窗口中的公开 foreseer.site 网页及其原生工具栏，通过 CDP 按网页矩形向上包含工具栏截取；无聊天正文、侧栏或本机路径。before 临时恢复旧 #root z-index:1 规则，after 使用 auto；两次网页矩形完全一致。截图后删除临时诊断样式，永久修复由活动源码提供。此处只有深色实机截图；深浅色和两种宽度的结果来自自动绘制夹具，不作为浅色实机验收。
+
 ## v0.18.3 Dots 标题预览
 
 2026-10-08，Windows Codex 26.1002.7124.0，运行时 v111-dots-header-owner。

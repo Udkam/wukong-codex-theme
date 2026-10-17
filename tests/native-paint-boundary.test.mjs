@@ -27,7 +27,14 @@ const loadNative = () => {
     const bodyClass = css.match(/\.(_ComposerLayoutBody_[\w]+)\{/)[1];
     const topMenu = css.match(/\.(_ComposerTopMenuPanel_[\w]+)\[/)[1];
     const effortClass = css.match(/\.(_ModelPickerTriggerEffortText_[\w]+)\[data-max-effort=true\]/)[1];
-    return { archive, css, rootClass, bodyClass, topMenu, effortClass };
+    const codeSurfaceClass = css.match(/\.(_CodeSurface_[\w]+)[,{]/)?.[1];
+    const stickyCodeBarClass = css.match(/\.(_StickyActionBar_[\w]+)[,{]/)?.[1];
+    const sharedScript = entries.find(entry => /webview[\\/]assets[\\/]app-shared-.*\.js$/.test(entry));
+    const codeBlockSource = sharedScript
+      ? asar.extractFile(archive, sharedScript.replace(/^[/\\]/, '')).toString('utf8')
+      : '';
+    return { archive, css, rootClass, bodyClass, topMenu, effortClass,
+      codeSurfaceClass, stickyCodeBarClass, codeBlockSource };
   } catch { return null; }
 };
 const native = loadNative();
@@ -348,21 +355,71 @@ test('current client CSS: native geometry/semantic colours, home paint boundarie
 
 
 test('native Markdown code cards keep text and geometry while unifying toolbar paint', {skip: !native}, async () => {
+  // Derive the paint owners from the installed component instead of keeping a
+  // retired utility in the fixture. Its default surface and sticky toolbar
+  // share native paint; preview/hover/transparent variants do not own it.
+  assert.ok(native.codeSurfaceClass, 'native default code surface drifted; re-audit the code-block paint owner');
+  assert.ok(native.stickyCodeBarClass, 'native sticky code toolbar drifted; re-audit its paint owner');
+  for (const contract of [native.codeSurfaceClass, native.stickyCodeBarClass,
+    '"data-code-block":', '"data-code-block-source":', '"data-markdown-copy":`code-block`',
+    '"data-markdown-copy":`exclude`', 'CodeSurface:', 'StickyActionBar:']) {
+    assert.ok(native.codeBlockSource.includes(contract), 'native code-block source contract drifted: '+contract);
+  }
   const browser = await chromium.launch({headless:true});
   try {
     for (const mode of ['light','dark']) {
       const page = await browser.newPage({colorScheme:mode});
-      await page.setContent('<html data-theme="'+mode+'"><div id="card" data-theme="'+mode+'" data-markdown-copy="code-block" class="relative w-full min-w-0 overflow-clip contain-inline-size rounded-(--radius-3xl-base) border border-subtle bg-secondary-soft-alpha"><div data-markdown-copy="exclude" class="sticky flex items-center min-h-12 text-default" style="background:var(--color-surface)">Plain text<button>Copy</button></div><pre class="overflow-auto px-4"><code>example/path.wav <span style="color:rgb(40,140,80)">token</span></code></pre></div><div id="preview" data-markdown-copy="code-block" class="bg-transparent">Preview</div></html>');
+      await page.setContent(`<html class="${mode}" data-theme="${mode}"><div id="code-scroll" style="height:190px;width:500px;overflow:auto">
+        <div id="card" data-code-block="true" data-theme="${mode}" data-markdown-copy="code-block" class="relative w-full min-w-0 overflow-clip contain-inline-size rounded-(--radius-3xl-base) border border-subtle text-default ${native.codeSurfaceClass}">
+          <div id="code-toolbar" data-markdown-copy="exclude" class="flex items-center font-sans text-sm select-none min-h-12 gap-2 py-1.5 ps-4 pe-1.5 font-medium text-default md:ps-5 sticky z-10 ${native.stickyCodeBarClass}">JavaScript<button id="copy-code">Copy</button><button id="wrap-code" aria-pressed="false">Wrap</button></div>
+          <div data-code-block-source="true"><pre id="source-code" class="overflow-auto px-4" style="white-space:pre"><code>${Array.from({length:18},(_,i)=>`example/path-${i}.wav <span style="color:rgb(40,140,80)">token</span>`).join('\n')}</code></pre></div>
+        </div></div>
+        <div id="legacy" data-theme="${mode}" data-markdown-copy="code-block" class="bg-secondary-soft-alpha"><div data-markdown-copy="exclude">Legacy toolbar</div><pre>Legacy default code</pre></div>
+        <div id="preview" data-code-block="true" data-theme="${mode}" data-markdown-copy="code-block" class="group/code-snippet rounded-lg border border-default bg-surface text-default"><div data-markdown-copy="exclude">Preview toolbar</div>Preview</div>
+        <div id="hover" data-code-block="true" data-theme="${mode}" data-markdown-copy="code-block" class="w-auto overflow-visible bg-transparent"><div data-markdown-copy="exclude">Hover toolbar</div>Hover</div>
+        <div id="transparent" data-code-block="true" data-theme="${mode}" data-markdown-copy="code-block" class="rounded-(--radius-3xl-base) border border-subtle text-default bg-transparent"><div data-markdown-copy="exclude">Transparent toolbar</div>Transparent</div>
+        <pre id="user-code" data-markdown-copy="code-block" class="bg-(--color-text-user-message)/10 text-user-message"><code>User code</code></pre></html>`);
       await page.addStyleTag({content:native.css});
-      const read=()=>page.locator('#card, #card *, #preview').evaluateAll(nodes=>nodes.map(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {color:s.color,rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,corner:s.cornerShape,overflow:s.overflow,bg:s.backgroundColor,filter:s.backdropFilter};}));
+      await page.evaluate(() => {
+        document.getElementById('copy-code').addEventListener('click', () => {
+          document.getElementById('card').dataset.copiedText = document.getElementById('source-code').textContent;
+        });
+        document.getElementById('wrap-code').addEventListener('click', event => {
+          const pressed = event.currentTarget.getAttribute('aria-pressed') !== 'true';
+          event.currentTarget.setAttribute('aria-pressed', String(pressed));
+          document.getElementById('source-code').style.whiteSpace = pressed ? 'pre-wrap' : 'pre';
+        });
+      });
+      const read=()=>page.locator('#card, #card *, #legacy, #legacy *, #preview, #preview *, #hover, #hover *, #transparent, #transparent *, #user-code, #user-code *').evaluateAll(nodes=>nodes.map(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {id:e.id,color:s.color,rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,corner:s.cornerShape,overflow:s.overflow,bg:s.backgroundColor,image:s.backgroundImage,filter:s.backdropFilter};}));
       const before=await read();
       await page.addStyleTag({content:theme});
       await page.evaluate(()=>document.documentElement.classList.add('forge-ink-mountain'));
       const after=await read();
       for(let i=0;i<before.length;i++) for(const key of ['color','rect','radius','corner','overflow','filter']) assert.deepEqual(after[i][key],before[i][key],mode+' '+i+' '+key);
-      assert.equal(after[0].bg,mode==='light'?'rgb(237, 240, 243)':'rgb(36, 40, 44)');
-      assert.equal(after[1].bg,after[0].bg);
-      assert.equal(after.at(-1).bg,before.at(-1).bg);
+      const card=after.find(node=>node.id==='card'),toolbar=after.find(node=>node.id==='code-toolbar');
+      assert.equal(card.bg,mode==='light'?'rgb(237, 240, 243)':'rgb(36, 40, 44)');
+      assert.equal(toolbar.bg,card.bg);
+      assert.equal(card.image,'none');
+      assert.equal(toolbar.image,'none');
+      assert.equal(after.find(node=>node.id==='legacy').bg,card.bg);
+      for (const id of ['preview','hover','transparent','user-code']) {
+        const start=before.findIndex(node=>node.id===id),end=before.findIndex((node,index)=>index>start&&node.id);
+        const stop=end===-1?before.length:end;
+        assert.deepEqual(after.slice(start,stop),before.slice(start,stop),mode+' '+id+' must retain native paint');
+      }
+      await page.getByRole('button',{name:'Copy',exact:true}).click();
+      assert.equal(await page.locator('#card').getAttribute('data-copied-text'),await page.locator('#source-code').textContent());
+      await page.getByRole('button',{name:'Wrap',exact:true}).click();
+      assert.equal(await page.getByRole('button',{name:'Wrap',exact:true}).getAttribute('aria-pressed'),'true');
+      assert.equal(await page.locator('#source-code').evaluate(e=>getComputedStyle(e).whiteSpace),'pre-wrap');
+      // The native toolbar must continue covering code while the card scrolls.
+      await page.locator('#code-scroll').evaluate(e=>{e.scrollTop=130;});
+      const scrolled=await read();
+      await page.evaluate(()=>document.documentElement.classList.remove('forge-ink-mountain'));
+      const nativeScrolled=await read();
+      for(let i=0;i<scrolled.length;i++) for(const key of ['color','rect','radius','corner','overflow','filter']) assert.deepEqual(scrolled[i][key],nativeScrolled[i][key],mode+' scrolled '+i+' '+key);
+      assert.equal(scrolled.find(node=>node.id==='code-toolbar').bg,card.bg);
+      await page.evaluate(()=>document.documentElement.classList.add('forge-ink-mountain'));
       await page.emulateMedia({forcedColors:'active'});
       assert.equal(await page.locator('#card').evaluate(e=>getComputedStyle(e).boxShadow),'none');
       await page.close();

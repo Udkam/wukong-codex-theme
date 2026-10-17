@@ -1,5 +1,25 @@
 # Wukong Codex Theme
 
+## v0.18.4：新版底部背景、代码块与浏览器修复
+
+运行时 **v113-native-footer-paint** 已注入本机，核对客户端 **26.1013.4894.0**。本轮按用户明确授权随 v0.18.4 运行包发行。新版把普通对话和 Dots 的底部绘制迁移到共享背景组件，本轮按实际装饰节点处理渐变、实色和组合三种状态，清除输入框后方黑边，保留原生尺寸、滚动预留和交互。
+
+同时适配默认代码块的新 CodeSurface 与吸顶工具栏，继续保护预览、悬浮和用户消息代码的原生绘制。本轮还合并了浏览器 portal 堆叠修复：取消 #root 的正 z-index，使原生网页视图恢复显示。
+
+![深色 Dots 输入区](docs/previews/dark-dots-footer-current.png)
+
+![浅色 Dots 输入区](docs/previews/light-dots-footer-current.png)
+
+预览来自当前客户端，截图时临时隐藏消息及草稿内容的绘制，截图后恢复。实机、原生源码与夹具结果分别记录在 [验证记录](docs/VALIDATION.md)；更多预览来源见 [预览说明](docs/previews/README.md)。
+
+### 本轮合并的浏览器显示修复
+
+客户端把浏览器网页挂载到 body 下，位于应用根节点之外。旧主题给 #root 添加 z-index: 1，将已加载的网页盖住。保留相对定位并取消该层级抬高后，网页恢复显示。专项原生来源和验证边界见 [浏览器修复说明](docs/BROWSER_PORTAL_FIX.md)。
+
+![修复后的实际内嵌浏览器](docs/previews/browser-portal-after.png)
+
+截图仅包含公开网页和浏览器工具栏；浏览器专项的深浅自动夹具结果与深色实机结果分别记录。
+
 为 Windows ChatGPT/Codex 桌面客户端提供悟空背景与玻璃材质，支持深浅色主题。保留原生交互，按区域替换材质；10 张战斗图、3 张风景图，对话默认雪山。
 
 ## v0.18.3：Dots 标题渐变修复
@@ -68,7 +88,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.3 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.3/Wukong-Codex-Theme-0.18.3-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.4 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.4/Wukong-Codex-Theme-0.18.4-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -83,7 +103,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.3**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前正式版本为 **v0.18.4**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

@@ -1,5 +1,9 @@
 # 原生 UI 与主题替换接口
 
+2026-10-17 当前来源已核对至 Windows Codex 26.1013.4894.0。底部背景共享组件有 fade、surface、combined 三个实际分支，分别出现在 transcript 占位、语义 footer、Dots composer、免责声明及主内容页面。按主内容／对话／composer 所属范围、空惰性节点和背景绘制家族识别，不绑定模块 hash、方向工具类或固定宽高；背景色和背景图同时清除，输入控件与布局预留保留。
+
+默认 Markdown 代码块以 data-markdown-copy、data-code-block 和 CodeSurface 模块共同识别，卡片与直接子工具栏共用阅读底色；preview、hover、透明模式及用户消息 pre 没有默认表面标记时保留原生绘制。新回归读取当前组件的 AST／CSS，并实际执行共享底部组件生成三种分支，防止旧手写夹具继续遗漏新版绘制节点。
+
 核对客户端：Windows Codex 26.930.3930.0，2026-10-04。依据安装包的活动 CSS/JS，来源哈希见 native-asar-provenance.json。本文件统一现役设计、材质配置和覆盖边界；历史方案从 Git 查询。
 
 2026-10-06 补充核对 26.930.4958.0 的 FloatingSurface / QuickChat 绘制归属，当前来源记录已更新。其圆角类可用于透明定位框；仅带原生 bg-surface-elevated-secondary 或 bg-surface-canvas 材质的载体参与玻璃替换，快速聊天的外框保持透明。
@@ -30,14 +34,14 @@
 | 目标、排队消息 | data-composer-rail / rail-item | 外层玻璃，排队叶节点不额外模糊；列表回退限定在 rail 内 |
 | 进度区 | data-in-progress-fixed-content 内绘制叶 | 不再依赖 h-8、字号或进度文案 |
 | 摘要、环境、变更面板 | data-summary-panel-variant、summary item slot | 卡片及 sticky 标题共用不透明底，遮挡滚动文字 |
-| 顶底渐变 | thread footer、scroll container、main-content-top-fade | 仅清除装饰节点绘制，保留布局预留 |
+| 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
 | dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
 | 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
 | 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、popover-content、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 定位层不绘制；命令根与添加列表使用浓阅读底色；嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |
 | 消息预览 | data-thread-user-message-navigation-tooltip-preview | 不再依赖 w-80 / max-width 类 |
-| Markdown 代码 | code-block 与原生绘制 token | 代码和 sticky 工具栏共用不透明底，语法颜色保留 |
+| Markdown 代码 | code-block、data-code-block 与默认 CodeSurface | 代码和 sticky 工具栏共用不透明底，语法颜色及非默认变体保留 |
 | 首页字标、题字 | home icon、landing title | 主题自有装饰，可快捷键关闭并还原，不重写对话正文 |
 
 ## Dots 标题合同
@@ -79,3 +83,11 @@
 host 对主模块和适配依赖共同计算指纹，并用于 renderer 新鲜度判定，映射单独更新也能加载。回归检查接口和实际行为，不把原生工具栏、侧栏尺寸锁成旧数值；漂移夹具改变尺寸、工具类、层级和页面可见状态，验证替换归属。夹具需要与安装包中的实际组件合同关联；存在 portal、资料开关或浮动变体的组件，还需检查这些变体的绘制归属。
 
 减少动态、减少透明度、强制色彩与还原功能保留。原生语义标记也可能变更，未来彻底重写组件时仍需维护映射。系统菜单和其他进程窗口不属于 renderer CSS。源码核对、夹具和实机范围分别记录于 VALIDATION.md。
+
+## 内嵌浏览器 portal 合同（2026-10-17）
+
+浏览器专项来源为安装客户端 26.1013.4894.0（包内 26.1013.40934），记录在 native-browser-provenance.json；其他区域仍保留各自已审计来源，不代表本次完成全 UI 重新审计。
+
+原生 [data-embedded-frame-host-root] 直接挂到 body，[data-browser-host-root] 位于其内并使用 contain:paint，[data-browser-sidebar-webview] 包含实际 webview。可见容器由原生设置固定矩形和 visibility:visible，z-index 为空（auto）；与 #root 是兄弟关系。v112-browser-portal-stacking 只取消主题 #root 的正 z-index，保留 position:relative。body 壁纸回退始终 prepend 在 root 之前，继续位于内容后方。
+
+不为浏览器 portal 添加高 z-index，不修改网页 CSS、浏览器坐标或指针行为。tests/native-browser-contract.test.mjs 关联当前原生源码；tests/browser-portal.test.mjs 使用同样的语义拓扑检查绘制像素、交互、模态层级和回退，并以旧规则复现缺陷。夹具不能替代真实 Electron guest 的屏幕验证。

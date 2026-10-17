@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.930.3930.0.
+/* Native paint boundary, audited against desktop 26.1013.4894.0.
  * Native fonts, radii and layout are retained. Navigation uses a translucent
  * reading surface with foreground colours matched to the native theme.
  * Only the existing landing wordmark/quote and inert background own geometry.
@@ -72,6 +72,21 @@
 }
 :root.forge-ink-mountain #root :is([data-thread-scroll-footer="true"], .thread-scroll-container) [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
   background-image: none !important;
+}
+/* The shared native footer owns fade, surface and combined paint leaves.
+ * The transcript reserve, footer, Dots composer and main-layout consumers can
+ * mount it independently. Match its empty decorative family, never dimensions
+ * or a gradient direction utility; surface-only leaves also carry solid fill.
+ * Keep the owner boundary and exclude controls, previews and nonempty shells. */
+:root.forge-ink-mountain #root :is(
+  [data-app-shell-main-content-layout],
+  .thread-scroll-container,
+  [data-thread-scroll-footer="true"],
+  [data-codex-composer-root]
+) [aria-hidden="true"].pointer-events-none:empty[class*="_background_"]:is(
+  [class*="_fade_"], [class*="_surface_"], [class*="_combined_"]
+) {
+  background: transparent !important;
 }
 /* Dots portal an empty, hidden paint leaf to the main content layout. The
  * anchor is its stable owner; CSS-module names change between header variants.
@@ -167,21 +182,21 @@
 /* Native default Markdown code cards. An opaque reading tint also lets the
  * sticky toolbar cover scrolled code without a second translucent stripe.
  * Preview/hover blocks, syntax colours, selection and geometry stay native. */
-:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) {
   --forge-code-fill: rgb(36, 40, 44);
   background-color: var(--forge-code-fill) !important;
   background-image: none !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
-:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha[data-theme="light"] {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"])[data-theme="light"] {
   --forge-code-fill: rgb(237, 240, 243);
 }
-:root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha > [data-markdown-copy="exclude"] {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) > [data-markdown-copy="exclude"] {
   background-color: var(--forge-code-fill) !important;
   background-image: none !important;
 }
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  :root.forge-ink-mountain [data-markdown-copy="code-block"].bg-secondary-soft-alpha {
+  :root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) {
     --forge-code-fill: var(--color-surface, Canvas) !important;
     box-shadow: none !important;
   }
@@ -539,9 +554,12 @@
 /* Settings retains the current surface's veil, including the light-mode veil.
  * A second settings-only override would visibly darken the same wallpaper. */
 
+/* Native browser webviews are portaled beside #root under body. Keep the
+ * native stacking order: a positive root z-index would cover the guest view.
+ * The viewport wallpaper is prepended before this positioned content root.
+ */
 :root.forge-ink-mountain #root {
   position: relative;
-  z-index: 1;
 }
 
 :root.forge-ink-mountain[data-forge-background-ready="true"] main.main-surface {

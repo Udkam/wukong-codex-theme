@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "scope": "browser only",
+  "installationDirectoryVersion": "26.1013.4894.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1013.4894.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1013.40934",
+  "asarRelativePath": "app/resources/app.asar",
+  "sizeBytes": 582072504,
+  "asarSha256": "bbec1d64e135b718a154b31655bb8ad9a39472bac1b2cabba991a9d97a339dd8",
+  "capturedAt": "2026-10-17",
+  "captureMode": "read-only installed browser portal DOM, stacking and pinned asset contract audit; general native UI baseline unchanged",
+  "assets": {
+    "javascript": {
+      "member": "webview/assets/app-shared-bbfeca5e5737.js",
+      "bytes": 5846881,
+      "sha256": "a6579611db8acf9c9908e2a29e70a88687eaa1d8f8dbcdc258de58f286051e9d"
+    },
+    "stylesheet": {
+      "member": "webview/assets/app-shared-dc7535e633d7.css",
+      "bytes": 1307139,
+      "sha256": "282dd3546bccfba48212a186641a73dedb27af6af7962dad40b3f5db6a9a08f2"
+    },
+    "entrypoint": {
+      "member": "webview/index.html",
+      "bytes": 15105,
+      "sha256": "29d4844bf383a60825c4fea48835402f46374dbacb33277688a40cb60c492594"
+    }
+  }
+}
