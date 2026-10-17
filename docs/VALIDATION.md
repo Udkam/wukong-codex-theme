@@ -22,6 +22,8 @@
 
 用该正式 ZIP 解压出的注入器实际恢复原生，verified=true；随后同包重新注入，verified=true、deferred=false。主页面实读 v113-native-footer-paint、backgroundReady=true、document.hidden=false。后续仅补充发行与清理记录，运行代码及打包输入保持一致。
 
+GitHub 已回读 v0.18.4 为 Latest，非草稿、非预发行，两个正式资产均 uploaded。重新下载 ZIP 与 SHA256SUMS.txt，两者 SHA-256 分别与本地正式文件一致；远程 ZIP 同为 4,053,113 字节。发布标签对应修复提交 334d455，后续仅补写验证及清理文档。首次 Git 连接超时，API 读取正常；再次 Git 读取、推送和正式上传成功，未改变网络配置。
+
 ## 浏览器专项记录：合并前 v112-browser-portal-stacking（2026-10-17）
 
 内嵌浏览器网页被主题 #root z-index:1 遮挡，已取消该层级并重新注入。实机同窗口前后对照恢复网页显示，网页矩形无变化；源码核对当前浏览器 portal 挂到 body，专项来源为安装版本 26.1013.4894.0／包内 26.1013.40934。

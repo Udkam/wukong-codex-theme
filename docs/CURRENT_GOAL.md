@@ -1,6 +1,6 @@
 # 当前目标与发行状态
 
-更新：2026-10-17。本轮发行版本为 [v0.18.4](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.4)，用户已明确授权发布。发行说明见 [RELEASE_0.18.4.md](RELEASE_0.18.4.md)，完整证据见 [验证记录](VALIDATION.md)。
+更新：2026-10-17。当前正式版本为 [v0.18.4](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.4)，已设为 GitHub Latest。运行包与校验文件回下载一致，同一正式包已完成本机恢复原生与重新注入。发行说明见 [RELEASE_0.18.4.md](RELEASE_0.18.4.md)，完整证据见 [验证记录](VALIDATION.md)。
 
 运行时 v113-native-footer-paint，原生来源 Windows Codex 26.1013.4894.0。统一处理普通对话和 Dots 的渐变、实色及组合背景，适配默认代码卡与吸顶工具栏，并合入浏览器 portal 堆叠修复。深浅实机底部预览与浏览器专项预览已同步。
 
