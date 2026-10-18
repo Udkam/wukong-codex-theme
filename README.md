@@ -1,5 +1,19 @@
 # Wukong Codex Theme
 
+## v0.18.6：设计控件弹层绘制范围（发布验证中）
+
+运行时 **v115-popover-paint-owner** 修正“设计控件”圆角外仍出现矩形背景的问题。原生 Popover 的 `data-slot="popover-content"` 也用于无底色的定位与缩放外壳，内层 FloatingSurface 才负责圆角和背景。主题现在依据实际背景载体替换材质：外壳保持透明，有原生表面底色的内容层绘制玻璃，避免两层背景叠加。
+
+同时从原生代码排查共用组件的 20 处无样式调用，补齐头像反应选择器与内联结账面板的材质入口，保留头像原生滤镜、引导提示的反色文字与箭头，以及设计面板内部标题和控件的原生绘制。该排查属于源码核对，相关业务面板未逐一实机打开。
+
+2026-10-18，用户已验收当前修复并授权发布 **v0.18.6**。v115 已注入本机，最终主页面读回背景就绪、窗口可见，已安装样式与当前源码一致。本轮正在从精确发行输入重新执行检查、构建运行包并验证远程资产；最终结果以 [验证记录](docs/VALIDATION.md) 为准。
+
+![深色设计控件圆角边界夹具](docs/previews/dark-design-controls-fixture.png)
+
+![浅色设计控件圆角边界夹具](docs/previews/light-design-controls-fixture.png)
+
+以上为真实原生渲染组件与 CSS 的 **136×116 局部材质边界夹具**，**不是实机截图，也未复刻业务面板的控件布局**；来源和限制见 [预览说明](docs/previews/README.md)。用户验收与夹具来源分别记录，发布内容见 [v0.18.6 发行说明](docs/RELEASE_0.18.6.md)。
+
 ## v0.18.5：Dots 处理框标题材质修复
 
 2026-10-18，运行时 **v114-summary-header-material** 已注入本机，核对客户端 **26.1013.4894.0**。修复 Dots 处理框顶部仍出现黑带的问题：任务标题、普通线程标题及资料收起标题的原生渐变现在从所在摘要面板取色，与面板底色一致。渐变及其透明度继续由原生控制，保留遮挡滚动文字的作用；原生布局、返回与打开聊天按钮继续生效。
@@ -100,7 +114,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.5 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.5/Wukong-Codex-Theme-0.18.5-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.6 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.6/Wukong-Codex-Theme-0.18.6-Windows.zip)。本轮正在发布验证，资产上传完成后该链接生效。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -115,7 +129,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.5**，已设为 GitHub Latest。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+本轮发行版本为 **v0.18.6**，发布验证进行中，尚未确认远程 Latest。完整操作说明见 [快速开始](docs/QUICK_START.txt)，发行结果见 [当前状态](docs/CURRENT_GOAL.md)。
 
 ## 常用操作
 

@@ -1,5 +1,7 @@
 # 原生 UI 与主题替换接口
 
+2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的“设计控件”Popover，开发运行时 v115-popover-paint-owner，尚未发布。`data-slot="popover-content"` 保留在原生 `unstyled:true` 的透明定位／缩放壳上，内层 FloatingSurface 才拥有真实圆角与底色。材质依据实际绘制载体分配，slot 或 dialog role 本身不能作为带底色的证据；详见下方 Popover 绘制归属合同。
+
 2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的摘要面板共享标题，运行时 v114-summary-header-material。Dots 处理框顶部的原生渐变仍读取默认 surface-elevated-secondary，而面板已替换为摘要材质，两者颜色不同形成黑带。本轮使空装饰渐变局部读取摘要填充，实色底板直接同色，保留原生渐变、透明度、布局和滚动遮挡；不把局部变量传给返回等控件。详见下方 Dots 处理框标题合同。
 
 2026-10-17 当前来源已核对至 Windows Codex 26.1013.4894.0。底部背景共享组件有 fade、surface、combined 三个实际分支，分别出现在 transcript 占位、语义 footer、Dots composer、免责声明及主内容页面。按主内容／对话／composer 所属范围、空惰性节点和背景绘制家族识别，不绑定模块 hash、方向工具类或固定宽高；背景色和背景图同时清除，输入控件与布局预留保留。
@@ -42,10 +44,22 @@
 | 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
-| 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、popover-content、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 定位层不绘制；命令根与添加列表使用浓阅读底色；嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |
+| 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、Popover slot 的实际原生底色及直接内容面、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 与无底色定位壳不绘制；命令根与添加列表使用浓阅读底色；内层表面与嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |
 | 消息预览 | data-thread-user-message-navigation-tooltip-preview | 不再依赖 w-80 / max-width 类 |
 | Markdown 代码 | code-block、data-code-block 与默认 CodeSurface | 代码和 sticky 工具栏共用不透明底，语法颜色及非默认变体保留 |
 | 首页字标、题字 | home icon、landing title | 主题自有装饰，可快捷键关闭并还原，不重写对话正文 |
+
+## Popover 绘制归属合同（2026-10-18，未发布 v115）
+
+原生编辑器的“设计控件”调用 Popover Content 时设置 `unstyled:true`。该组件仍输出 `data-slot="popover-content"`，用于定位、缩放与承载交互内容，但不提供默认底色和圆角；真正表面位于其内层 FloatingSurface。仅凭 slot 给外壳绘制玻璃，会在圆角外暴露矩形背景。
+
+主题先检查 slot 自身的类 token：无状态前缀的原生 `bg-surface` 家族底色才表示该节点本身拥有材质，`bg-transparent` 明确退出。slot 自身没有该底色时，仅补齐直接块级内容面中实际具有原生表面底色的节点；保持外壳的原生透明、定位和缩放关系。菜单、列表、对话框等 role 的通用规则排除该 slot，避免它们绕过同一绘制归属边界。已有 FloatingSurface 的实际背景载体规则继续生效。
+
+同次源码审查覆盖共享组件的 20 处无样式调用，补充两种独立材质入口：slot 直接子节点的 `data-avatar-overlay-material="css"` 仅局部设置 `--avatar-overlay-material-background` 为玻璃填充，保留原生 SVG 材质滤镜及边框；slot 自身的 `data-checkout-presentation="inline"` 使用玻璃材质，独立结账页不参与该规则。通用 role 规则同时排除 `bg-coachmark`，保留引导提示的原生反色文字与 SVG 箭头配对。
+
+纯壳直接子表面的补齐限定为 `div`、`section`、`form`、`aside` 和 `nav`。不递归追改设计面板内部的 `h3 bg-text/5`、输入控件或 composer；其原生绘制层级继续有效。这些边界来自调用源码核对，不能扩大为 20 个业务入口的实机验收。
+
+这种识别不依赖“设计控件”中文文案、原生宽高、圆角数值或模块 hash。需要区分完整 class token 与 `hover:`、`focus:` 等状态前缀，不能仅因类字符串包含 `bg-` 就把定位壳作为背景。当前修正的原生源码、共享 Popover 调用及自动回归范围见 [验证记录](VALIDATION.md)。本轮用户暂时无法重开业务面板；深浅预览来自真实原生渲染组件与 CSS 夹具，未完成该面板的实机视觉验收。
 
 ## Dots 标题合同
 

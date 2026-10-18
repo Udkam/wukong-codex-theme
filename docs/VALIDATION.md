@@ -1,5 +1,29 @@
 # 当前适配验证
 
+## v0.18.6／v115-popover-paint-owner（2026-10-18）
+
+用户提供可视化“设计控件”圆角外出现矩形底板的截图，修正阶段用户暂时无法重新打开面板，明确要求先按原生代码修复。已只读核对当前 Windows Codex 26.1013.4894.0，ASAR SHA-256 与来源锁一致；源码确定该面板由无样式 Popover 负责定位／调整尺寸，直接子 FloatingSurface 才拥有圆角与背景。原规则无条件给 data-slot=popover-content 加玻璃，导致透明外壳与真实表面重复绘制。修正完成后用户明确回复“已验收通过，发布”，本轮据此准备 v0.18.6。用户验收来自其直接反馈，不扩大为代理亲自执行了目标面板所有业务流程。
+
+现要求 Popover 自身具有无状态前缀的原生 bg-surface 家族才绘制；其自身无背景时，只补齐直接块级且确实带此背景的子载体。通用 role 规则不再绕过该 slot 的绘制判定，hover／after 等状态或伪元素类不构成背景证据。原生宽高、定位、缩放、拖动、圆角与内层控件不变。
+
+已追踪 20 处直接 unstyled 调用，确认普通 styled 菜单及调用者自带底色的分支保留玻璃；符号选择器、工具条、插件与表单由真实子表面绘制。头像材质只局部设置其原生背景变量，保留 SVG 滤镜和边框；inline checkout 按实际语义标记替换当前载体，保留 standalone 及表单状态；coachmark 背景、反色文字和 SVG 箭头保留原生配对。设计面板内分组标题、开关、选择器和 single-line composer 不作为新的子绘制面继续递归处理。
+
+首轮 v115 注入 verified=true、deferred=false；补齐同类分支后客户端主窗口隐藏，注入返回 deferred=true，样式与 v115 已安装，背景解码按既有可见性策略延后，不将其写成可见界面验收。实际打开的个人菜单仍使用原生菜单载体并具有玻璃材质，检查后关闭，没有修改账户或其他业务数据。
+
+定向 3/3 通过，0 失败、0 跳过，约 3.43 秒。回归执行原生 Popover、FloatingSurface、switch、头像及 inline checkout 的纯绘制组件，源码合同关联 editor 父子关系、独立工具条、头像材质与 asChild checkout。深浅色／两种面板尺寸和 checkout 展开宽度检查通过；保持原生几何、控件样式与状态、checkout Token、头像 SVG 滤镜、独立页面及 iframe 隔离。夹具卸载重挂后外壳仍透明。旧 HEAD 样式的内存负控制会在 design-shell 透明断言失败，读回旧外壳 alpha=.72、blur(12px)，确认可捕获本次双层错涂。
+
+两张 136×116 预览已按真实 renderer／CSS 生成，仅截取右上圆角与外部背景交界；属于局部材质边界夹具，没有复刻整个业务控件布局，不作为实机验收。最终准确定位主页面读回 v115-popover-paint-owner、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery，并确认已安装 CSS 包含完整的当前活动源码。未为目标面板注入假 DOM，未触发支付、头像业务或修改可视化内容。
+
+从精确索引导出的独立源码 npm run check：176/176 通过，0 失败、0 跳过，约 56.1 秒；同一输入的 Studio E2E 通过。随后仅补写文档与清理记录，运行时代码及测试输入保持一致。coachmark 的运行边界由夹具检查，反色背景与箭头配对另由原生源码核对，没有执行其业务引导流程。
+
+发布准备时再次核对当前安装包 SHA-256，来源未变；运行时与测试保持已验收的 v115 输入，仅同步版本及发行文档。本轮精确索引独立源码 npm run check：176/176 通过，0 失败、0 跳过，约 57.2 秒；同一输入的 Studio E2E 通过。
+
+正式 Windows ZIP 为 4,053,537 字节，37 个必要文件；解压后逐文件 SHA-256 与构建目录完全一致，包版本为 0.18.6／v115。ZIP SHA-256：
+
+`58ae168725d1fd2714fa4f8e1fc097ed770ffd2f46d822c320bb15da151cedac`
+
+用正式 ZIP 解压的注入器恢复原生，verified=true；再用同包重新注入，verified=true、deferred=false。准确定位主页面读回 v115-popover-paint-owner、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery，已安装 CSS 与包内完整活动样式一致。远程上传与回下载结果在执行后补记。代理未执行完整冷启动，也未亲自执行目标业务面板的实际开关、拖动、缩放流程。
+
 ## v0.18.5／v114-summary-header-material（2026-10-18）
 
 原生来源仍为 Windows Codex 26.1013.4894.0，当前 ASAR 与来源锁的大小及 SHA-256 一致。已复现 Dots 处理框顶部渐变与卡片色差：卡片使用主题底色，但独立共享标题组件仍从原生深灰色渐变。该组件有任务动态标题、紧凑返回标题和资料身份收起底板三个实际消费者，标题通过 portal 挂到卡片内、消息滚动区之外。

@@ -206,14 +206,22 @@
  * choose an opaque fill without inheriting an unrelated selector's weight.
  * FloatingSurface's radius class is also used on QuickChat's drag frame.
  * Only its native background carrier owns paint; the positioning frame must
- * remain transparent, including when the header expands. */
+ * remain transparent, including when the header expands.
+ * Popover Content is also an unstyled positioning/resize shell around an
+ * independent FloatingSurface. Its slot and dialog role do not own paint;
+ * require an unprefixed native surface-background token on the slot itself or
+ * its direct block-level surface. Nested controls keep their own material. */
 :root.forge-ink-mountain :where(
-  [role="menu"][class*="bg-"]:not([class~="bg-transparent"]),
-  [role="listbox"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-list]):not([data-cmdk-list]),
-  [role="dialog"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-dialog]):not(:has(img.object-contain)),
-  [role="alertdialog"][class*="bg-"]:not([class~="bg-transparent"]),
+  :is(
+    [role="menu"][class*="bg-"]:not([class~="bg-transparent"]),
+    [role="listbox"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-list]):not([data-cmdk-list]),
+    [role="dialog"][class*="bg-"]:not([class~="bg-transparent"]):not([cmdk-dialog]):not(:has(img.object-contain)),
+    [role="alertdialog"][class*="bg-"]:not([class~="bg-transparent"])
+  ):not([data-slot="popover-content"]):not([class~="bg-coachmark"]),
   [cmdk-root], [data-cmdk-root],
-  [data-slot="popover-content"],
+  [data-slot="popover-content"]:is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
+  [data-slot="popover-content"]:not(:is([class^="bg-surface"], [class*=" bg-surface"])) > :is(div, section, form, aside, nav):is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
+  [data-slot="popover-content"][data-checkout-presentation="inline"],
   [role="dialog"][class*="_Popover_"],
   .codex-dialog:is([class*="_chatgptConfirmationSurface_"], [class*="_voicePickerSurface_"]),
   [class*="_floatingSurface_"]:is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
@@ -231,6 +239,11 @@
   box-shadow: var(--forge-glass-shadow) !important;
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
+}
+/* Avatar reaction pickers use a native SVG material filter. Retint the real
+ * material through its own input; preserve that filter and the native border. */
+:root.forge-ink-mountain [data-slot="popover-content"] > [data-avatar-overlay-material="css"] {
+  --avatar-overlay-material-background: var(--forge-glass-fill);
 }
 /* Command menus paint their semantic root, not the transparent dialog. This
  * also covers standalone project/branch/action pickers using the same root.
