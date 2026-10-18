@@ -22,7 +22,9 @@
 
 `58ae168725d1fd2714fa4f8e1fc097ed770ffd2f46d822c320bb15da151cedac`
 
-用正式 ZIP 解压的注入器恢复原生，verified=true；再用同包重新注入，verified=true、deferred=false。准确定位主页面读回 v115-popover-paint-owner、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery，已安装 CSS 与包内完整活动样式一致。远程上传与回下载结果在执行后补记。代理未执行完整冷启动，也未亲自执行目标业务面板的实际开关、拖动、缩放流程。
+用正式 ZIP 解压的注入器恢复原生，verified=true；再用同包重新注入，verified=true、deferred=false。准确定位主页面读回 v115-popover-paint-owner、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery，已安装 CSS 与包内完整活动样式一致。代理未执行完整冷启动，也未亲自执行目标业务面板的实际开关、拖动、缩放流程。
+
+GitHub 已回读 v0.18.6 为 Latest，非草稿、非预发行，ZIP 与 SHA256SUMS.txt 两个资产均 uploaded。重新下载两个文件，SHA-256 分别与本地正式资产一致；远程 ZIP 同为 4,053,537 字节。发布标签指向修复提交 01d732a，随后仅补写发行和清理文档；运行时代码、测试和打包输入保持已验收及已验证的版本。
 
 ## v0.18.5／v114-summary-header-material（2026-10-18）
 
