@@ -1,5 +1,17 @@
 # Wukong Codex Theme
 
+## v0.18.5：Dots 处理框标题材质修复
+
+2026-10-18，运行时 **v114-summary-header-material** 已注入本机，核对客户端 **26.1013.4894.0**。修复 Dots 处理框顶部仍出现黑带的问题：任务标题、普通线程标题及资料收起标题的原生渐变现在从所在摘要面板取色，与面板底色一致。渐变及其透明度继续由原生控制，保留遮挡滚动文字的作用；原生布局、返回与打开聊天按钮继续生效。
+
+本轮按用户授权准备发布 v0.18.5。已完成深浅模式的实际任务面板检查及定向回归；全量检查、正式包与发行结果见 [验证记录](docs/VALIDATION.md)。回归直接执行当前安装包的共享标题组件，覆盖普通渐变、动态透明度、实色底板和 portal 挂载，减少遗漏处理框变体的情况。
+
+![深色 Dots 处理框标题](docs/previews/dark-dots-task-header.png)
+
+![浅色 Dots 处理框标题](docs/previews/light-dots-task-header.png)
+
+预览来自真实客户端，标题临时替换为“示例任务”，消息滚动区仅隐藏绘制，截图后均恢复。当前任务内容没有可滚动范围，实机检查不包含长列表滚动；滚动和遮挡行为由原生组件夹具覆盖。完整来源见 [预览说明](docs/previews/README.md)，本轮范围见 [发行说明](docs/RELEASE_0.18.5.md)。
+
 ## v0.18.4：新版底部背景、代码块与浏览器修复
 
 运行时 **v113-native-footer-paint** 已注入本机，核对客户端 **26.1013.4894.0**。本轮按用户明确授权随 v0.18.4 运行包发行。新版把普通对话和 Dots 的底部绘制迁移到共享背景组件，本轮按实际装饰节点处理渐变、实色和组合三种状态，清除输入框后方黑边，保留原生尺寸、滚动预留和交互。
@@ -88,7 +100,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.4 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.4/Wukong-Codex-Theme-0.18.4-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.5 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.5/Wukong-Codex-Theme-0.18.5-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -103,7 +115,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.4**。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
+当前发行目标为 **v0.18.5**，发布验证状态见 [验证记录](docs/VALIDATION.md)。完整操作说明见 [快速开始](docs/QUICK_START.txt)。
 
 ## 常用操作
 

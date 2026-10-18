@@ -239,6 +239,10 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     if (s === ':root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]):not([class*="ComposerTopMenuPanel"] *)' &&
         ['color','--color-text','--color-text-secondary','--color-text-tertiary','--color-codex-description'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain [data-mention-list-scroll-area]' && d.prop === '--color-surface-elevated-secondary') return;
+    // The shared summary header resolves its gradient through this token.
+    // Permit only the empty inert paint leaf, never an inherited container.
+    if (s === ':root.forge-ink-mountain [data-summary-panel-variant] [aria-hidden="true"].pointer-events-none:empty[class~="from-surface-elevated-secondary"]' &&
+        d.prop === '--color-surface-elevated-secondary' && d.value === 'var(--forge-summary-fill)') return;
     if (s.startsWith(':root.forge-ink-mountain [data-mention-list-scroll-area] :is(') && d.prop === '--color-codex-description') return;
     if (s === ':root.forge-ink-mountain [class~="group/settings"] table:has([id^="browser-use-site-permissions-column-"])' &&
         ['--color-background-panel','--color-surface-elevated-secondary','--color-border'].includes(d.prop)) return;

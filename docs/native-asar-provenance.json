@@ -6,6 +6,6 @@
   "asarRelativePath": "app/resources/app.asar",
   "sizeBytes": 582072504,
   "sha256": "BBEC1D64E135B718A154B31655BB8AD9A39472BAC1B2CABBA991A9D97A339DD8",
-  "capturedAt": "2026-10-17",
-  "captureMode": "read-only installed shared-footer, composer, code-surface and active theme-surface audit"
+  "capturedAt": "2026-10-18",
+  "captureMode": "read-only installed shared summary-header renderer, task/profile consumers and active theme-surface audit; prior footer/code-surface audit retained"
 }

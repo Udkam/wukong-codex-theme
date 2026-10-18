@@ -1,5 +1,11 @@
 # 当前预览
 
+## v0.18.5 Dots 处理框标题预览（2026-10-18）
+
+dark-dots-task-header.png / light-dots-task-header.png：Windows Codex 26.1013.4894.0，运行时 v114-summary-header-material。实际打开 Dots 的任务处理面板，通过原生外观设置切换深浅模式后截图。任务标题临时替换为“示例任务”，消息滚动区及其后代仅隐藏绘制；原生面板、顶部渐变、返回和打开聊天按钮均保持实际状态，截图后恢复标题及正文绘制。预览未重绘或合成。
+
+实机抽查面板、渐变叶和返回按钮的矩形、内边距、圆角、定位、字体、行高、边框、透明度与变换，均与原生一致。当前实际任务内容没有可滚动范围，图片不代表已完成长内容滚动的实机检查；滚动遮挡和其他标题变体由实际原生组件夹具覆盖。完整边界见 ../VALIDATION.md。
+
 ## v0.18.4 底部修复预览（2026-10-17）
 
 dark-thread-footer-current.png / light-thread-footer-current.png 与 dark-dots-footer-current.png / light-dots-footer-current.png：Windows Codex 26.1013.4894.0，运行时 v113-native-footer-paint。实机分别打开普通对话和 Dots，切换原生深浅模式后截取消息滚动区同宽的底部 180 CSS px。仅临时隐藏消息、草稿和附件内容的绘制以保护隐私，保留背景装饰、输入框、控件的原生可见状态和布局；截图后恢复，结束时恢复深色及当前任务。不是合成或夹具截图。

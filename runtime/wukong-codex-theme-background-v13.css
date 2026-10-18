@@ -364,6 +364,16 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+/* Dots task details and the profile's collapsed identity use the shared
+ * decorative header, not header.sticky. Keep its native fade and opacity so
+ * scrolled content is still occluded; only its paint leaf reads the card tint.
+ * The hidden identity plate may contain the fade but never owns controls. */
+:root.forge-ink-mountain [data-summary-panel-variant] [aria-hidden="true"].pointer-events-none:empty[class~="from-surface-elevated-secondary"] {
+  --color-surface-elevated-secondary: var(--forge-summary-fill) !important;
+}
+:root.forge-ink-mountain [data-summary-panel-variant] [aria-hidden="true"] > .pointer-events-none.sticky[class~="bg-surface-elevated-secondary"] {
+  background-color: var(--forge-summary-fill) !important;
+}
 :root.forge-ink-mountain [class*="ComposerTopMenuPanel"] {
   --composer-top-tray-background: transparent !important;
 }

@@ -1,5 +1,7 @@
 # 原生 UI 与主题替换接口
 
+2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的摘要面板共享标题，运行时 v114-summary-header-material。Dots 处理框顶部的原生渐变仍读取默认 surface-elevated-secondary，而面板已替换为摘要材质，两者颜色不同形成黑带。本轮使空装饰渐变局部读取摘要填充，实色底板直接同色，保留原生渐变、透明度、布局和滚动遮挡；不把局部变量传给返回等控件。详见下方 Dots 处理框标题合同。
+
 2026-10-17 当前来源已核对至 Windows Codex 26.1013.4894.0。底部背景共享组件有 fade、surface、combined 三个实际分支，分别出现在 transcript 占位、语义 footer、Dots composer、免责声明及主内容页面。按主内容／对话／composer 所属范围、空惰性节点和背景绘制家族识别，不绑定模块 hash、方向工具类或固定宽高；背景色和背景图同时清除，输入控件与布局预留保留。
 
 默认 Markdown 代码块以 data-markdown-copy、data-code-block 和 CodeSurface 模块共同识别，卡片与直接子工具栏共用阅读底色；preview、hover、透明模式及用户消息 pre 没有默认表面标记时保留原生绘制。新回归读取当前组件的 AST／CSS，并实际执行共享底部组件生成三种分支，防止旧手写夹具继续遗漏新版绘制节点。
@@ -34,6 +36,7 @@
 | 目标、排队消息 | data-composer-rail / rail-item | 外层玻璃，排队叶节点不额外模糊；列表回退限定在 rail 内 |
 | 进度区 | data-in-progress-fixed-content 内绘制叶 | 不再依赖 h-8、字号或进度文案 |
 | 摘要、环境、变更面板 | data-summary-panel-variant、summary item slot | 卡片及 sticky 标题共用不透明底，遮挡滚动文字 |
+| dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
 | 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
 | dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
 | 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
@@ -53,6 +56,14 @@
 `:empty` 是控件隔离条件：打开资料页时，头像容器也会使用同一锚点并切换到 `aria-hidden="true"`，但仍带有头像与交互子节点；通话控件同样有子节点。它们不能仅因共享锚点被当作背景处理。
 
 `tests/native-asar-ui-contract.test.mjs` 读取实际安装包中的标题组件，解析动态锚点、装饰叶、交互兄弟和 portal，并关联真实 CSS 的渐变声明。几何和材质回归使用该原生结构，同时覆盖深浅模式、滚动位置及资料开关状态。接口漂移时先重新核对原生代码，不把旧夹具的通过结果当作当前组件已经覆盖。
+
+## Dots 处理框标题合同（2026-10-18）
+
+处理框使用 `data-summary-panel-variant` 的真实摘要容器。任务标题、普通线程预览标题和资料身份收起标题消费同一个共享 sticky 标题组件：默认分支绘制从面板色到透明的顶部渐变，solid 分支额外绘制实色底板及其下沿渐变。任务标题的透明度由原生滚动状态驱动；普通线程标题默认完全显示。标题可能通过 portal 挂在摘要面板的顶部容器中，不一定是消息滚动区域的后代。
+
+材质映射限定在摘要范围内的空装饰渐变叶：`pointer-events-none`、`aria-hidden="true"`、`:empty`，并具有原生从 surface-elevated-secondary 到透明的渐变绘制。仅在该叶节点设置局部颜色变量，使渐变起点与 `--forge-summary-fill` 一致；不清除背景图或改写 opacity。solid 底板限定在无障碍隐藏的装饰分支及其共享标题结构，直接设置背景色，不向整个标题及其交互后代传递材质变量。返回按钮、资料控件和“打开聊天”按钮保留原生控件表面。
+
+`tests/native-summary-fade.test.mjs` 从当前安装包中提取并执行真实共享组件，关联原生 CSS 与三个消费者，覆盖默认、动态透明度、solid 和 portal 分支。检查关注渐变、遮挡和绘制边界，不将高度、挂载位置或模块 hash 固定为当前值。2026-10-18 的深浅实机检查核对了任务面板、渐变和返回按钮的布局与绘制；当前内容无可滚动范围，长内容滚动和资料收起状态由组件夹具覆盖，不能视作实机验收。
 
 ## 材质配置
 
