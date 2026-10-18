@@ -18,7 +18,9 @@ Windows ZIP 为 4,053,269 字节，37 个必要文件；解压后逐文件 SHA-2
 
 `dc6a442599df17f4a90637a29f0374c619f6c40e88654f8c01484bd682efb482`
 
-使用正式 ZIP 解压的注入器恢复原生 verified=true，再用同包重新注入 verified=true、deferred=false。准确定位主页面读回 v114-summary-header-material、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery；预览脱敏样式残留为 0。用户已明确授权发布，远程上传及回下载结果执行后补记。
+使用正式 ZIP 解压的注入器恢复原生 verified=true，再用同包重新注入 verified=true、deferred=false。准确定位主页面读回 v114-summary-header-material、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery；预览脱敏样式残留为 0。
+
+GitHub 已回读 v0.18.5 为 Latest，非草稿、非预发行，两个正式资产均 uploaded。重新下载 ZIP 与 SHA256SUMS.txt，其 SHA-256 分别与本地正式文件一致；远程 ZIP 同为 4,053,269 字节。发行标签指向修复提交 cc0a403，后续仅补写发行及清理文档，运行代码、测试和打包输入保持一致。
 
 本轮未执行完整冷启动、卸载或新的流式文字重载专项；源码及夹具结果不代替用户实机验收。
 
