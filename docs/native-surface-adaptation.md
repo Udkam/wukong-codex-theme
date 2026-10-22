@@ -1,6 +1,18 @@
 # 原生 UI 与主题替换接口
 
-2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的“设计控件”Popover，开发运行时 v115-popover-paint-owner，尚未发布。`data-slot="popover-content"` 保留在原生 `unstyled:true` 的透明定位／缩放壳上，内层 FloatingSurface 才拥有真实圆角与底色。材质依据实际绘制载体分配，slot 或 dialog role 本身不能作为带底色的证据；详见下方 Popover 绘制归属合同。
+## 额度提示卡与输入框轮廓（2026-10-21，v0.18.7／v116）
+
+当前核对 Windows Codex 26.1016.6573.0。公共 Notice 的 `recovery` 分支提前返回独立 Recovery renderer，跳过普通 Notice 的 `attachedToComposer` 重叠分支。真实表面为带 `role="status"`、`aria-live="polite"` 的 aside；缺少专用 data 属性，使用限定在 composer 根内的 `_banner_` 组件家族作为回退标记。它自身使用固定 28px 圆角；默认多行 ComposerLayout 将其圆角映射到 `--composer-radius`，Windows 当前为 22px，曲线来自 `--composer-corner-shape`。
+
+仅在同一 composer 根内存在默认多行／默认表面／默认圆角的输入框时，独立 Recovery aside 读取这两个变量。内嵌于实际输入表面、Popover、dialog、摘要或 checkout 的通知，以及嵌套 composer 的后代明确排除。其他输入布局保留原生轮廓。该规则只调整两项轮廓声明，不修改背景、宽高、padding、margin、布局、按钮或状态行为；全局禁止几何改写的测试仅为完整选择器和精确变量值增加例外。
+
+回归实际执行当前安装包的 Recovery、按钮、ComposerLayout 与宿主渲染组件，并加载入口的 `@layer theme, base, components, utilities` 声明及实际 CSS 次序；仅拼接 CSS 而遗漏层声明会使原生 padding 被 reset 覆盖，不能作为有效夹具。源码合同和基线断言共同保护这一点。
+
+用户额度已重置，原始业务状态无法再次打开。当前合法组件重现未出现截图中的额外深色底板；其归属和根因仍未确认，不能为此把共享父容器改透明或套用普通 Notice 的负边距。此处记录的是轮廓适配，不是原始底板问题已复现、已修复或实机验收通过。
+
+## 既有表面适配
+
+2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的“设计控件”Popover，运行时 v115-popover-paint-owner，已随 v0.18.6 发行。`data-slot="popover-content"` 保留在原生 `unstyled:true` 的透明定位／缩放壳上，内层 FloatingSurface 才拥有真实圆角与底色。材质依据实际绘制载体分配，slot 或 dialog role 本身不能作为带底色的证据；详见下方 Popover 绘制归属合同。
 
 2026-10-18 补充核对同一 Windows Codex 26.1013.4894.0 的摘要面板共享标题，运行时 v114-summary-header-material。Dots 处理框顶部的原生渐变仍读取默认 surface-elevated-secondary，而面板已替换为摘要材质，两者颜色不同形成黑带。本轮使空装饰渐变局部读取摘要填充，实色底板直接同色，保留原生渐变、透明度、布局和滚动遮挡；不把局部变量传给返回等控件。详见下方 Dots 处理框标题合同。
 
@@ -49,7 +61,7 @@
 | Markdown 代码 | code-block、data-code-block 与默认 CodeSurface | 代码和 sticky 工具栏共用不透明底，语法颜色及非默认变体保留 |
 | 首页字标、题字 | home icon、landing title | 主题自有装饰，可快捷键关闭并还原，不重写对话正文 |
 
-## Popover 绘制归属合同（2026-10-18，未发布 v115）
+## Popover 绘制归属合同（2026-10-18，v0.18.6／v115）
 
 原生编辑器的“设计控件”调用 Popover Content 时设置 `unstyled:true`。该组件仍输出 `data-slot="popover-content"`，用于定位、缩放与承载交互内容，但不提供默认底色和圆角；真正表面位于其内层 FloatingSurface。仅凭 slot 给外壳绘制玻璃，会在圆角外暴露矩形背景。
 

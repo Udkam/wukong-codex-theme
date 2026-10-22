@@ -1,5 +1,29 @@
 # 当前适配验证
 
+## v0.18.7／v116-quota-seam-contour（2026-10-21 开发核对，2026-10-23 授权发行）
+
+用户明确问题为额度提示框底部与下方输入框接缝错位。最初的底色假设已撤回；排查期间用户额度已重置，真实提示无法再打开。当前原生 Recovery 的固定圆角为 28px，Windows 默认多行输入框则取 `--composer-radius`（22px）与 `--composer-corner-shape`。本轮只使 composer 内的独立提示卡跟随后者，保留原生底色与布局。合法源码组合中未重现截图中的额外深色底板，**其根因仍未确认，不能称为已修复或实机视觉验收通过**。
+
+核对当前 Windows Codex 26.1016.6573.0（内部包 26.1016.51333），ASAR 为 625,947,151 字节，SHA-256 为 `6f56542b508eea5b6e4d03e852dcd90afc2578aac7125baa3f25ebe85ebc7e25`。先读取并执行真实 Recovery、按钮、ComposerLayout、宿主组件和入口 CSS 层顺序，再建立独立浏览器夹具。初版夹具遗漏 `@layer theme, base, components, utilities` 会使原生 padding 被 reset 覆盖，已更正并加入 padding、边框、按钮轮廓等基线断言，失效图片已移除。
+
+专项 3/3 通过。深浅模式、368／736px 两种宽度中，旧样式负控制保留 28px，与输入框 22px 不同；新样式两者圆角／曲线相同。逐节点矩形、padding、margin、边框宽度、原有背景、文字及控件语义保持不变，原生 8px 间距保留。动态切换 inline 或移除主题时恢复原生轮廓。22 个负组合覆盖外部提示、large、inline、single-line、embedded header、Popover、dialog、alertdialog、summary、checkout 和 nested composer，不参与映射。
+
+现有全局几何守卫仅为完整额度选择器增加精确例外：只允许 `border-radius:var(--composer-radius)` 与 `corner-shape:var(--composer-corner-shape)` 两项，要求 `!important`、无重复且两项齐全；其他几何禁用保护继续生效。客户端升级导致 Popover 测试的固定压缩变量失效，已迁移到语义 AST／导出关系查找，原有绘制、控件和隔离断言保留。
+
+最终独立源码 `npm run check` 为 **179/179 通过，0 失败、0 跳过，约 59.4 秒**；同一运行代码的 Studio E2E 通过。原生来源锁在当前合同全部通过后更新；浏览器专项同时核对当前源码资产、入口引用及 body/root portal 拓扑，未重新导航业务网页或宣称新的 guest 屏幕验收。两张最新预览来自真实原生纯展示组件及 CSS 的独立浏览器夹具，明确标注非额度实机，不向正在运行的客户端插入假的额度状态。
+
+已使用仓库注入器应用 v116。实际读回 `runtimeRevision=v116-quota-seam-contour`、已安装完整样式与活动源码一致，临时额度／脱敏样式数量为 0；当前额度提示数量为 0。应用窗口处于 `document.hidden=true`，注入返回 `deferred=true`、`verified=false`，背景解码按既有可见性策略延后；这是隐藏窗口的结构安装状态，不能写成可见界面验证通过。未重启客户端、未执行完整冷启动／卸载、未触发额度重置或支付流程。
+
+2026-10-23 用户明确回复“可发布”，本轮据此准备 v0.18.7。重新核对当前安装 ASAR 的大小与 SHA-256 均与上述来源一致；发布开始时主窗口实际读回 v116、dark、backgroundReady=true、document.hidden=false。10 月 21 日的隐藏窗口记录仍为历史事实；新读回不代表原始额度提示状态的实机视觉验收。
+
+精确暂存的 20 个相关文件连同其他已跟踪源码导出到独立目录，未导出无关的未跟踪材料。正式发行输入 `npm run check` 为 **179/179 通过，0 失败、0 跳过，约 56.4 秒**；同一源码的 Studio E2E 通过。独立源码只通过联接复用已安装依赖，测试与构建使用导出文件，不以工作区诊断材料为输入。
+
+Windows ZIP 为 **4,053,853 字节、37 个必要文件**，包版本 0.18.7；重新解压后逐文件 SHA-256 与构建目录完全一致。ZIP SHA-256：
+
+`d5c819474034db019944498e73dd92ff7d40477cbb1b5082283119e4d7f52598`
+
+使用该 ZIP 解压出的注入器实际恢复原生，verified=true；随后同包重新应用，verified=true、deferred=false。主页面读回 v116-quota-seam-contour、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery；完整样式与发行源码一致，临时额度／脱敏样式为 0，真实额度提示数量为 0。未执行完整冷启动、卸载或额度重置／支付业务流程。GitHub 资产的实际发布与回下载结果完成后另记。
+
 ## v0.18.6／v115-popover-paint-owner（2026-10-18）
 
 用户提供可视化“设计控件”圆角外出现矩形底板的截图，修正阶段用户暂时无法重新打开面板，明确要求先按原生代码修复。已只读核对当前 Windows Codex 26.1013.4894.0，ASAR SHA-256 与来源锁一致；源码确定该面板由无样式 Popover 负责定位／调整尺寸，直接子 FloatingSurface 才拥有圆角与背景。原规则无条件给 data-slot=popover-content 加玻璃，导致透明外壳与真实表面重复绘制。修正完成后用户明确回复“已验收通过，发布”，本轮据此准备 v0.18.6。用户验收来自其直接反馈，不扩大为代理亲自执行了目标面板所有业务流程。

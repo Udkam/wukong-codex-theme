@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v115-popover-paint-owner';
+export const RUNTIME_REVISION = 'v116-quota-seam-contour';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',

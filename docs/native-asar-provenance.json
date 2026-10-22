@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packageName": "OpenAI.Codex",
-  "packageVersion": "26.1013.4894.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1013.4894.0_x64__2p2nqsd0c76g0",
+  "packageVersion": "26.1016.6573.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1016.6573.0_x64__2p2nqsd0c76g0",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 582072504,
-  "sha256": "BBEC1D64E135B718A154B31655BB8AD9A39472BAC1B2CABBA991A9D97A339DD8",
-  "capturedAt": "2026-10-18",
-  "captureMode": "read-only shared Popover/FloatingSurface renderer and all 20 direct unstyled consumers, visualization editor, avatar material, inline checkout and coachmark audit; prior summary/footer/code-surface audit retained"
+  "sizeBytes": 625947151,
+  "sha256": "6F56542B508EEA5B6E4D03E852DCD90AFC2578AAC7125BAA3F25EBE85EBC7E25",
+  "capturedAt": "2026-10-21",
+  "captureMode": "read-only current installed source contracts and native recovery/composer renderer geometry audit; recovery quota state unavailable after user reset; source and fixture verification do not imply live quota acceptance"
 }

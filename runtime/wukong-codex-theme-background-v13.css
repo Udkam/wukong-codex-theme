@@ -1,7 +1,8 @@
-/* Native paint boundary, audited against desktop 26.1013.4894.0.
- * Native fonts, radii and layout are retained. Navigation uses a translucent
- * reading surface with foreground colours matched to the native theme.
- * Only the existing landing wordmark/quote and inert background own geometry.
+/* Native paint boundary, audited against desktop 26.1016.6573.0.
+ * Native fonts and layout are retained. The standalone Recovery banner in the
+ * default multiline composer follows its native composer contour tokens.
+ * Navigation uses a translucent reading surface matched to the native theme.
+ * Other geometry belongs to the landing wordmark/quote and inert background.
  */
 :root.forge-ink-mountain {
   --forge-paper: #151515;
@@ -163,6 +164,22 @@
   [data-composer-utility-bar-variant="home"] > [data-composer-body]
 ) {
   background-image: var(--forge-glass-highlight) !important;
+}
+/* Recovery notices keep their native surface, spacing and actions. Within a
+ * default multiline composer, use the same radius and corner curve as the
+ * input below, instead of a separate fixed 28px circular outline. The module
+ * family is a bounded fallback: the installed recovery renderer has no data
+ * hook, but does own this live status aside. Other layouts retain native shape.
+ */
+:root.forge-ink-mountain [data-codex-composer-root]:has(
+  [data-composer-layout="multiline"][data-composer-radius-variant="default"][data-composer-surface-variant="default"]
+) aside[role="status"][aria-live="polite"][class*="_banner_"]:not(:is(
+  [data-composer-surface-variant], [data-slot="popover-content"],
+  [role="dialog"], [role="alertdialog"], [data-summary-panel-variant],
+  [data-checkout-presentation]
+) *):not([data-codex-composer-root] [data-codex-composer-root] *) {
+  border-radius: var(--composer-radius) !important;
+  corner-shape: var(--composer-corner-shape) !important;
 }
 /* User messages retain the same native paint treatment in both themes. */
 /* Dark conversation ink must remain readable over the scene's bright snow.

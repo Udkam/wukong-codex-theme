@@ -80,7 +80,7 @@ const loadNative = () => {
   const editor = read(editorEntry), editorAst = parseAst(editor);
   const editorCss = entries.filter(entry => /webview[\\/]assets[\\/]editor-[^\\/]+\.css$/.test(entry)).map(read).join('\n');
   const popover = funcAt(shared, '"data-slot":`popover-content`');
-  const floating = funcAt(shared, 'g9.floatingSurface');
+  const floating = funcAt(shared, '.floatingSurface');
   const member = (fn, name) => fn.nodes.find(node => node.type === 'MemberExpression' && key(node.property) === name && node.object.type === 'Identifier')?.object.name;
   const namedClassCall = (fn, predicate) => fn.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(predicate));
   const popClass = namedClassCall(popover, argument => text(argument).includes('text-default z-50 flex origin-'));
@@ -131,19 +131,22 @@ const loadNative = () => {
   const surfaceClass = editorCss.match(/\.(_surface_[\w]+)\{--radius-token-composer-single-line:/)?.[1];
   assert.ok(innerFloating && surfaceCall && surfaceClass && reaches(prop(innerFloating.arguments[1], 'className'), surfaceCall), 'Native editor inner FloatingSurface ownership changed');
   const editorClasses = [surfaceClass, ...surfaceCall.arguments.map(text).filter(Boolean)].join(' ');
-  const toolbarName = initial.match(/([\w$]+) as SPn[,}]/)?.[1];
-  const toolbar = funcAt(initial, initial.indexOf(`function ${toolbarName}(`) + 10);
+  const toolbar = funcAt(initial, 'pointer-events-auto flex w-fit max-w-full overflow-hidden');
+  const toolbarAlias = initial.match(new RegExp(`\\b${toolbar.ast.id.name} as ([\\w$]+)`))?.[1];
+  assert.ok(toolbarAlias, 'Native independent toolbar export changed');
   const toolbarBase = toolbar.nodes.map(text).find(value => value === 'pointer-events-auto flex w-fit max-w-full overflow-hidden');
   const toolbarPaint = toolbar.nodes.map(text).find(value => value.includes('min-w-0 flex-wrap items-center rounded-xl bg-surface-elevated-secondary'));
   assert.ok(toolbarBase && toolbarPaint, 'Native independent toolbar carrier changed');
-  const aboutEntry = entries.find(entry => /webview[\\/]assets[\\/]about-you-summary-.*\.js$/.test(entry) && read(entry).includes('SPn'));
+  const aboutEntry = entries.find(entry => /webview[\\/]assets[\\/]about-you-summary-.*\.js$/.test(entry) &&
+    parseAst(read(entry)).body.some(node => node.type === 'ImportDeclaration' && /app-initial-.*\.js$/.test(node.source.value) &&
+      node.specifiers.some(specifier => key(specifier.imported) === toolbarAlias)));
+  assert.ok(aboutEntry, 'Native independent toolbar consumer changed');
   const aboutAst = parseAst(read(aboutEntry));
   const controls = read(entries.find(entry => /webview[\\/]assets[\\/]design-editor-state-.*\.js$/.test(entry)));
   const controlAst = parseAst(controls);
   const selectClass = nodes(controlAst).find(node => node.type === 'CallExpression' && node.arguments.some(argument => text(argument).includes('cursor-interaction items-center gap-2 overflow-hidden px-3 text-start')))?.arguments.map(text).filter(Boolean).join(' ');
   const inputClass = nodes(controlAst).find(node => node.type === 'CallExpression' && node.arguments.some(argument => text(argument).startsWith('min-w-0 appearance-none border-0 bg-transparent')))?.arguments.map(text).filter(Boolean).join(' ');
-  const switchName = shared.match(/([\w$]+) as jO[,}]/)?.[1];
-  const switchFn = funcAt(shared, shared.indexOf(`function ${switchName}(`) + 10);
+  const switchFn = funcAt(shared, 'thumbClassName:');
   const switchVisual = switchFn.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'checked') && prop(node.arguments[1], 'thumbClassName'))?.arguments[0].name;
   const switchTrack = funcAt(shared, shared.indexOf(`function ${switchVisual}(`) + 10);
   const switchMaps = [...new Set(switchTrack.nodes.filter(node => node.type === 'MemberExpression' && node.computed && node.object.type === 'Identifier').map(node => node.object.name))]
@@ -157,8 +160,7 @@ const loadNative = () => {
   assert.ok(inputClass && selectClass, 'Native design input/select class contract changed');
   const avatarEntry = entries.find(entry => /webview[\\/]assets[\\/]avatar-overlay-native-page-.*\.js$/.test(entry));
   const avatarSource = read(avatarEntry), avatarAst = parseAst(avatarSource);
-  const avatarMaterialName = initial.match(/([\w$]+) as bf[,}]/)?.[1];
-  const avatarMaterial = funcAt(initial, initial.indexOf(`function ${avatarMaterialName}(`) + 10);
+  const avatarMaterial = funcAt(initial, '"data-avatar-overlay-material-variant":');
   const avatarModuleName = member(avatarMaterial, 'Material');
   const avatarClassCall = avatarMaterial.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => argument.type === 'MemberExpression' && key(argument.property) === 'Material'));
   const renderAvatarMaterial = compile(avatarMaterial, { [member(avatarMaterial, 'c')]: cache, [member(avatarMaterial, 'jsx')]: jsx,
@@ -168,7 +170,7 @@ const loadNative = () => {
   assert.ok(reactionCall, 'Native reaction picker material call changed');
   const renderAvatarReaction = compile(avatarReaction, { [member(avatarReaction, 'c')]: cache, [member(avatarReaction, 'jsx')]: jsx,
     [member(avatarReaction, 'useId')]: { useId: () => 'native-reaction-filter' }, [reactionCall.arguments[0].name]: renderAvatarMaterial });
-  const checkoutEntry = entries.find(entry => /webview[\\/]assets[\\/]checkout-page-.*\.js$/.test(entry) && read(entry).includes('function Bf('));
+  const checkoutEntry = entries.find(entry => /webview[\\/]assets[\\/]checkout-page-.*\.js$/.test(entry) && read(entry).includes('chatgpt.inline_credit_checkout.payment.title'));
   const checkoutSource = read(checkoutEntry), checkoutAst = parseAst(checkoutSource);
   const checkoutCss = entries.filter(entry => /webview[\\/]assets[\\/]checkout-page-.*\.css$/.test(entry)).map(read).join('\n');
   const shellEntry = entries.find(entry => /webview[\\/]assets[\\/]shell-.*\.js$/.test(entry) && read(entry).includes('data-checkout-presentation'));
@@ -181,7 +183,7 @@ const loadNative = () => {
   const checkoutShellClassCall = checkoutShell.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => argument.type === 'MemberExpression' && key(argument.property) === 'root'));
   const renderCheckoutShell = compile(checkoutShell, { [member(checkoutShell, 'c')]: cache, [member(checkoutShell, 'jsx')]: jsx,
     [checkoutShellClassCall.callee.name]: classNames, [checkoutModuleName]: moduleMap(initial, checkoutModuleExport) });
-  const checkout = funcAt(checkoutSource, checkoutSource.indexOf('function Bf(') + 10);
+  const checkout = funcAt(checkoutSource, 'chatgpt.inline_credit_checkout.payment.title');
   const checkoutRootCall = checkout.nodes.find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'presentation')) === 'inline');
   const checkoutPaintCall = checkout.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => argument.type === 'MemberExpression' && key(argument.property) === 'surface'));
   const checkoutPaintModule = checkoutPaintCall.arguments.find(argument => argument.type === 'MemberExpression' && key(argument.property) === 'surface').object.name;
@@ -197,7 +199,7 @@ const loadNative = () => {
   cachedNative = { css: `${css}\n${editorCss}\n${checkoutCss}`, renderPopover, renderFloating, renderSwitch, editorPopover, editorFunction, innerFloating, reaches,
     editorClasses, toolbarClasses: `${toolbarBase} ${toolbarPaint}`, inputClass, selectClass, popAlias, floatAlias,
     avatarAst, avatarReaction, avatarMaterial, renderAvatarReaction, renderAvatarMaterial, checkoutDialogAst, checkoutAst, checkoutRootCall, checkoutShell, checkoutPageExport, renderCheckout,
-    aboutAst, toolbar, checkoutSecondary: checkoutCss.match(/\.(_secondary_[\w]+)\{background:var\(--bg-tertiary\)/)?.[1],
+    aboutAst, toolbar, toolbarAlias, checkoutSecondary: checkoutCss.match(/\.(_secondary_[\w]+)\{background:var\(--bg-tertiary\)/)?.[1],
     editorHeader: editorNodes.map(text).find(value => value.startsWith('flex h-toolbar shrink-0 cursor-grab')),
     editorHeading: editorNodes.map(text).find(value => value.startsWith('flex h-token-button-composer min-w-0 flex-1')) };
   return cachedNative;
@@ -232,7 +234,7 @@ test('native independent toolbar, avatar material and asChild checkout preserve 
     const children = prop(parent.arguments[1], 'children'), reaches = aliases(fn);
     return children?.type === 'ArrayExpression' ? children.elements.some(item => reaches(item, child)) : reaches(children, child);
   };
-  const toolbarImport = imported(native.aboutAst, /app-initial-.*\.js$/, 'SPn');
+  const toolbarImport = imported(native.aboutAst, /app-initial-.*\.js$/, native.toolbarAlias);
   const toolbarCall = nodes(native.aboutAst).find(node => node.type === 'CallExpression' && node.arguments[0]?.name === toolbarImport);
   const aboutPopoverImport = imported(native.aboutAst, /app-shared-.*\.js$/, native.popAlias);
   assert.ok(toolbarCall && nodes(native.aboutAst).some(node => node.type === 'CallExpression' && node.arguments[0]?.name === aboutPopoverImport &&

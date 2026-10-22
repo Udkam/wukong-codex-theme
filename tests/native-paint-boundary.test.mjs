@@ -227,8 +227,30 @@ test('model/permission clicks do not schedule submit follow-up scans', async () 
 });
 
 test('active paint sheet preserves geometry and scopes ink to navigation and dark conversation', () => {
+  const quotaContourSelector = `:root.forge-ink-mountain [data-codex-composer-root]:has(
+  [data-composer-layout="multiline"][data-composer-radius-variant="default"][data-composer-surface-variant="default"]
+) aside[role="status"][aria-live="polite"][class*="_banner_"]:not(:is(
+  [data-composer-surface-variant], [data-slot="popover-content"],
+  [role="dialog"], [role="alertdialog"], [data-summary-panel-variant],
+  [data-checkout-presentation]
+) *):not([data-codex-composer-root] [data-codex-composer-root] *)`;
+  const quotaContourValues = new Map([
+    ['border-radius', 'var(--composer-radius)'],
+    ['corner-shape', 'var(--composer-corner-shape)']
+  ]);
+  const quotaContourSeen = new Set();
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
+    // Only the independent recovery notice may adopt the adjacent native
+    // composer's contour; every other native geometry guard remains active.
+    if (s === quotaContourSelector) {
+      assert.ok(quotaContourValues.has(d.prop), `Unexpected quota contour declaration: ${d.prop}`);
+      assert.equal(d.value, quotaContourValues.get(d.prop), `Quota contour value: ${d.prop}`);
+      assert.equal(d.important, true, `Quota contour priority: ${d.prop}`);
+      assert.ok(!quotaContourSeen.has(d.prop), `Duplicate quota contour declaration: ${d.prop}`);
+      quotaContourSeen.add(d.prop);
+      return;
+    }
     const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
     if (conversation && ['--color-text-secondary','--color-text-tertiary'].includes(d.prop)) return;
     if (s.includes('[data-forge-native-theme="dark"]') && s.includes('[data-markdown-text-style="assistant-message"] a') && d.prop === 'color') return;
@@ -253,6 +275,8 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     assert.ok(!/^(?:color|-webkit-text-fill-color|fill|stroke|font.*|line-height|letter-spacing|text-shadow|border(?:-.*)?-radius|border-radius|corner-shape|clip-path|mask.*|transform|(?:min-|max-)?(?:width|height)|padding.*|margin.*|inset.*|top|right|bottom|left|position|display|flex.*|grid.*|gap|overflow.*|opacity|border(?:-.*)?-width)$/.test(d.prop), `${d.prop}: ${s}`);
     assert.ok(!/^--color-/.test(d.prop), `Client token override: ${d.prop}`);
   });
+  assert.deepEqual([...quotaContourSeen].sort(), [...quotaContourValues.keys()].sort(),
+    'The bounded quota contour rule retains both native variable declarations');
 });
 
 test('current client CSS: native geometry/semantic colours, home paint boundaries and popup first paint', {

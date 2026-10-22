@@ -1,29 +1,29 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1013.4894.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1013.4894.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1013.40934",
+  "installationDirectoryVersion": "26.1016.6573.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1016.6573.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1016.51333",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 582072504,
-  "asarSha256": "bbec1d64e135b718a154b31655bb8ad9a39472bac1b2cabba991a9d97a339dd8",
-  "capturedAt": "2026-10-17",
-  "captureMode": "read-only installed browser portal DOM, stacking and pinned asset contract audit; general native UI baseline unchanged",
+  "sizeBytes": 625947151,
+  "asarSha256": "6f56542b508eea5b6e4d03e852dcd90afc2578aac7125baa3f25ebe85ebc7e25",
+  "capturedAt": "2026-10-21",
+  "captureMode": "read-only installed browser portal source contract and live body/root topology recheck; no new webpage navigation or guest screenshot acceptance",
   "assets": {
     "javascript": {
-      "member": "webview/assets/app-shared-bbfeca5e5737.js",
-      "bytes": 5846881,
-      "sha256": "a6579611db8acf9c9908e2a29e70a88687eaa1d8f8dbcdc258de58f286051e9d"
+      "member": "webview/assets/app-shared-9cc135f1bdc1.js",
+      "bytes": 5899320,
+      "sha256": "a530ffa50442439640d6d25227c10babc23e757812e827d0ca2e3ba0c613f7cb"
     },
     "stylesheet": {
-      "member": "webview/assets/app-shared-dc7535e633d7.css",
-      "bytes": 1307139,
-      "sha256": "282dd3546bccfba48212a186641a73dedb27af6af7962dad40b3f5db6a9a08f2"
+      "member": "webview/assets/app-shared-295ec67e1c5d.css",
+      "bytes": 1321704,
+      "sha256": "99af1eb079a37a02e29d1ac602cb189179fb9630ad0c362922ba2e3fb0dc279e"
     },
     "entrypoint": {
       "member": "webview/index.html",
-      "bytes": 15105,
-      "sha256": "29d4844bf383a60825c4fea48835402f46374dbacb33277688a40cb60c492594"
+      "bytes": 15137,
+      "sha256": "7b3756ea81aa7f8703ccebf80d72678515c57a733ea093ba71a3ae0c51024674"
     }
   }
 }
