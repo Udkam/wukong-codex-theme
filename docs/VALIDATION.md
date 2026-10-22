@@ -22,7 +22,9 @@ Windows ZIP 为 **4,053,853 字节、37 个必要文件**，包版本 0.18.7；�
 
 `d5c819474034db019944498e73dd92ff7d40477cbb1b5082283119e4d7f52598`
 
-使用该 ZIP 解压出的注入器实际恢复原生，verified=true；随后同包重新应用，verified=true、deferred=false。主页面读回 v116-quota-seam-contour、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery；完整样式与发行源码一致，临时额度／脱敏样式为 0，真实额度提示数量为 0。未执行完整冷启动、卸载或额度重置／支付业务流程。GitHub 资产的实际发布与回下载结果完成后另记。
+使用该 ZIP 解压出的注入器实际恢复原生，verified=true；随后同包重新应用，verified=true、deferred=false。主页面读回 v116-quota-seam-contour、backgroundReady=true、document.hidden=false、nativeTheme=dark、mode=scenery；完整样式与发行源码一致，临时额度／脱敏样式为 0，真实额度提示数量为 0。未执行完整冷启动、卸载或额度重置／支付业务流程。
+
+GitHub 已回读 v0.18.7 为 Latest，非草稿、非预发行，ZIP 与 SHA256SUMS.txt 均 uploaded。两个资产重新下载后的 SHA-256 分别与本地正式文件一致，亦与 GitHub 资产 digest 一致；远程 ZIP 同为 4,053,853 字节。发行标签指向修复提交 434bf85，随后仅补写发行／清理文档；运行代码、测试和打包输入保持上述已验证版本。原始额度状态的实机视觉验收仍待提示再次出现。
 
 ## v0.18.6／v115-popover-paint-owner（2026-10-18）
 

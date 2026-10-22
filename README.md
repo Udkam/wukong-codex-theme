@@ -2,7 +2,7 @@
 
 ## v0.18.7：额度提示与输入框的接缝轮廓
 
-2026-10-23，用户明确授权发布 v0.18.7。运行时 **v116-quota-seam-contour** 针对默认多行输入框上方的额度提示卡，统一两者的圆角来源。原生提示卡固定使用 28px 圆角，Windows 输入框当前使用 `--composer-radius`（22px）；本轮让独立提示卡跟随该输入框的圆角与曲线变量，保留卡片原生底色、宽度、间距、文字和按钮。嵌入输入表面、弹层、摘要面板及其他输入布局不参与该规则。
+2026-10-23，按用户明确授权已发布 **[v0.18.7](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.7)**，并回读为 GitHub Latest。运行时 **v116-quota-seam-contour** 针对默认多行输入框上方的额度提示卡，统一两者的圆角来源。原生提示卡固定使用 28px 圆角，Windows 输入框当前使用 `--composer-radius`（22px）；本轮让独立提示卡跟随该输入框的圆角与曲线变量，保留卡片原生底色、宽度、间距、文字和按钮。嵌入输入表面、弹层、摘要面板及其他输入布局不参与该规则。
 
 用户指出的是提示框底部与输入框的接缝错位；排查期间额度已重置，无法再次显示原始业务状态。当前原生组件与 CSS 的独立重现能确认圆角差异，**没有重现截图中的额外深色底板，因此不将本轮轮廓适配写成该底板根因已修复或实机验收通过**。原生来源为 Windows Codex 26.1016.6573.0，完整技术检查与边界见 [验证记录](docs/VALIDATION.md)。
 
@@ -126,7 +126,7 @@
 
 需要已安装的官方 Windows 桌面客户端，无需另外安装 Node.js、Python 或 npm。
 
-1. 下载 [v0.18.6 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.6/Wukong-Codex-Theme-0.18.6-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
+1. 下载 [v0.18.7 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.7/Wukong-Codex-Theme-0.18.7-Windows.zip)。请选择此运行包，GitHub 自动生成的 **Source code** 是开发源码。
 2. 完整解压到固定文件夹。首次启动前，完全退出 ChatGPT/Codex，包括系统托盘实例。
 3. 双击 **start.cmd**。
 
@@ -141,7 +141,7 @@ Wukong-Codex-Theme/
 
 请保留整个文件夹，不要只复制 start.cmd，也不要直接在压缩包内运行。可为 start.cmd 创建桌面快捷方式。
 
-当前正式版本为 **v0.18.6**，已设为 GitHub Latest。完整操作说明见 [快速开始](docs/QUICK_START.txt)，发行结果见 [当前状态](docs/CURRENT_GOAL.md)。
+当前正式版本为 **v0.18.7**，已设为 GitHub Latest。精确源码 179 项回归及 Studio E2E 通过，同包恢复／注入与远程资产回下载哈希一致。完整操作说明见 [快速开始](docs/QUICK_START.txt)，发行结果见 [当前状态](docs/CURRENT_GOAL.md)。
 
 ## 常用操作
 

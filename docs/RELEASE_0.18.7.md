@@ -16,3 +16,5 @@
 Windows 运行包：`Wukong-Codex-Theme-0.18.7-Windows.zip`。SHA-256：
 
 `d5c819474034db019944498e73dd92ff7d40477cbb1b5082283119e4d7f52598`
+
+已发布为 GitHub Latest，非草稿、非预发行。ZIP 与 SHA256SUMS.txt 两个正式资产均已回下载，其哈希与本地文件及 GitHub 资产 digest 一致。
