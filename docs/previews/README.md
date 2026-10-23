@@ -1,5 +1,17 @@
 # 当前预览
 
+## v0.18.8／v117 浏览器 goal 输入框圆角对照（2026-10-24）
+
+dark-goal-floating-before.png / dark-goal-floating-after.png：Windows Codex 26.1016.8622.0 当前真实浏览器浮动输入框的左上角局部。before 为临时恢复旧版共享条目材料选择器的负控制，after 为 v117 的正式活动样式；并非两次业务运行或手绘夹具。截图后已恢复活动样式，未更改目标、草稿或网页业务数据。
+
+用户随后明确授权发布 v0.18.8，该授权不改变本组图片的来源与隐藏渲染器验证边界，实际发行结果见 ../CURRENT_GOAL.md。
+
+两张图均通过原生 CDP 按同一矩形裁取，输出 130×120px，只展示目标图标、标题开头与输入控件边缘，不包含目标路径或聊天正文。before 的透明 goal 行被主题重新涂成方形，after 由外层原生 22px 圆角背景统一绘制。当前渲染器 document.hidden=true，图片是该真实渲染器的局部绘制证据，不代表前台窗口或浅色业务界面已验收。深浅及展开组合另由真实原生组件回归检查。
+
+| 旧规则临时负控制 | v117 修正 |
+| --- | --- |
+| ![旧规则方形覆盖](dark-goal-floating-before.png) | ![修正后原生圆角](dark-goal-floating-after.png) |
+
 ## v0.18.7／v116 额度接缝轮廓夹具（2026-10-21 生成）
 
 dark-quota-seam-fixture.png / light-quota-seam-fixture.png：Windows Codex 26.1016.6573.0 的真实 Recovery、按钮、ComposerLayout 与宿主纯渲染组件，在独立浏览器中使用原生 CSS 生成。CSS 按当前入口的层预声明和 shared、initial、primary 顺序加载；先核对原生 padding、边框、按钮与圆角有效，再比较轮廓。

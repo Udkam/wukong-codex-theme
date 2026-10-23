@@ -1,5 +1,27 @@
 # 当前适配验证
 
+## v0.18.8／v117-goal-rail-paint-owner（2026-10-24）
+
+用户报告开启 goal 后的网页输入框异常。当前真实浏览器浮动输入框的 goal 行原生为透明、0px 圆角，外层独立 FloatingSurface 负责统一底色和 22px 圆角；旧主题无条件给 data-composer-rail-item 写背景、渐变、边框颜色和 inset shadow，导致方形覆盖。当前规则只映射未加前缀的真实 bg-* token，排除 bg-transparent，透明 goal／controls／inline 保持原生，独立 default／warning 继续替换材料。
+
+原生来源为 Windows Codex 26.1016.8622.0（包内 26.1016.62342），ASAR 625,947,531 字节，SHA-256 为 `a05dfd86ca508148c83c25590639cf91a52c6647733cdf200723d85357052b49`。三份活动 CSS 与上次核对一致，重新核对了变化后的 JS、入口和原生浏览器 body portal。现行来源合同 3/3 通过，新增 goal 展示组件回归 2/2 通过，均无跳过。
+
+新增回归执行真实 rail Item／Root、Composer Root／Body、FloatingSurface 和 compact frame，仅替代 React 传递／挂载及动画静止态。检查深浅模式 × single-line／multiline、#root 外 portal、原生透明 goal、独立 default／warning，以及 controls／inline 和仅 hover:bg-*／after:bg-* 的非背景 token。旧选择器内存负控制确实重现透明行被涂成方形；当前规则的矩形、padding、margin、圆角、字体、边框、伪元素及输入／按钮状态保护均通过。未放宽全局几何守卫。
+
+本机实际 goal 处于浏览器浮动输入框中。已用原生 CDP 同矩形裁图对照旧选择器与当前规则，22 个原生节点的几何差异为 0；goal 恢复透明，外层圆角与玻璃保留。两张正式局部图未包含目标路径或聊天正文。已注入 v117；应用返回 deferred=true、verified=false，document.hidden=true，既有背景已就绪。此处是隐藏渲染器的实际 DOM／绘制检查，不能写成前台窗口用户验收。
+
+精确暂存的 14 个相关变更连同其他已跟踪源码导出到独立目录，未包含无关未跟踪材料。最终 `npm run check` 为 **181/181 通过，0 失败、0 跳过，约 55.7 秒**；同一源码的 Studio E2E 通过。后续只补写本段及收尾文档，运行样式、版本标记、测试和原生来源保持该精确输入不变。
+
+检查后已切回本聊天，最终独立读回活动 revision=v117-goal-rail-paint-owner、backgroundReady=true、nativeTheme=dark，完整已安装样式与源码一致，临时诊断／脱敏样式数量为 0，document.hidden 仍为 true。修正阶段未发送业务消息、暂停／修改目标、编辑草稿或导航新的网页，未执行冷启动／卸载；原有额度提示底板问题的验证边界不随本轮改变。临时素材收尾见 [清理记录](CLEANUP.md)。
+
+用户随后明确回复“可发布”，本轮据此准备 v0.18.8。发布前再次核对安装路径与 ASAR SHA-256 一致；当前主渲染器仍隐藏、活动 v117 与完整样式匹配，既有背景就绪。以下发布验证按实际执行补记，发布授权不改变此前后台绘制与前台验收的边界。
+
+正式发行输入由精确暂存的 17 个相关文件及其他已跟踪源码导出，包与 lockfile 同步为 0.18.8，无关未跟踪材料未导出。独立目录 `npm run check` 为 **181/181 通过，0 失败、0 跳过，约 54.3 秒**；同一源码的 Studio E2E 通过。Windows ZIP 为 **4,053,919 字节、37 个必要文件**，重新解压后逐文件 SHA-256 与构建目录完全一致。ZIP SHA-256：
+
+`dec1dc15706a2bbb54fa180f9cd89dc02067807dbfe00e7fec445a2d9ca04734`
+
+发布测试期间曾独立读回窗口可见、backgroundReady=true、活动 v117 与完整样式一致；这是普通主页面运行状态，不扩写为 goal 前台业务状态验收。随后使用该正式 ZIP 解压出的注入器恢复原生 verified=true；同包重新应用时窗口已隐藏，返回 deferred=true／verified=false，背景解码等待既有可见性策略触发。实际读回活动 v117、dark、scenery、完整样式与包内源码一致、临时诊断样式为 0；没有将该延期安装写成完整可见应用通过。未执行冷启动／卸载。正式 GitHub 资产发布及回下载结果将在实际完成后补记。
+
 ## v0.18.7／v116-quota-seam-contour（2026-10-21 开发核对，2026-10-23 授权发行）
 
 用户明确问题为额度提示框底部与下方输入框接缝错位。最初的底色假设已撤回；排查期间用户额度已重置，真实提示无法再打开。当前原生 Recovery 的固定圆角为 28px，Windows 默认多行输入框则取 `--composer-radius`（22px）与 `--composer-corner-shape`。本轮只使 composer 内的独立提示卡跟随后者，保留原生底色与布局。合法源码组合中未重现截图中的额外深色底板，**其根因仍未确认，不能称为已修复或实机视觉验收通过**。

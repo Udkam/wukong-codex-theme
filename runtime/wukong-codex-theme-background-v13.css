@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1016.6573.0.
+/* Native paint boundary, audited against desktop 26.1016.8622.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -443,20 +443,22 @@
   --color-codex-description: var(--forge-nav-ink) !important;
 }
 
-/* Goal/queue strips retain their native clipping and corners.
+/* Goal/queue strips retain their native clipping and corners. Embedded default
+ * rail items are transparent: the floating chat's rounded carrier owns paint.
+ * Replace material only where an unprefixed native background token exists.
  * Only the outer strip blurs; inner queue leaves never create extra blur layers.
  */
 :root.forge-ink-mountain :is(
-  .forge-composer-panel[class*="bg-"],
+  .forge-composer-panel,
   [data-composer-rail-item],
-  .forge-composer-progress-pill[class*="bg-"]
-) {
+  .forge-composer-progress-pill
+):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
   border-color: var(--forge-glass-edge) !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
-:root.forge-ink-mountain .forge-composer-panel[class*="bg-"] {
+:root.forge-ink-mountain .forge-composer-panel:is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
 }

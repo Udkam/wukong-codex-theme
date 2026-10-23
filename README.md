@@ -28,4 +28,4 @@
 
 ---
 
-[开发文档](docs/DEVELOPMENT.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)
+[开发文档](docs/DEVELOPMENT.md) · [发行说明](docs/RELEASE_0.18.8.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)

@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1016.6573.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1016.6573.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1016.51333",
+  "installationDirectoryVersion": "26.1016.8622.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1016.8622.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1016.62342",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 625947151,
-  "asarSha256": "6f56542b508eea5b6e4d03e852dcd90afc2578aac7125baa3f25ebe85ebc7e25",
-  "capturedAt": "2026-10-21",
-  "captureMode": "read-only installed browser portal source contract and live body/root topology recheck; no new webpage navigation or guest screenshot acceptance",
+  "sizeBytes": 625947531,
+  "asarSha256": "a05dfd86ca508148c83c25590639cf91a52c6647733cdf200723d85357052b49",
+  "capturedAt": "2026-10-24",
+  "captureMode": "read-only installed browser portal source contract and live floating-composer body/root topology recheck; reused existing webpage without guest navigation or page-content acceptance",
   "assets": {
     "javascript": {
-      "member": "webview/assets/app-shared-9cc135f1bdc1.js",
-      "bytes": 5899320,
-      "sha256": "a530ffa50442439640d6d25227c10babc23e757812e827d0ca2e3ba0c613f7cb"
+      "member": "webview/assets/app-shared-2feb3d4c6fcc.js",
+      "bytes": 5899319,
+      "sha256": "d73051468be4c5521d4e53b4ac53a0d1cd52ddede37035183871a1845b4e1dc3"
     },
     "stylesheet": {
       "member": "webview/assets/app-shared-295ec67e1c5d.css",
@@ -23,7 +23,7 @@
     "entrypoint": {
       "member": "webview/index.html",
       "bytes": 15137,
-      "sha256": "7b3756ea81aa7f8703ccebf80d72678515c57a733ea093ba71a3ae0c51024674"
+      "sha256": "23a9ca11f27bbc397cca13a56a8991b4350f6fdeec09694c81a2ff13b0524818"
     }
   }
 }

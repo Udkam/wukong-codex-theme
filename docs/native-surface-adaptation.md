@@ -1,5 +1,15 @@
 # 原生 UI 与主题替换接口
 
+## 浏览器浮动输入框的 goal 背景归属（2026-10-24，v0.18.8／v117）
+
+核对 Windows Codex 26.1016.8622.0。浮动输入框经 body portal 挂载在 #root 外；带 data-quick-chat-drag-handle 的 section 是透明定位／拖动外壳，保留 overflow-visible。它的直接 FloatingSurface 背景子节点负责整个组件的 22px 圆角、底色和滤镜；data-floating-chat-surface 内使用 compact／inline composer。不得通过给外壳加裁切或给 goal 行硬加圆角来修复材料归属。
+
+原生 rail Item 的背景选择为 `(variant !== "default" || !embedded && !expandedTopTray) && backgroundMap[variant]`。默认 embedded／expandedTopTray 行没有背景类，controls 和 inline 也透明；独立 default 使用 bg-surface-elevated-secondary，warning 使用原生 color-mix 背景类。data-composer-rail-contained 只表示存在 rail 上下文，本身不能证明有底色。
+
+共享条目材料现要求未加状态或伪元素前缀的 bg-* token，排除 bg-transparent；与运行时标记的 panel／progress 入口使用同一判定。原生透明 goal 行不会重复绘制方形玻璃，独立 default／warning 条仍保留材料替换。宽高、圆角、边距、溢出和控件行为均不改写。
+
+回归实际执行当前原生 rail、composer 与 floating frame／surface 展示函数，保护 body portal 归属、真实背景子节点、透明 goal 和其他变体；旧共享选择器的内存负控制能捕获方形覆盖。实机只复现并对照当前深色状态，渲染器隐藏及其他检查边界见 [验证记录](VALIDATION.md)。
+
 ## 额度提示卡与输入框轮廓（2026-10-21，v0.18.7／v116）
 
 当前核对 Windows Codex 26.1016.6573.0。公共 Notice 的 `recovery` 分支提前返回独立 Recovery renderer，跳过普通 Notice 的 `attachedToComposer` 重叠分支。真实表面为带 `role="status"`、`aria-live="polite"` 的 aside；缺少专用 data 属性，使用限定在 composer 根内的 `_banner_` 组件家族作为回退标记。它自身使用固定 28px 圆角；默认多行 ComposerLayout 将其圆角映射到 `--composer-radius`，Windows 当前为 22px，曲线来自 `--composer-corner-shape`。

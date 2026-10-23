@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packageName": "OpenAI.Codex",
-  "packageVersion": "26.1016.6573.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1016.6573.0_x64__2p2nqsd0c76g0",
+  "packageVersion": "26.1016.8622.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1016.8622.0_x64__2p2nqsd0c76g0",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 625947151,
-  "sha256": "6F56542B508EEA5B6E4D03E852DCD90AFC2578AAC7125BAA3F25EBE85EBC7E25",
-  "capturedAt": "2026-10-21",
-  "captureMode": "read-only current installed source contracts and native recovery/composer renderer geometry audit; recovery quota state unavailable after user reset; source and fixture verification do not imply live quota acceptance"
+  "sizeBytes": 625947531,
+  "sha256": "A05DFD86CA508148C83C25590639CF91A52C6647733CDF200723D85357052B49",
+  "capturedAt": "2026-10-24",
+  "captureMode": "read-only installed goal rail/floating surface source audit and real browser floating-composer DOM/screenshot reproduction; hidden renderer readback is separate from visible-window acceptance"
 }
