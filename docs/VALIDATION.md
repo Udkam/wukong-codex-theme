@@ -1,5 +1,29 @@
 # 当前适配验证
 
+## v0.18.9／v118-native-module-families（2026-11-05）
+
+当前原生来源 Windows Codex 26.1029.7803.0，内部版本 26.1029.61003；ASAR 720,736,234 字节，SHA-256 为 77ed4ddc5b388ac8b29f5035f9c98f982b095df55aad6fa6c27bb80d763b9691。资源已变为数字 Rspack chunks，CSS 模块类变为 name-hash，旧 app-shared／initial／primary 与下划线类的定位失效。来源锁、真实 module factory 的 require／export 关系、CSS 层次和异步资源可达性均按当前包重新关联，不通过静默跳过或只刷新哈希掩盖漂移。
+
+普通线程的 fade／surface、Dots 的 combined／免责声明 surface，以及工作区预览 portal 的 footer／独立间隙背景由同一真实原生 renderer 生成。当前规则以明确 owner、空、aria-hidden、pointer-events-none 和完整 class token 边界匹配背景，清除颜色及渐变，保护无 owner、非空、交互、相似子串／伪状态类和外部网页。旧方向工具类专用补丁已由当前共享组件回归承接，未新增尺寸、位置、圆角或裁切覆盖。
+
+一并迁移 PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音、侧栏和额度提示的当前模块入口。原生组件审计覆盖 composer／rail、summary 三类消费者、popup 的透明外壳与真实材料层、权限表滚动及 disabled suggestion；没有证据支持额外的全局几何修改。权限表仍由 table 滚动，FloatingSurface 外壳和透明 goal 仍保持原生材料归属。语义材料压力夹具与当前 module 合同分开，不作为实机结构验收。
+
+实机采用原规则／新规则同一矩形和状态对照：深色普通对话 2 个背景叶／10 个控件，Dots 1 个背景叶／7 个控件，均读回 document.hidden=false；浅色通过客户端原生外观 radio 切换后检查，捕获时 document.hidden=true，同样为 2／1 个背景叶与 10／7 个控件。四组均重现旧背景、新规则清除且采样几何差异为 0。一次普通输入区检查遇到原生运行状态切换导致控件数量变化，该次未计通过；状态稳定后重做对照通过，未修改控件或放宽差异阈值。
+
+四张当前局部图使用真实 CDP 裁图。截图时仅临时隐藏消息正文的绘制，草稿为空，未发送消息、改写正文或附件；检查后移除临时样式并恢复原深色和本聊天。最终读取 v118、backgroundReady=true、native-page 定位、完整样式与源码一致，临时脱敏样式为 0。前台深色检查与后台浅色结果分别记录，未执行完整冷启动、卸载或各业务面板逐页验收。
+
+精确暂存的 33 个相关路径（包括压力夹具改名的旧／新路径）及其他已跟踪源码导出到独立目录，不包含无关未跟踪材料。最终 npm run check 为 181/181 通过，0 失败、0 跳过，约 54.8 秒；同一输入的 Studio E2E 通过。定向迁移中暴露的旧 CSS nesting 判断、JSX transport 依赖和组件候选歧义均按当前原生源码修正，保留原有行为／几何断言；没有通过关闭测试或模拟业务状态通过检查。
+
+独立源码共享依赖联接在开发检查结束后单独核验并移除，临时测试／源码和重复素材已清理，详见 [清理记录](CLEANUP.md)。随后仅补写验证及清理文档，运行时、测试和来源锁保持该精确已验证输入。
+
+用户随后明确回复“可发布”，本轮据此准备 v0.18.9。发布前再次核对安装路径、ASAR SHA-256 与当前源码一致；主渲染器活动 v118、dark、backgroundReady=true、native-page、完整样式匹配，临时脱敏样式为 0，读取时 document.hidden=true。发布授权不扩大此前前台／后台检查范围，以下发行结果按实际执行补记。
+
+正式发行输入为 36 个 no-renames 相关路径（含旧／新压力夹具路径），package 与 lockfile 同步为 0.18.9；独立导出后 npm run check 为 181/181 通过，0 失败、0 跳过，约 54.7 秒，Studio E2E 通过。Windows ZIP 为 4,053,853 字节、37 个必要文件，重新解压后逐文件 SHA-256 与构建目录一致。ZIP SHA-256：
+
+e5dc5db0559e4987517160a22372f50ee5cb3d1393b18c7282678023959561d1
+
+使用正式 ZIP 内的注入器实际恢复原生 verified=true；随后同包重新应用时窗口隐藏，返回 deferred=true／verified=false。实际读回活动 v118、dark、scenery、native-page、完整样式与包内源码一致、临时脱敏样式为 0；背景解码按既有策略等待可见性触发。未把该延期状态写成完整前台应用通过，未执行冷启动／卸载。远程发行与回下载结果在实际完成后补记。
+
 ## v0.18.8／v117-goal-rail-paint-owner（2026-10-24）
 
 用户报告开启 goal 后的网页输入框异常。当前真实浏览器浮动输入框的 goal 行原生为透明、0px 圆角，外层独立 FloatingSurface 负责统一底色和 22px 圆角；旧主题无条件给 data-composer-rail-item 写背景、渐变、边框颜色和 inset shadow，导致方形覆盖。当前规则只映射未加前缀的真实 bg-* token，排除 bg-transparent，透明 goal／controls／inline 保持原生，独立 default／warning 继续替换材料。

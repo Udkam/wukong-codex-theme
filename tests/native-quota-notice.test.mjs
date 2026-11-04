@@ -22,12 +22,14 @@ test('current native quota recovery has its own status surface and bypasses ordi
   assert.ok(banner.props.className.split(/\s+/).includes(native.classes.banner));
   assert.equal(Object.keys(banner.props).filter(name => name.startsWith('data-')).length, 0,
     'Recovery has no dedicated native data marker; do not invent one in production');
-  const branch = native.notice.nodes.find(node => node.type === 'IfStatement' && node.test.type === 'BinaryExpression' && text(node.test.right) === 'recovery');
+  const branch = native.notice.nodes.find(node => node.type === 'IfStatement' && node.test.type === 'BinaryExpression' && [node.test.left, node.test.right].some(value => text(value) === 'recovery'));
   assert.ok(branch && nodes(branch.consequent).some(node => node.type === 'ReturnStatement'),
     'Recovery must return before generic attachedToComposer notice styling');
-  assert.ok(nodes(branch.consequent).some(node => node.type === 'CallExpression' && node.arguments[0]?.name === native.banner.ast.id.name));
+  assert.ok(nodes(branch.consequent).some(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
+    native.bundle.imports(native.notice.record)[node.arguments[0].object.name]?.id === native.bannerRecord.id),
+  'The recovery branch must invoke the real dedicated banner module');
   assert.ok(!nodes(branch.consequent).some(node => /-mb-|pb-9|rounded-b-none/.test(text(node))));
-  assert.match(native.placement.source, /className=`contents`/);
+  assert.ok(native.placement.nodes.some(node => node.type === 'Property' && node.key.name === 'className' && text(node.value) === 'contents'));
   const nativeRule = native.css.match(new RegExp(`\\.${native.classes.banner}\\{([^}]+)\\}`))?.[1];
   assert.ok(nativeRule);
   assert.match(nativeRule, /border-radius:28px/);

@@ -2,11 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { parseAst } from 'rollup/parseAst';
+import { loadNativeBundle, nativeFunction, presentationHarness } from './native-bundle-current-helper.mjs';
 import { chromium } from '@playwright/test';
 
-const require = createRequire(import.meta.url);
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const lock = JSON.parse(fs.readFileSync(new URL('../docs/native-asar-provenance.json', import.meta.url), 'utf8'));
 const archive = process.env.CODEX_LOCAL_ASAR || path.join(process.env.ProgramFiles || '', 'WindowsApps', lock.packageDirectoryName, lock.asarRelativePath);
@@ -27,7 +25,7 @@ const nodes = tree => {
   visit(tree);
   return result;
 };
-const ownerFunction = (ast, target) => nodes(ast).filter(node => node.type === 'FunctionDeclaration' && node.start <= target.start && node.end >= target.end)
+const ownerFunction = (ast, target) => nodes(ast).filter(node => ['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type) && node.start <= target.start && node.end >= target.end)
   .sort((left, right) => (left.end - left.start) - (right.end - right.start))[0];
 const ownNodes = fn => {
   const nested = nodes(fn).filter(node => node !== fn && /^(?:Function|ArrowFunction)/.test(node.type));
@@ -53,46 +51,27 @@ const aliasResolver = fn => {
 let cachedNative;
 const loadNative = () => {
   if (cachedNative) return cachedNative;
-  const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-  const entries = asar.listPackage(archive);
-  const read = entry => asar.extractFile(archive, entry.replace(/^[/\\]/, '')).toString('utf8');
-  const source = read(entries.find(entry => /webview[\\/]assets[\\/]app-shared-.*\.js$/.test(entry)));
-  const css = entries.filter(entry => /webview[\\/]assets[\\/]app-(initial|shared|primary)-.*\.css$/.test(entry)).map(read).join('\n');
+  const bundle = loadNativeBundle({ archive }), harness = presentationHarness(bundle);
   const drift = 'Native summary header paint ownership changed; inspect its renderer and side-panel consumers';
-  const anchor = source.indexOf('pointer-events-none sticky top-0 isolate z-10 shrink-0 select-none');
-  assert.ok(anchor > 0, drift);
-  const start = source.lastIndexOf('function ', anchor), end = source.indexOf('function ', anchor);
-  const rendererSource = source.slice(start, end);
-  const renderer = parseAst(rendererSource).body.find(node => node.type === 'FunctionDeclaration');
-  const content = nodes(renderer);
-  const member = name => content.find(node => node.type === 'MemberExpression' && key(node.property) === name && node.object.type === 'Identifier')?.object.name;
-  const classCall = content.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => text(argument).startsWith('pointer-events-none sticky')));
-  const cache = member('c'), jsx = member('jsx'), motion = member('div'), portal = member('createPortal');
-  assert.ok(cache && jsx && motion && portal && classCall, drift);
-  const jsxFactory = { jsx: (tag, props) => ({ tag, props }), jsxs: (tag, props) => ({ tag, props }), Fragment: '#fragment' };
-  // Execute the native pure renderer. Its default/solid branches, portal
-  // placeholder, dimensions and motion opacity are therefore not fixture copies.
-  const render = new Function(cache, jsx, motion, portal, classCall.callee.name,
-    `return (${rendererSource.slice(renderer.start, renderer.end)});`)(
-    { c: length => Array(length).fill(Symbol('unset')) }, jsxFactory, { div: 'div' },
-    { createPortal: (children, target) => ({ tag: '#portal', props: { children, target } }) },
-    (...values) => values.flat(Infinity).filter(Boolean).join(' '));
-  const alias = source.match(new RegExp(`\\b${renderer.id.name} as ([\\w$]+)`))?.[1];
-  assert.ok(alias, drift);
-  const consumers = entries.filter(entry => /webview[\\/]assets[\\/]side-panel-[^\\/]+\.js$/.test(entry)).map(entry => {
-    const code = read(entry), ast = parseAst(code);
-    const local = ast.body.filter(node => node.type === 'ImportDeclaration' && /app-shared-.*\.js$/.test(node.source.value))
-      .flatMap(node => node.specifiers).find(node => key(node.imported) === alias)?.local.name;
-    const calls = local ? nodes(ast).filter(node => node.type === 'CallExpression' && node.arguments[0]?.name === local && node.arguments[1]?.type === 'ObjectExpression') : [];
-    return { code, ast, calls };
-  });
-  const summarySource = read(entries.find(entry => /webview[\\/]assets[\\/]thread-summary-panel-components-.*\.js$/.test(entry)));
-  const summaryAst = parseAst(summarySource);
-  const summaryClasses = [...summarySource.matchAll(/`([^`]*group\/summary-panel[^`]*)`/g)].map(match => match[1])[0];
-  assert.ok(summaryClasses && summarySource.includes('"data-summary-panel-variant"'), drift);
-  const controlClass = css.match(/\.(_controlSurface_[\w]+)\{background:linear-gradient\(var\(--color-background-viewer-control\)/)?.[1];
+  const records = bundle.findModules(['pointer-events-none sticky top-0 isolate z-10 shrink-0 select-none', 'from-surface-elevated-secondary']);
+  assert.equal(records.length, 1, drift);
+  const record = records[0], renderer = nativeFunction(record, 'pointer-events-none sticky top-0 isolate z-10 shrink-0 select-none');
+  const exported = Object.entries(bundle.exports(record)).find(([, node]) => node.name === renderer.ast.id?.name)?.[0];
+  assert.ok(exported, drift);
+  const consumers = bundle.findModules([`"${record.id}"`, 'portalContainer:']).map(record => {
+    const imported = bundle.imports(record);
+    const calls = nodes(record.ast).filter(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
+      imported[node.arguments[0].object.name]?.id === records[0].id && key(node.arguments[0].property) === exported && node.arguments[1]?.type === 'ObjectExpression');
+    return { code: record.source, ast: record.ast, calls, record };
+  }).filter(record => record.calls.length);
+  const summaryRecords = bundle.findModules(['group/summary-panel', '"data-summary-panel-variant"']);
+  assert.equal(summaryRecords.length, 1, drift);
+  const summary = summaryRecords[0], summaryClasses = nodes(summary.ast).map(text).find(value => value.includes('group/summary-panel'));
+  assert.ok(summaryClasses, drift);
+  const css = bundle.css('controlSurface-');
+  const controlClass = css.match(/\.(controlSurface-[\w-]+)\{background:linear-gradient\(var\(--color-background-viewer-control\)/)?.[1];
   assert.ok(controlClass, `${drift}: viewer control material changed`);
-  cachedNative = { css, render, consumers, summaryAst, summaryClasses, controlClass, drift };
+  cachedNative = { bundle, css, render: harness.load(record.id)[exported], consumers, summaryAst: summary.ast, summaryRecord: summary, summaryClasses, controlClass, drift };
   return cachedNative;
 };
 
@@ -119,20 +98,20 @@ test('installed summary fade renderer retains default, solid and portal branches
   assert.ok(calls.some(call => text(prop(call.arguments[1], 'variant')) === 'solid' && prop(call.arguments[1], 'children')?.value === null), `${native.drift}: profile identity solid plate missing`);
   assert.ok(calls.some(call => prop(call.arguments[1], 'portalContainer') && prop(call.arguments[1], 'fadeOpacity')), `${native.drift}: animated task title missing`);
   assert.ok(calls.some(call => prop(call.arguments[1], 'portalContainer') && !prop(call.arguments[1], 'fadeOpacity')), `${native.drift}: compact task title missing`);
-  assert.ok(native.consumers.some(consumer => consumer.code.includes('"data-orbit-profile-identity"') && consumer.code.includes('variant:`dynamic-isle`')), `${native.drift}: collapsed profile owner changed`);
+  assert.ok(native.consumers.some(consumer => consumer.code.includes('"data-orbit-profile-identity"') && nodes(consumer.ast).some(node => node.type === 'Property' && key(node.key) === 'variant' && text(node.value) === 'dynamic-isle')), `${native.drift}: collapsed profile owner changed`);
 });
 
 test('native task portals and collapsed identity paints remain inside their actual summary owners', { skip }, () => {
   const native = loadNative();
   const consumer = native.consumers.find(item => item.calls.length === 3);
   assert.ok(consumer, native.drift);
-  const summaryImport = consumer.ast.body.find(node => node.type === 'ImportDeclaration' && /thread-summary-panel-components-.*\.js$/.test(node.source.value));
-  const summaryExport = native.summaryAst.body.filter(node => node.type === 'ExportNamedDeclaration').flatMap(node => node.specifiers)
-    .find(specifier => nodes(native.summaryAst).some(node => node.type === 'AssignmentExpression' && node.left.name === specifier.local.name && prop(node.right, 'Content')));
-  const summaryName = summaryImport?.specifiers.find(specifier => key(specifier.imported) === key(summaryExport?.exported))?.local.name;
-  assert.ok(summaryName, `${native.drift}: summary Content import/export mapping changed`);
-  const module = nodes(native.summaryAst).find(node => node.type === 'AssignmentExpression' && node.left.name === summaryExport.local.name && prop(node.right, 'Content'));
-  const contentFunction = native.summaryAst.body.find(node => node.type === 'FunctionDeclaration' && node.id.name === prop(module.right, 'Content').name);
+  const summaryImport = Object.entries(native.bundle.imports(consumer.record)).find(([, imported]) => imported.id === native.summaryRecord.id);
+  assert.ok(summaryImport, `${native.drift}: summary Content import/export mapping changed`);
+  const registry = nodes(native.summaryAst).find(node => node.type === 'VariableDeclarator' && prop(node.init, 'Content'));
+  const summaryExport = Object.entries(native.bundle.exports(native.summaryRecord)).find(([, expression]) => expression.name === registry?.id.name)?.[0];
+  const summaryName = summaryImport[0];
+  assert.ok(registry && summaryExport, `${native.drift}: summary Content registry changed`);
+  const contentFunction = prop(registry.init, 'Content');
   const contentNodes = ownNodes(contentFunction), contentAliases = aliasResolver(contentFunction);
   const contentPaint = contentNodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'data-summary-panel-variant'));
   const variantDefault = contentNodes.find(node => node.type === 'VariableDeclarator' && node.init?.type === 'ConditionalExpression' && text(node.init.consequent) === 'summary');
@@ -143,12 +122,12 @@ test('native task portals and collapsed identity paints remain inside their actu
   const childrenParameter = parameter('children'), scrollableParameter = parameter('scrollable');
   const scrollableDefault = contentNodes.find(node => node.type === 'VariableDeclarator' && node.init?.type === 'LogicalExpression' &&
     node.init.operator === '||' && node.init.right.name === scrollableParameter?.name && node.init.left.type === 'BinaryExpression' &&
-    node.init.left.operator === '===' && node.init.left.left.name === scrollableParameter?.name && node.init.left.right.type === 'UnaryExpression' && node.init.left.right.operator === 'void');
+    node.init.left.operator === '===' && [node.init.left.left, node.init.left.right].some(value => value.name === scrollableParameter?.name) && [node.init.left.left, node.init.left.right].some(value => value.type === 'UnaryExpression' && value.operator === 'void'));
   const forwardedChildren = contentNodes.find(node => node.type === 'ConditionalExpression' && node.test?.name === scrollableDefault?.id.name && node.alternate?.name === childrenParameter?.name);
   assert.ok(scrollableDefault && forwardedChildren && contentAliases.resolves(prop(contentPaint.arguments[1], 'children'), forwardedChildren),
     `${native.drift}: non-scrolling Content must forward its children directly inside the semantic summary owner`);
   const isContent = node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
-    node.arguments[0].object.name === summaryName && key(node.arguments[0].property) === 'Content';
+    node.arguments[0].object.type === 'MemberExpression' && node.arguments[0].object.object.name === summaryName && key(node.arguments[0].object.property) === summaryExport && key(node.arguments[0].property) === 'Content';
   const directChild = (call, target, resolves) => {
     const child = prop(call.arguments[1], 'children');
     return child?.type === 'ArrayExpression' ? child.elements.some(element => resolves(element, target)) : resolves(child, target);

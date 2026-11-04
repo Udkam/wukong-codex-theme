@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1016.8622.0.
+/* Native paint boundary, audited against desktop 26.1029.7803.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -71,21 +71,20 @@
   background: none !important;
   box-shadow: none !important;
 }
-:root.forge-ink-mountain #root :is([data-thread-scroll-footer="true"], .thread-scroll-container) [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
-  background-image: none !important;
-}
 /* The shared native footer owns fade, surface and combined paint leaves.
  * The transcript reserve, footer, Dots composer and main-layout consumers can
  * mount it independently. Match its empty decorative family, never dimensions
  * or a gradient direction utility; surface-only leaves also carry solid fill.
  * Keep the owner boundary and exclude controls, previews and nonempty shells. */
-:root.forge-ink-mountain #root :is(
-  [data-app-shell-main-content-layout],
-  .thread-scroll-container,
+:root.forge-ink-mountain :is(
+  #root [data-app-shell-main-content-layout],
+  #root .thread-scroll-container,
   [data-thread-scroll-footer="true"],
   [data-codex-composer-root]
-) [aria-hidden="true"].pointer-events-none:empty[class*="_background_"]:is(
-  [class*="_fade_"], [class*="_surface_"], [class*="_combined_"]
+) [aria-hidden="true"].pointer-events-none:empty:is([class^="background-"], [class*=" background-"]):is(
+  [class^="fade-"], [class*=" fade-"],
+  [class^="surface-"], [class*=" surface-"],
+  [class^="combined-"], [class*=" combined-"]
 ) {
   background: transparent !important;
 }
@@ -98,8 +97,8 @@
 }
 /* ThreadScrollLayout now paints a separate inert footer plate. Scope to its
  * semantic owner, including focus mode; never clear cards inside the composer. */
-:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"],
-:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none {
+:root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"],
+:root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none {
   background: transparent !important;
 }
 /* Your dot uses the native messaging shell rather than the Codex thread shell.
@@ -110,12 +109,6 @@
 }
 :root.forge-ink-mountain #root .messaging-root.messaging-embedded .composer-wrap {
   border-bottom-color: transparent !important;
-}
-/* Embedded dots mount the shared composer outside ThreadScrollLayout's footer.
- * Its inert gradient belongs to the composer and otherwise leaves a dark band
- * behind the capsule. Preserve the gradient's layout and every input/control. */
-:root.forge-ink-mountain #root .messaging-root.messaging-embedded .composer-wrap [data-codex-composer-root] [aria-hidden="true"].pointer-events-none.bg-gradient-to-t {
-  background-image: none !important;
 }
 /* SearchablePageLayout gives its toolbar shell a titlebar inset variable.
  * Its ::before owns the fill; the variable and sticky state identify that
@@ -173,7 +166,7 @@
  */
 :root.forge-ink-mountain [data-codex-composer-root]:has(
   [data-composer-layout="multiline"][data-composer-radius-variant="default"][data-composer-surface-variant="default"]
-) aside[role="status"][aria-live="polite"][class*="_banner_"]:not(:is(
+) aside[role="status"][aria-live="polite"]:is([class^="banner-"], [class*=" banner-"]):not(:is(
   [data-composer-surface-variant], [data-slot="popover-content"],
   [role="dialog"], [role="alertdialog"], [data-summary-panel-variant],
   [data-checkout-presentation]
@@ -199,21 +192,21 @@
 /* Native default Markdown code cards. An opaque reading tint also lets the
  * sticky toolbar cover scrolled code without a second translucent stripe.
  * Preview/hover blocks, syntax colours, selection and geometry stay native. */
-:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block]:is([class^="CodeSurface-"], [class*=" CodeSurface-"])) {
   --forge-code-fill: rgb(36, 40, 44);
   background-color: var(--forge-code-fill) !important;
   background-image: none !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
-:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"])[data-theme="light"] {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block]:is([class^="CodeSurface-"], [class*=" CodeSurface-"]))[data-theme="light"] {
   --forge-code-fill: rgb(237, 240, 243);
 }
-:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) > [data-markdown-copy="exclude"] {
+:root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block]:is([class^="CodeSurface-"], [class*=" CodeSurface-"])) > [data-markdown-copy="exclude"] {
   background-color: var(--forge-code-fill) !important;
   background-image: none !important;
 }
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  :root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block][class*="_CodeSurface_"]) {
+  :root.forge-ink-mountain [data-markdown-copy="code-block"]:is(.bg-secondary-soft-alpha, [data-code-block]:is([class^="CodeSurface-"], [class*=" CodeSurface-"])) {
     --forge-code-fill: var(--color-surface, Canvas) !important;
     box-shadow: none !important;
   }
@@ -239,9 +232,9 @@
   [data-slot="popover-content"]:is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
   [data-slot="popover-content"]:not(:is([class^="bg-surface"], [class*=" bg-surface"])) > :is(div, section, form, aside, nav):is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
   [data-slot="popover-content"][data-checkout-presentation="inline"],
-  [role="dialog"][class*="_Popover_"],
-  .codex-dialog:is([class*="_chatgptConfirmationSurface_"], [class*="_voicePickerSurface_"]),
-  [class*="_floatingSurface_"]:is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
+  [role="dialog"]:is([class^="Popover-"], [class*=" Popover-"]),
+  .codex-dialog:is(:is([class^="chatgptConfirmationSurface-"], [class*=" chatgptConfirmationSurface-"]), :is([class^="voicePickerSurface-"], [class*=" voicePickerSurface-"])),
+  :is([class^="floatingSurface-"], [class*=" floatingSurface-"]):is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
   [data-summary-panel-variant],
   [data-thread-user-message-navigation-tooltip-preview],
   aside[data-testid="app-shell-floating-left-panel"],
@@ -305,7 +298,7 @@
   backdrop-filter: var(--forge-navigation-filter) !important;
   -webkit-backdrop-filter: var(--forge-navigation-filter) !important;
 }
-:root.forge-ink-mountain .sidebar-navigation[class*="_ConversationSidebar_"] nav[class*="_Navigation_"] {
+:root.forge-ink-mountain .sidebar-navigation:is([class^="ConversationSidebar-"], [class*=" ConversationSidebar-"]) nav:is([class^="Navigation-"], [class*=" Navigation-"]) {
   --color-text: var(--forge-nav-ink) !important;
   --color-text-secondary: var(--forge-nav-muted) !important;
   --color-text-secondary-solid: var(--forge-nav-muted) !important;
@@ -314,7 +307,7 @@
   color: var(--forge-nav-ink) !important;
   text-shadow: var(--forge-nav-shadow);
 }
-:root.forge-ink-mountain [class*="_ApplicationMenuTopBar_"] {
+:root.forge-ink-mountain :is([class^="ApplicationMenuTopBar-"], [class*=" ApplicationMenuTopBar-"]) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
   backdrop-filter: var(--forge-shell-filter) !important;

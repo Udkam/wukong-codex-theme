@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import postcss from 'postcss';
 import { PNG } from 'pngjs';
+import { loadNativeBundle, nodes, prop, text } from './native-bundle-current-helper.mjs';
 import { makeApplyExpression, makeStyleUpdateExpression } from '../runtime/injection-plan-v13.mjs';
 
 fs.mkdirSync(new URL('../artifacts/test-runs/native-boundary-20260920/',import.meta.url),{recursive:true});
@@ -14,28 +15,15 @@ fs.mkdirSync(new URL('../artifacts/test-runs/native-boundary-20260920/',import.m
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const require = createRequire(import.meta.url);
 const loadNative = () => {
-  try {
-    const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-    const root = path.join(process.env.ProgramFiles, 'WindowsApps');
-    const archive = fs.readdirSync(root).filter(x => /^OpenAI\.Codex_.*_x64__/.test(x))
-      .map(x => path.join(root, x, 'app/resources/app.asar')).filter(fs.existsSync)
-      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-    const entries = asar.listPackage(archive);
-    const css = entries.filter(x => /webview[\\/]assets[\\/](app-shared-|app-initial-|app-primary-).*\.css$/.test(x))
-      .map(x => asar.extractFile(archive, x.replace(/^[/\\]/, '')).toString('utf8')).join('\n');
-    const rootClass = css.match(/\.(_ComposerLayoutRoot_[\w]+)\{/)[1];
-    const bodyClass = css.match(/\.(_ComposerLayoutBody_[\w]+)\{/)[1];
-    const topMenu = css.match(/\.(_ComposerTopMenuPanel_[\w]+)\[/)[1];
-    const effortClass = css.match(/\.(_ModelPickerTriggerEffortText_[\w]+)\[data-max-effort=true\]/)[1];
-    const codeSurfaceClass = css.match(/\.(_CodeSurface_[\w]+)[,{]/)?.[1];
-    const stickyCodeBarClass = css.match(/\.(_StickyActionBar_[\w]+)[,{]/)?.[1];
-    const sharedScript = entries.find(entry => /webview[\\/]assets[\\/]app-shared-.*\.js$/.test(entry));
-    const codeBlockSource = sharedScript
-      ? asar.extractFile(archive, sharedScript.replace(/^[/\\]/, '')).toString('utf8')
-      : '';
-    return { archive, css, rootClass, bodyClass, topMenu, effortClass,
-      codeSurfaceClass, stickyCodeBarClass, codeBlockSource };
-  } catch { return null; }
+  const lock=JSON.parse(fs.readFileSync(new URL('../docs/native-asar-provenance.json',import.meta.url),'utf8'));
+  const archive=process.env.CODEX_LOCAL_ASAR||path.join(process.env.ProgramFiles||'', 'WindowsApps',lock.packageDirectoryName,lock.asarRelativePath);
+  if(!fs.existsSync(archive))return null;
+  const bundle = loadNativeBundle();
+  const css = bundle.css();
+  const family = name => { const match = css.match(new RegExp('\\.(' + name + '-[A-Za-z0-9_-]+)[\\[{,]')); assert.ok(match, 'Native CSS family missing: ' + name); return match[1]; };
+  const code = bundle.findModules(['data-code-block-source', 'data-markdown-copy']).find(record => record.source.includes('CodeSurface-'));
+  assert.ok(code, 'Native code block owner changed');
+  return { archive:bundle.archive, css, rootClass:family('ComposerLayoutRoot'), bodyClass:family('ComposerLayoutBody'), topMenu:family('ComposerTopMenuPanel'), effortClass:family('ModelPickerTriggerEffortText'), codeSurfaceClass:family('CodeSurface'), stickyCodeBarClass:family('StickyActionBar'), codeBlockSource:code.source, codeBlockAST:code.ast };
 };
 const native = loadNative();
 
@@ -229,7 +217,7 @@ test('model/permission clicks do not schedule submit follow-up scans', async () 
 test('active paint sheet preserves geometry and scopes ink to navigation and dark conversation', () => {
   const quotaContourSelector = `:root.forge-ink-mountain [data-codex-composer-root]:has(
   [data-composer-layout="multiline"][data-composer-radius-variant="default"][data-composer-surface-variant="default"]
-) aside[role="status"][aria-live="polite"][class*="_banner_"]:not(:is(
+) aside[role="status"][aria-live="polite"]:is([class^="banner-"], [class*=" banner-"]):not(:is(
   [data-composer-surface-variant], [data-slot="popover-content"],
   [role="dialog"], [role="alertdialog"], [data-summary-panel-variant],
   [data-checkout-presentation]
@@ -254,7 +242,7 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
     if (conversation && ['--color-text-secondary','--color-text-tertiary'].includes(d.prop)) return;
     if (s.includes('[data-forge-native-theme="dark"]') && s.includes('[data-markdown-text-style="assistant-message"] a') && d.prop === 'color') return;
-    if (s === ':root.forge-ink-mountain .sidebar-navigation[class*="_ConversationSidebar_"] nav[class*="_Navigation_"]' &&
+    if (s === ':root.forge-ink-mountain .sidebar-navigation:is([class^="ConversationSidebar-"], [class*=" ConversationSidebar-"]) nav:is([class^="Navigation-"], [class*=" Navigation-"])' &&
         ['color','text-shadow','--color-text','--color-text-secondary','--color-text-secondary-solid','--color-text-tertiary','--color-background-primary-ghost-hover'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain :has(> [data-mention-list-scroll-area])' &&
         ['color','--color-text','--color-codex-description','--color-text-tertiary'].includes(d.prop)) return;
@@ -388,11 +376,11 @@ test('native Markdown code cards keep text and geometry while unifying toolbar p
   // share native paint; preview/hover/transparent variants do not own it.
   assert.ok(native.codeSurfaceClass, 'native default code surface drifted; re-audit the code-block paint owner');
   assert.ok(native.stickyCodeBarClass, 'native sticky code toolbar drifted; re-audit its paint owner');
-  for (const contract of [native.codeSurfaceClass, native.stickyCodeBarClass,
-    '"data-code-block":', '"data-code-block-source":', '"data-markdown-copy":`code-block`',
-    '"data-markdown-copy":`exclude`', 'CodeSurface:', 'StickyActionBar:']) {
-    assert.ok(native.codeBlockSource.includes(contract), 'native code-block source contract drifted: '+contract);
-  }
+  for (const contract of [native.codeSurfaceClass, native.stickyCodeBarClass]) assert.ok(native.codeBlockSource.includes(contract), 'Current renderer must own native class ' + contract);
+  const objects = nodes(native.codeBlockAST).filter(node => node.type === 'ObjectExpression');
+  assert.ok(objects.some(node => prop(node,'data-code-block') && text(prop(node,'data-markdown-copy')) === 'code-block'), 'Code card semantic owner changed');
+  assert.ok(objects.some(node => prop(node,'data-code-block-source')), 'Source content hook changed');
+  assert.ok(objects.some(node => text(prop(node,'data-markdown-copy')) === 'exclude'), 'Toolbar copy-exclusion hook changed');
   const browser = await chromium.launch({headless:true});
   try {
     for (const mode of ['light','dark']) {

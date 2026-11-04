@@ -19,18 +19,18 @@ test('native ownership survives utility churn and retained hidden main/shell nod
   try {
     await page.setContent(`<style>
       [data-app-shell-page-surface]{position:relative;height:700px}
-      [class*="_PageSurface_"]{position:absolute;inset:20px;border-radius:31px;pointer-events:none}
+      [class^="PageSurface-"]{position:absolute;inset:20px;border-radius:31px;pointer-events:none}
       main{height:300px}aside{height:200px}.sidebar-navigation{height:100px}
-    </style><section hidden data-app-shell-page-surface><div class="_PageSurface_retired_2"></div><main id="stale" data-app-shell-main-surface>Old</main></section>
+    </style><section hidden data-app-shell-page-surface><div class="PageSurface-retired2"></div><main id="stale" data-app-shell-main-surface>Old</main></section>
     <section style="opacity:0" data-app-shell-page-surface="true">
-      <div class="_PageSurface_transparent_3" aria-hidden="true" style="opacity:1"></div>
+      <div class="PageSurface-transparent3" aria-hidden="true" style="opacity:1"></div>
       <main data-app-shell-main-surface="default" style="opacity:1">
         <aside data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation">Retained navigation</div></aside>
         <div data-settings-mobile-header="false" style="height:100px">Retained settings</div>
       </main>
     </section>
     <div style="visibility:hidden"><section data-app-shell-page-surface="true">
-      <div id="paint" style="visibility:visible" class="_PageSurface_newhash_99" aria-hidden="true"></div>
+      <div id="paint" style="visibility:visible" class="PageSurface-newhash99" aria-hidden="true"></div>
       <main id="active" style="visibility:visible" data-app-shell-main-surface="default">
         <aside data-app-shell-left-panel-appearance="default"><div id="nav" class="sidebar-navigation changed-classes"><div class="sidebar-navigation">Inner list</div></div></aside>
       </main></section></div>`);

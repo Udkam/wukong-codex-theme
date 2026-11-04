@@ -1,11 +1,11 @@
 /*
- * Native DOM contracts, audited against the packaged 26.930 UI. Data attributes
+ * Native DOM contracts, audited against the packaged 26.1029 UI. Data attributes
  * describe ownership; utility classes are only retained as bounded fallbacks.
  * Keep this module dependency-free: the factory is serialized into the client.
  */
 export const NATIVE_UI_SELECTORS = Object.freeze({
   pageShell: '[data-app-shell-page-surface]:not([data-app-shell-page-surface="false"])',
-  pagePaint: '[class*="_PageSurface_"]',
+  pagePaint: '[class^="PageSurface-"], [class*=" PageSurface-"]',
   main: '[data-app-shell-main-surface]',
   mainContent: '[data-app-shell-main-content-layout]',
   sidebar: 'aside[data-app-shell-left-panel-appearance], aside.app-shell-left-panel',

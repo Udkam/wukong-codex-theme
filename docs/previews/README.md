@@ -1,5 +1,18 @@
 # 当前预览
 
+## v0.18.9／v118 底部背景（2026-11-05）
+
+dark-normal-footer-20261105.png、dark-dots-footer-20261105.png、light-normal-footer-20261105.png、light-dots-footer-20261105.png：Windows Codex 26.1029.7803.0 的普通对话／Dots 实际输入区局部，运行时 v118-native-module-families。深色两类均读回 document.hidden=false；浅色通过客户端原生外观设置切换后取图，捕获时 document.hidden=true，不能等同于浅色前台验收。检查后恢复原深色及本聊天。
+
+用户已授权随 v0.18.9 发布，这不改变本组图片的实际来源和前台／后台验证边界。发行结果见 ../CURRENT_GOAL.md。
+
+通过当前组件矩形向上包含 32 CSS px 裁取；输入草稿为空，截图期间临时隐藏消息正文绘制，保留布局与控件，随后删除临时样式。没有重绘壁纸、输入框或背景。当前聊天的更改计数徽标属于原生界面，不含文件名或正文。原始负控制图留在本机验证证据中，以下只展示修正后的实际绘制。
+
+| 普通对话 | Dots |
+| --- | --- |
+| ![深色普通输入区](dark-normal-footer-20261105.png) | ![深色 Dots 输入区](dark-dots-footer-20261105.png) |
+| ![浅色普通输入区](light-normal-footer-20261105.png) | ![浅色 Dots 输入区](light-dots-footer-20261105.png) |
+
 ## v0.18.8／v117 浏览器 goal 输入框圆角对照（2026-10-24）
 
 dark-goal-floating-before.png / dark-goal-floating-after.png：Windows Codex 26.1016.8622.0 当前真实浏览器浮动输入框的左上角局部。before 为临时恢复旧版共享条目材料选择器的负控制，after 为 v117 的正式活动样式；并非两次业务运行或手绘夹具。截图后已恢复活动样式，未更改目标、草稿或网页业务数据。

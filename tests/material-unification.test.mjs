@@ -6,24 +6,20 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import { PNG } from 'pngjs';
+import { loadNativeBundle } from './native-bundle-current-helper.mjs';
 
 const require = createRequire(import.meta.url);
 const output = new URL('../artifacts/test-runs/native-boundary-20260920/', import.meta.url);
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
-const structurePath = new URL('./fixtures/native-environment-classes.json', import.meta.url);
+const structurePath = new URL('./fixtures/semantic-material-stress.json', import.meta.url);
 function loadNative() {
-  try {
-    const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-    const root = path.join(process.env.ProgramFiles, 'WindowsApps');
-    const archive = fs.readdirSync(root).filter(name => /^OpenAI\.Codex_.*_x64__/.test(name))
-      .map(name => path.join(root, name, 'app/resources/app.asar')).filter(fs.existsSync)
-      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-    const css = asar.listPackage(archive)
-      .filter(name => /webview[\\/]assets[\\/](app-shared-|app-initial-|app-primary-).*\.css$/.test(name))
-      .map(name => asar.extractFile(archive, name.replace(/^[/\\]/, '')).toString('utf8')).join('\n');
-    const effort = css.match(/\.(_ModelPickerTriggerEffortText_[\w]+)\[data-max-effort=true\]/)[1];
-    return { archive, css, effort };
-  } catch { return null; }
+  const lock=JSON.parse(fs.readFileSync(new URL('../docs/native-asar-provenance.json',import.meta.url),'utf8'));
+  const archive=process.env.CODEX_LOCAL_ASAR||path.join(process.env.ProgramFiles||'', 'WindowsApps',lock.packageDirectoryName,lock.asarRelativePath);
+  if(!fs.existsSync(archive))return null;
+  const bundle=loadNativeBundle(),css=bundle.css();
+  const effort=css.match(/\.(ModelPickerTriggerEffortText-[\w-]+)\[data-max-effort=true\]/)?.[1];
+  assert.ok(effort,'Native model effort text interface changed');
+  return {archive:bundle.archive,css,effort};
 }
 const native = loadNative();
 const rgbAt = (png, x, y) => [...png.data.subarray((Math.round(y) * png.width + Math.round(x)) * 4, (Math.round(y) * png.width + Math.round(x)) * 4 + 3)];
@@ -42,7 +38,7 @@ test('component fixture: uniform summary paint, shared shells and accessible mat
   try {
     report.relativeColorWithOpaqueAlphaSupported = await page.evaluate(() => CSS.supports('background-color', 'rgb(from rgb(1 2 3 / .4) r g b / 1)'));
     assert.equal(report.relativeColorWithOpaqueAlphaSupported, true, 'Chromium must support the explicit opaque relative-colour fallback');
-    // Sanitized native class names only; the fixture contains no captured user content.
+    // Synthetic semantic stress classes; current renderer ownership is checked separately.
     const classes = JSON.parse(fs.readFileSync(structurePath, 'utf8'));
     fs.mkdirSync(output, { recursive: true });
     const samples = [{ name: 'dark', color: 'rgb(12,20,28)' }, { name: 'middle', color: 'rgb(120,110,95)' }, { name: 'light', color: 'rgb(230,235,240)' }];

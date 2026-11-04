@@ -1,125 +1,52 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
-import { createRequire } from 'node:module';
-import { parseAst } from 'rollup/parseAst';
+import { nativeFunction, nativeObject } from './native-bundle-current-helper.mjs';
 import postcss from 'postcss';
 import { chromium } from '@playwright/test';
-import { loadQuotaNative, quotaNativeSkip, quotaArchive, quotaHtml, key, text, prop, nodes } from './native-quota-current-helper.mjs';
+import { loadQuotaNative, quotaNativeSkip, quotaHtml, key, text, prop, nodes } from './native-quota-current-helper.mjs';
 
-const require = createRequire(import.meta.url);
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
-const member = (fn, name) => fn.nodes.find(node => node.type === 'MemberExpression' && key(node.property) === name && node.object.type === 'Identifier')?.object.name;
-const classNames = (...values) => values.flat(Infinity).filter(value => typeof value === 'string' && value).join(' ');
-const cache = { c: length => Array(length).fill(Symbol.for('react.memo_cache_sentinel')) };
-const jsx = { jsx: (tag, props) => typeof tag === 'function' ? tag(props) : ({ tag, props }),
-  jsxs: (tag, props) => jsx.jsx(tag, props), Fragment: '#fragment' };
-const compile = (fn, bindings) => new Function(...Object.keys(bindings), `return (${fn.source});`)(...Object.values(bindings));
-const objectStrings = (fn, name) => {
-  const strings = Object.fromEntries(fn.nodes.filter(node => node.type === 'AssignmentExpression' && node.left.type === 'Identifier' && text(node.right))
-    .map(node => [node.left.name, text(node.right)]));
-  const object = fn.nodes.find(node => node.type === 'AssignmentExpression' && node.left.name === name && node.right.type === 'ObjectExpression')?.right;
-  assert.ok(object, `Native goal/floating module changed: ${name}`);
-  return Object.fromEntries(object.properties.map(node => [key(node.key), text(node.value) || strings[node.value.name] || '']));
-};
 const element = (tag, props) => ({ tag, props });
-// Resolve only resting animation styles. Native class selection, framing,
-// embedded/variant decisions and actual presentation renderers execute intact.
-const motion = tag => props => {
-  const style = { ...props.style };
-  for (const [name, value] of Object.entries(props.animate || {})) {
-    if (['top', 'right', 'bottom', 'left', 'borderTopWidth', 'borderBottomWidth'].includes(name)) style[name] = `${value}px`;
-    else if (['opacity', 'gridTemplateRows'].includes(name)) style[name] = value;
-  }
-  return element(tag, { ...props, style });
-};
-
+// Installed Rspack module factories execute only audited presentation code.
+// Memo cache, hooks, motion transport and editor slots are inert boundaries.
 let cached;
 const loadGoalNative = () => {
   if (cached) return cached;
-  const native = loadQuotaNative();
-  const item = native.functionAt('initial', '"data-composer-rail-item":');
-  const rail = native.functionAt('initial', '"data-composer-rail":');
-  const railModule = member(item, 'item');
-  const railClasses = objectStrings(native.functionAt('initial', `${railModule}={rail:`), railModule);
-  const backgroundMapName = item.nodes.filter(node => node.type === 'MemberExpression' && node.computed && node.object.type === 'Identifier')
-    .map(node => node.object.name).find(name => native.initial.includes(`${name}={default:`));
-  assert.ok(backgroundMapName, 'Native goal rail background variant map changed');
-  const variantInitializer = native.functionAt('initial', `${backgroundMapName}={default:`);
-  const backgrounds = objectStrings(variantInitializer, backgroundMapName);
-  const contextCall = item.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'SequenceExpression' &&
-    key(node.callee.expressions.at(-1)?.property) === 'useContext');
-  const contextName = contextCall.arguments[0].name;
-  const fallbackName = item.nodes.find(node => node.type === 'LogicalExpression' && node.operator === '??' && node.right.type === 'Identifier')?.right.name;
-  const exitName = item.nodes.find(node => node.type === 'Property' && key(node.key) === 'exit' && node.value.type === 'Identifier')?.value.name;
-  const presence = item.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.length === 0)?.callee.name;
-  const classes = item.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => text(argument) === 'relative min-w-0 overflow-clip text-default'))?.callee.name;
-  assert.ok(contextName && fallbackName && exitName && presence && classes, 'Native goal rail pure presentation boundary changed');
-  let context;
-  const renderItemFn = compile(item, {
-    [member(item, 'c')]: cache, [member(item, 'jsx')]: jsx,
-    [member(item, 'useContext')]: { useContext: () => context },
-    [member(item, 'div')]: { div: motion('div') }, [contextName]: {},
-    [fallbackName]: { embedded: false, expandedTopTray: false, placement: 'above', shouldUseReducedMotion: true },
-    [exitName]: { gridTemplateRows: '0fr', borderTopWidth: 0, borderBottomWidth: 0 },
-    [presence]: () => true, [classes]: classNames, [railModule]: railClasses, [backgroundMapName]: backgrounds
-  });
+  const native = loadQuotaNative(), { bundle, harness } = native;
+  const records = bundle.findModules(['"data-composer-rail-item"', '"data-composer-rail"']);
+  assert.equal(records.length, 1, 'Native composer rail module must be unique');
+  const record = records[0], item = nativeFunction(record, '"data-composer-rail-item"'), rail = nativeFunction(record, '"data-composer-rail"');
+  const backgroundMap = nodes(record.ast).find(node => node.type === 'ObjectExpression' && text(prop(node, 'default')) === 'bg-surface-elevated-secondary' && prop(node, 'warning'));
+  assert.ok(backgroundMap, 'Native background variant map changed');
+  const backgrounds = nativeObject(record, backgroundMap);
+  const registry = harness.load(record.id).l;
+  const context = harness.createdContexts.find(value => value.defaultValue === null);
+  assert.ok(context, 'Native rail context boundary changed');
   const renderItem = (options, embedded = true) => {
-    context = { embedded, expandedTopTray: false, placement: 'above', shouldUseReducedMotion: true };
-    try { return renderItemFn(options); } finally { context = undefined; }
+    harness.contexts.set(context, { embedded, expandedTopTray: false, placement: 'above', shouldUseReducedMotion: true });
+    try { return registry.Item(options); } finally { harness.contexts.delete(context); }
   };
-  const railClassCall = rail.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => text(argument) === 'relative flex min-w-0 flex-col empty:contents'));
-  const railPresence = rail.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.length === 0);
-  const animation = rail.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'propagate'));
-  const mapper = rail.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'MemberExpression' && key(node.callee.property) === 'map');
-  const expandedWrapper = rail.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'expandedTopTray') && prop(node.arguments[1], 'inFlow'));
-  assert.ok(railClassCall && railPresence && animation && mapper && expandedWrapper, 'Native composer rail wrapper changed');
-  const contextProvider = props => props.children;
-  const renderRail = compile(rail, {
-    [member(rail, 'c')]: cache, [member(rail, 'jsx')]: jsx, [railClassCall.callee.name]: classNames,
-    [railPresence.callee.name]: () => true, [railModule]: railClasses,
-    [mapper.callee.object.object.name]: { Children: { map: children => children } },
-    [mapper.arguments[1].name]: value => value,
-    [animation.arguments[0].name]: contextProvider, [expandedWrapper.arguments[0].name]: contextProvider,
-    [contextName]: { Provider: contextProvider }
+  const railClasses = Object.fromEntries(['rail', 'embedded', 'item', 'attached'].map(name => [name,
+    nodes(record.ast).map(text).find(value => value.startsWith(`${name}-`) && !value.includes(' '))]));
+  const floatingRecord = bundle.findModules(['.floatingSurface', '.singleLineSurface', '"composer"']).filter(record => record.source.length < 5000);
+  assert.equal(floatingRecord.length, 1, 'Native floating presentation module changed');
+  const floating = nativeFunction(floatingRecord[0], '.floatingSurface');
+  const floatImport = Object.values(bundle.imports(floatingRecord[0])).find(imported => {
+    const object = bundle.exports(bundle.module(imported.id)).A;
+    return object?.type === 'ObjectExpression' && prop(object, 'floatingSurface');
   });
-
-  const floating = native.functionAt('shared', '.floatingSurface');
-  const floatingModule = member(floating, 'floatingSurface');
-  const floatingClasses = objectStrings(native.functionAt('shared', `${floatingModule}={floatingSurface:`), floatingModule);
-  const floatClassCall = floating.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' &&
-    nodes(node).some(child => child.type === 'MemberExpression' && key(child.property) === 'floatingSurface'));
-  const renderFloating = compile(floating, {
-    [member(floating, 'c')]: cache, [member(floating, 'jsx')]: jsx, [floatingModule]: floatingClasses,
-    [floatClassCall.callee.name]: classNames,
-    [member(floating, 'cloneElement')]: { cloneElement: (child, props) => ({ ...child, props: { ...child.props, ...props } }) }
-  });
-  const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-  const entries = asar.listPackage(quotaArchive);
-  const read = entry => asar.extractFile(quotaArchive, entry.replace(/^[/\\]/, '')).toString('utf8');
-  const surfaceEntry = entries.find(entry => /webview[\\/]assets[\\/]floating-chat-surface-.*\.js$/.test(entry));
-  const source = read(surfaceEntry), ast = parseAst(source);
-  const frameAst = ast.body.find(node => node.type === 'FunctionDeclaration' && nodes(node).some(child => text(child) === 'group/chat-frame focus:outline-none'));
-  assert.ok(frameAst, 'Native compact floating chat frame changed');
-  const frame = { ast: frameAst, source: source.slice(frameAst.start, frameAst.end), nodes: nodes(frameAst) };
-  const frameModule = member(frame, 'frame');
-  const frameInitializer = ast.body.find(node => node.type === 'FunctionDeclaration' && nodes(node).some(child => child.type === 'AssignmentExpression' && child.left.name === frameModule));
-  const frameClasses = objectStrings({ nodes: nodes(frameInitializer) }, frameModule);
-  const frameClassCall = frame.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.some(argument => text(argument) === 'flex flex-col text-default'));
-  const frameFloating = frame.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'asChild') && prop(node.arguments[1], 'unstyled'));
-  const mergeRef = frame.nodes.find(node => node.type === 'CallExpression' && node.callee.type === 'Identifier' && node.arguments.length === 3);
-  assert.ok(frameClassCall && frameFloating && mergeRef, 'Native floating frame paint/transport boundary changed');
-  const renderFrame = compile(frame, {
-    [member(frame, 'c')]: cache, [member(frame, 'jsx')]: jsx,
-    [member(frame, 'section')]: { section: motion('section'), div: motion('div') },
-    [frameClassCall.callee.name]: classNames, [frameFloating.arguments[0].name]: renderFloating,
-    [frameModule]: frameClasses, [member(frame, 'floatingSurface')]: floatingClasses,
-    [mergeRef.callee.name]: () => undefined, [mergeRef.arguments[2].name]: () => {}
-  });
-  const extraCss = entries.filter(entry => /webview[\\/]assets[\\/]floating-chat-surface-.*\.css$/.test(entry)).map(read).join('\n');
-  cached = { ...native, item, rail, backgrounds, railClasses, floating, floatingClasses, frame, source,
-    css: `${native.css}\n${extraCss}`, renderItem, renderRail, renderFloating, renderFrame };
+  assert.ok(floatImport, 'Native floating CSS module changed');
+  const cssMap = bundle.module(floatImport.id), floatingClasses = nativeObject(cssMap, bundle.exports(cssMap).A);
+  const frameRecords = bundle.findModules(['group/chat-frame focus:outline-none', 'prefersCompactPresentation']);
+  assert.equal(frameRecords.length, 1, 'Native floating frame module changed');
+  const frame = nativeFunction(frameRecords[0], 'group/chat-frame focus:outline-none');
+  const frameClass = frame.nodes.map(text).find(value => /^frame-\S+$/.test(value));
+  assert.ok(frameClass, 'Native floating frame CSS module changed');
+  const renderFrame = harness.compile(frame);
+  cached = { ...native, item, rail, backgrounds, railClasses, floating, floatingClasses, frame, source: frameRecords[0].source,
+    css: `${native.css}\n${bundle.css(floatingClasses.floatingSurface)}\n${bundle.css(frameClass)}\n${bundle.css(railClasses.item)}`,
+    renderItem, renderRail: registry, renderFloating: harness.load(floatingRecord[0].id).kW, renderFrame };
   return cached;
 };
 

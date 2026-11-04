@@ -3,17 +3,30 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import postcss from 'postcss';
 import { chromium } from '@playwright/test';
 import { makeApplyExpression, ACTIVE_PROBE_EXPRESSION } from '../runtime/injection-plan-v13.mjs';
 import { createRuntimeProvider } from '../runtime/host.mjs';
+import { loadNativeBundle, nodes, prop, text } from './native-bundle-current-helper.mjs';
 
-const require = createRequire(import.meta.url);
 const lock = JSON.parse(fs.readFileSync('docs/native-asar-provenance.json', 'utf8'));
-const archive = path.join(process.env.ProgramFiles || '', 'WindowsApps', lock.packageDirectoryName, lock.asarRelativePath);
+const archive = process.env.CODEX_LOCAL_ASAR || path.join(process.env.ProgramFiles || '', 'WindowsApps', lock.packageDirectoryName, lock.asarRelativePath);
 const theme = fs.readFileSync('runtime/wukong-codex-theme-background-v13.css', 'utf8');
 const asset = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#708090"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${asset}");}`;
+
+const nativeClassMap = (bundle, names) => {
+  const candidates = bundle.findModules(names.map(name => new RegExp(`\\b${name}:`)));
+  const maps = candidates.flatMap(record => nodes(record.ast).filter(node => node.type === 'ObjectExpression' &&
+    names.every(name => prop(node, name)?.type === 'Literal' && text(prop(node, name)).startsWith(`${name}-`))));
+  assert.equal(maps.length, 1, `Native CSS module ${names.join('/')} must be re-audited`);
+  return Object.fromEntries(names.map(name => [name, text(prop(maps[0], name))]));
+};
+const nativeStyles = (bundle, needles) => {
+  const assets = bundle.stylesheetAssets(needles);
+  assert.ok(assets.length, `Native styles for ${needles.join('/')} must be re-audited`);
+  return `${bundle.layerOrder}\n${[...new Set([...bundle.baseStylesheets(), assets[0]])].map(asset => bundle.read(asset)).join('\n')}`;
+};
 
 test('thread footer and embedded messaging clear layout paint without clearing controls', async () => {
   const browser = await chromium.launch({headless:true});
@@ -21,7 +34,7 @@ test('thread footer and embedded messaging clear layout paint without clearing c
     const page = await browser.newPage();
     await page.setContent(`<html><style>
       .plate,.thread-pane,.messaging-root,.card{background:rgb(255,255,255)}
-      .bg-gradient-to-t,._background_fixture_1{background-image:linear-gradient(white,transparent)}
+      .background-fixture{background-image:linear-gradient(white,transparent)}
       .composer-wrap{border-bottom:12px solid white}
       [data-thread-scroll-footer]{position:relative;padding:16px;border-radius:14px}
     </style><div id="root"><div data-thread-scroll-footer="true">
@@ -29,10 +42,10 @@ test('thread footer and embedded messaging clear layout paint without clearing c
       <div id="card" class="card">Control</div></div>
       <div class="messaging-root messaging-embedded"><div class="thread-pane">
       <div class="composer-wrap"><div data-codex-composer-root>
-        <div id="dot-composer-fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t"></div>
+        <div id="dot-composer-fade" aria-hidden="true" class="pointer-events-none background-fixture combined-fixture"></div>
         <div class="card">Input</div></div></div></div></div>
-      <div class="thread-scroll-container"><div id="fade" aria-hidden="true" class="pointer-events-none bg-gradient-to-t from-surface"></div></div>
-      <div id="orbit-fade" aria-hidden="true" class="pointer-events-none _background_fixture_1" style="position-anchor:--orbit-messaging-header-fixture"></div>
+      <div class="thread-scroll-container"><div id="fade" aria-hidden="true" class="pointer-events-none background-fixture fade-fixture"></div></div>
+      <div id="orbit-fade" aria-hidden="true" class="pointer-events-none background-fixture" style="position-anchor:--orbit-messaging-header-fixture"></div>
       <div id="standalone" class="messaging-root">Standalone</div></div></html>`);
     const measure = () => page.evaluate(() => [...document.querySelectorAll('#root *')].map(e=>{
       const r=e.getBoundingClientRect(),s=getComputedStyle(e);return [r.x,r.y,r.width,r.height,s.borderRadius,s.padding,s.borderBottomWidth];
@@ -54,16 +67,22 @@ test('thread footer and embedded messaging clear layout paint without clearing c
 test('native dots floating header paint follows its inert anchor contract across class and portal changes', {
   skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
 }, async () => {
-  const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-  const css = asar.listPackage(archive).filter(x => /webview[\\/]assets[\\/]app-(?:initial|shared)-.*\.css$/.test(x))
-    .map(x => asar.extractFile(archive, x.slice(1)).toString('utf8')).join('\n');
+  const bundle = loadNativeBundle({ archive });
   // Discover the two actual native paint hosts; keep the fixture independent of
   // the theme selector so a native rename/removal fails the contract audit.
-  const nativeGradient = css.match(/\.(_background_[\w]+),\.(_floatingHeader_[\w]+)\{background-image:[^}]+\}/);
-  assert.ok(nativeGradient, 'Native dots floating header paint must be re-audited');
-  const [, legacyClass, floatingClass] = nativeGradient;
+  const { background: legacyClass, floatingHeader: floatingClass } = nativeClassMap(bundle, ['background', 'floatingHeader']);
+  const css = nativeStyles(bundle, [`.${legacyClass}`, `.${floatingClass}`]);
+  const gradients = [];
+  postcss.parse(css).walkRules(rule => {
+    const selectors = rule.selector.split(',').map(selector => selector.trim());
+    if (selectors.length === 2 && selectors.includes(`.${legacyClass}`) && selectors.includes(`.${floatingClass}`) &&
+        rule.nodes.some(node => node.type === 'decl' && node.prop === 'background-image' && node.value.startsWith('linear-gradient('))) gradients.push(rule);
+  });
+  assert.equal(gradients.length, 1, 'Native dots floating header paint must be re-audited');
   const renamedClass = 'future-header-material';
-  const renamedPaint = nativeGradient[0].replaceAll(legacyClass, renamedClass).replaceAll(floatingClass, renamedClass);
+  // Preserve the native nested titlebar-context gradient as well as its base
+  // declaration when testing an otherwise unrelated future module rename.
+  const renamedPaint = gradients[0].clone({ selector: `.${renamedClass}` }).toString();
   const browser = await chromium.launch({headless:true});
   try {
     const page = await browser.newPage({viewport:{width:1280,height:760}});
@@ -168,18 +187,25 @@ test('updated runtime provider replaces cached code and rejects incomplete updat
 test('new native paint hosts keep geometry, sticky corners, tooltip ink and decoded layers', {
   skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
 }, async () => {
-  const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-  const css = asar.listPackage(archive).filter(x => /webview[\\/]assets[\\/]app-initial-.*\.css$/.test(x))
-    .map(x => asar.extractFile(archive, x.slice(1)).toString('utf8')).join('\n');
-  const component = name => {
-    const found = css.match(new RegExp(`\\.(${name}_[a-z0-9]+_\\d+)`));
-    assert.ok(found, `Native component ${name} must be re-audited`);
-    return found[1];
+  const bundle = loadNativeBundle({ archive });
+  const { PageSurface: surface } = nativeClassMap(bundle, ['PageSurface', 'LeftPanel', 'FullHeightPageSurface']);
+  // Bind both classes to the renderer that supplies the sticky semantics and
+  // titlebar inset. Generic shell/content names exist in unrelated components.
+  const stickyRecords = bundle.findModules(['--app-shell-titlebar-left-inset', 'data-scroll-collapse', 'data-sticky']);
+  const stickyFunctions = stickyRecords.flatMap(record => nodes(record.ast).filter(node =>
+    node.type === 'FunctionDeclaration' && node !== record.ast && nodes(node).some(child =>
+      child.type === 'ObjectExpression' && prop(child, 'data-sticky') && prop(child, 'data-scroll-collapse'))).map(fn => ({ record, fn })));
+  assert.equal(stickyFunctions.length, 1, 'Native sticky header renderer must be re-audited');
+  const { record: stickyRecord, fn: stickyFunction } = stickyFunctions[0];
+  assert.ok(Object.values(bundle.exports(stickyRecord)).some(value => value.type === 'Identifier' && value.name === stickyFunction.id.name),
+    'Native sticky header must retain its real renderer export');
+  const stickyClass = prefix => {
+    const values = [...new Set(nodes(stickyFunction).map(text).filter(value => new RegExp(`^${prefix}-[\\w-]+$`).test(value)))];
+    assert.equal(values.length, 1, `Native sticky header ${prefix} class must be re-audited`);
+    return values[0];
   };
-  const surface = component('_PageSurface'), shell = component('_shell'), content = component('_content');
-  // Find the actual sticky header module rather than the first generic _shell.
-  const sticky = css.match(/\.(_shell_\w+)\[data-sticky\]:before/)[1];
-  const stickyContent = sticky.replace('_shell_', '_content_');
+  const sticky = stickyClass('shell'), stickyContent = stickyClass('content');
+  const css = nativeStyles(bundle, [`.${surface}`, `.${sticky}[data-sticky]:before`, `.${stickyContent}`]);
   const browser = await chromium.launch({headless:true});
   try {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
@@ -248,11 +274,11 @@ test('mapping-only hot updates move the wallpaper owner and carry a new renderer
   const browser=await chromium.launch({headless:true});
   try {
     const page=await browser.newPage();
-    await page.setContent('<style>section{position:relative;height:600px}.paint{position:absolute;inset:0}main{height:400px}</style><div id="root"><section data-app-shell-page-surface><div id="old-paint" class="paint _PageSurface_fixture_1"></div><div id="new-paint" class="paint" data-proof-paint></div><main data-app-shell-main-surface><h1>Home</h1></main></section></div>');
+    await page.setContent('<style>section{position:relative;height:600px}.paint{position:absolute;inset:0}main{height:400px}</style><div id="root"><section data-app-shell-page-surface><div id="old-paint" class="paint PageSurface-fixture"></div><div id="new-paint" class="paint" data-proof-paint></div><main data-app-shell-main-surface><h1>Home</h1></main></section></div>');
     const read=createRuntimeProvider(file),first=await read();
     await page.evaluate(first.makeApplyExpression({styleSheet:theme,variables}));
     assert.equal(await page.locator('#wukong-codex-theme-background').evaluate(e=>e.parentElement.id),'old-paint');
-    const updated=original.replace("pagePaint: '[class*=\"_PageSurface_\"]'","pagePaint: '[data-proof-paint]'");
+    const updated=original.replace(/(pagePaint:\s*)'[^']*'/,"$1'[data-proof-paint]'");
     assert.notEqual(updated,original);
     fs.writeFileSync(contract,updated,'utf8');
     const second=await read();

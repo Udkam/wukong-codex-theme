@@ -1,7 +1,5 @@
 {
-  "sourceVersion": "26.930.2377.0",
-  "sourceAsset": "app-initial-1da99842592d.js",
-  "source": "Read-only native SummaryPanel default accordion classes; synthetic content in fixture",
+  "source": "Synthetic semantic material stress composition exercised against current native CSS; authoritative current structure is checked by installed-module contract tests.",
   "root": "rounded-2xl bg-surface-elevated-secondary electron:elevation-prominent extension:border extension:border-default extension:shadow-md group/summary-panel relative flex max-h-full min-h-0 flex-col overflow-hidden",
   "scroller": "flex h-fit max-h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto",
   "stack": "flex flex-col gap-2 py-2.5",

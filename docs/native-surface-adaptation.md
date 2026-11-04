@@ -1,5 +1,15 @@
 # 原生 UI 与主题替换接口
 
+## 数字资源块与当前模块类名（2026-11-05，v0.18.9／v118）
+
+当前来源 Windows Codex 26.1029.7803.0 已改用 Rspack 数字资源块，入口只有四个 JavaScript 资源，组件及样式经运行时映射异步加载。原来的 app-shared／initial／primary 文件名和下划线模块类名不再是当前接口；不得只刷新来源哈希后沿用旧组件夹具。测试现在静态读取实际 module factory、require／export 关系、入口资源与 CSS 层次，再执行限定的纯展示组件，不执行客户端业务模块。
+
+共享底部组件仍有 fade、surface、combined 三个分支，真实空装饰叶使用 background- 与对应 part 的类名 token。普通线程独立挂载 fade／surface，Dots 使用 combined／免责声明 surface，工作区预览通过 portal 挂载语义 footer 和独立间隙中的 fade。主题仅在明确布局／输入区 owner 下，匹配空、aria-hidden、pointer-events-none 的这组叶子，同时清除实体背景和渐变。显式 footer／composer owner 可在 body portal 中生效；无 owner、非空、交互、伪状态类及外部网页继续隔离。
+
+PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、侧栏与额度提示的模块回退标记已迁移到当前未加前缀的 name- token 边界。页面壁纸仍挂到实际 PageSurface 中，保留原生 inset／圆角；代码工具栏与材质归属沿用原生结构。没有新增尺寸、位置、裁切或控件几何覆盖。
+
+真实 ordinary／Dots 深浅状态的旧规则负控制均重现残余背景，新规则清除后所采样控件几何差异为 0；深色两类均取得可见窗口结果，浅色另有实际设置切换后的渲染器检查。当前准确检查范围见 [验证记录](VALIDATION.md)。
+
 ## 浏览器浮动输入框的 goal 背景归属（2026-10-24，v0.18.8／v117）
 
 核对 Windows Codex 26.1016.8622.0。浮动输入框经 body portal 挂载在 #root 外；带 data-quick-chat-drag-handle 的 section 是透明定位／拖动外壳，保留 overflow-visible。它的直接 FloatingSurface 背景子节点负责整个组件的 22px 圆角、底色和滤镜；data-floating-chat-surface 内使用 compact／inline composer。不得通过给外壳加裁切或给 goal 行硬加圆角来修复材料归属。

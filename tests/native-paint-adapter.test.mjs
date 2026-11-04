@@ -1,48 +1,83 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { loadNativeBundle, nodes, text, prop, nativeObject } from './native-bundle-current-helper.mjs';
 
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 
-const require = createRequire(import.meta.url);
 const native = (() => {
-  try {
-    const asar = require(path.join(process.env.APPDATA, 'npm/node_modules/asar'));
-    const packages = path.join(process.env.ProgramFiles, 'WindowsApps');
-    const archive = fs.readdirSync(packages).filter(name => /^OpenAI\.Codex_.*_x64__/.test(name))
-      .map(name => path.join(packages, name, 'app/resources/app.asar')).filter(fs.existsSync)
-      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
-    const entries = asar.listPackage(archive);
-    const read = entry => asar.extractFile(archive, entry.replace(/^[/\\]/, '')).toString('utf8');
-    const css = entries.filter(entry => /webview[\\/]assets[\\/]app-(shared|initial|primary)-.*\.css$/.test(entry)).map(read).join('\n');
-    const source = read(entries.find(entry => /webview[\\/]assets[\\/]app-initial-.*\.js$/.test(entry)));
-    const permissionsCss = read(entries.find(entry => /webview[\\/]assets[\\/]browser-use-policy-site-permissions-.*\.css$/.test(entry)));
-    const permissionsSource = read(entries.find(entry => /webview[\\/]assets[\\/]browser-use-policy-site-permissions-.*\.js$/.test(entry)));
-    const popoverCss = read(entries.find(entry => /webview[\\/]assets[\\/]popover-.*\.css$/.test(entry)));
-    return { css, source, permissionsCss, permissionsSource, popoverCss,
-      popoverClass: popoverCss.match(/\.(_Popover_[\w]+)\{/)[1],
-      confirmationClass: css.match(/\.(_chatgptConfirmationSurface_[\w]+)\{/)[1],
-      voicePickerClass: css.match(/\.(_voicePickerSurface_[\w]+)\{/)[1],
-      permissionsClass: permissionsCss.match(/\.(_table_[\w]+)\{/)[1],
-      permissionsViewportClass: permissionsCss.match(/\.(_viewport_[\w]+)\{/)?.[1],
-      suggestionClass: css.match(/\.(_suggestionMenu_[\w]+)\{/)[1],
-      floatingClass: css.match(/\.(_floatingSurface_[\w]+)\{/)[1],
-      topTrayClass: css.match(/\.(_ComposerTopMenuPanel_[\w]+)\[/)[1] };
-  } catch { return null; }
+  const bundle = loadNativeBundle();
+  const records = bundle.findModules([/browser-use-site-permissions-column-|data-mention-list-scroll-area|voicePickerSurface|chatgptConfirmationSurface|ComposerTopMenuPanel|suggestionMenu|floatingSurface|popover-width/]);
+  const family = prefix => {
+    const values = [...new Set(records.flatMap(record => nodes(record.ast)
+      .map(node => text(node)).filter(value => value.startsWith(`${prefix}-`) && /^[\w-]+$/.test(value))))];
+    assert.ok(values.length, `Native presentation class changed: ${prefix}`);
+    return values[0];
+  };
+  const staticClass = property => {
+    const record = records.find(record => !Object.keys(bundle.imports(record)).length &&
+      bundle.exports(record).A?.type === 'ObjectExpression' &&
+      prop(bundle.exports(record).A, property));
+    assert.ok(record, `Native CSS presentation map changed: ${property}`);
+    return nativeObject(record, bundle.exports(record).A)[property];
+  };
+  const permissionRecords = records.filter(record => record.source.includes('browser-use-site-permissions-column-'));
+  assert.equal(permissionRecords.length, 1, 'Native permissions renderer changed');
+  const permissions = permissionRecords[0], permissionNodes = nodes(permissions.ast);
+  assert.ok(permissionNodes.some(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'th' &&
+    prop(node.arguments[1], 'id')?.type === 'TemplateLiteral' &&
+    text(prop(node.arguments[1], 'id')).startsWith('browser-use-site-permissions-column-')),
+  'Native permissions semantic column ID changed');
+  const table = permissionNodes.find(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'table' &&
+    prop(node.arguments[1], 'data-page-size'));
+  const heading = permissionNodes.find(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'thead');
+  const viewport = permissionNodes.find(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'div' &&
+    text(prop(node.arguments[1], 'className')).startsWith('viewport-'));
+  assert.ok(table && heading && viewport, 'Native permissions table/heading/viewport boundary changed');
+  assert.ok(prop(table.arguments[1], 'ref') && prop(table.arguments[1], 'onScroll'),
+    'Native permissions scrolling must remain owned by the table, not its tbody');
+  assert.ok(!permissionNodes.some(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'tbody' &&
+    prop(node.arguments[1], 'onScroll')), 'Native permissions tbody must not become the horizontal scroll owner');
+  const disabledRows = records.flatMap(record => nodes(record.ast).filter(node => node.type === 'CallExpression' &&
+    text(node.arguments[0]) === 'div' && text(prop(node.arguments[1], 'aria-disabled')) === 'true' &&
+    text(prop(node.arguments[1], 'className')).includes('--suggestion-menu-item-padding')));
+  assert.ok(disabledRows.length, 'Native unavailable suggestion row contract changed');
+  assert.ok(records.some(record => nodes(record.ast).some(node => node.type === 'Property' &&
+    (node.key.name ?? node.key.value) === 'data-mention-list-scroll-area')),
+  'Native suggestion list scroll boundary changed');
+  const presentation = {
+    popoverClass: family('Popover'), confirmationClass: family('chatgptConfirmationSurface'),
+    voicePickerClass: family('voicePickerSurface'), topTrayClass: family('ComposerTopMenuPanel'),
+    floatingClass: staticClass('floatingSurface'), suggestionClass: staticClass('suggestionMenu'),
+    permissionsClass: text(prop(table.arguments[1], 'className')),
+    permissionsViewportClass: text(prop(viewport.arguments[1], 'className')),
+    headingClass: text(prop(heading.arguments[1], 'className')),
+    disabledRowClass: text(prop(disabledRows[0].arguments[1], 'className')),
+  };
+  const stylesheet = className => {
+    const asset = bundle.stylesheetAssets([`.${className}`])[0];
+    assert.ok(asset, `Native presentation CSS missing: ${className}`);
+    return asset;
+  };
+  // Preserve the actual index layer order and Tailwind base; a numbered chunk
+  // alone silently loses native padding, radii, disabled opacity and utilities.
+  const cssAssets = new Set([...bundle.baseStylesheets(),
+    ...['popoverClass', 'confirmationClass', 'voicePickerClass', 'topTrayClass', 'floatingClass', 'suggestionClass']
+      .map(name => stylesheet(presentation[name])),
+    bundle.stylesheetAssets(['[cmdk-root],[data-cmdk-root]'])[0]]);
+  assert.ok(!cssAssets.has(undefined), 'Native command-menu CSS missing');
+  return { ...presentation, css: [bundle.layerOrder, ...[...cssAssets].map(asset => bundle.read(asset))].join('\n'),
+    permissionsCss: bundle.read(stylesheet(presentation.permissionsClass)),
+    popoverCss: bundle.read(stylesheet(presentation.popoverClass)) };
 })();
 
 test('browser permissions use local cell materials and retain native paging, sticky corners and controls', {
   skip: !native && 'Requires the installed native UI CSS'
 }, async () => {
-  assert.match(native.permissionsSource, /browser-use-site-permissions-column-\$\{e\}/);
   assert.ok(native.permissionsViewportClass, 'native permissions viewport owner drifted');
-  assert.match(native.permissionsSource, /\(`table`,\{ref:[^,]+,className:[\w$]+\.table,"data-page-size":[^,]+,onScroll:/,
-    'native permissions scrolling must remain owned by the table, not its tbody');
-  const headingClass=native.permissionsSource.match(/\(`thead`,\{ref:[^,]+,className:`([^`]+)`/)?.[1];
+  const headingClass=native.headingClass;
   assert.ok(headingClass, 'native permissions header contract drifted');
   const browser=await chromium.launch({headless:true});
   try {
@@ -125,11 +160,9 @@ test('floating quick chat paints only the native carrier, preserving its drag fr
 test('Add suggestion groups use one reading material in both modes without changing native row states', {
   skip: !native && 'Requires the installed native UI CSS'
 }, async () => {
-  assert.match(native.source, /data-mention-list-scroll-area/);
   // SuggestionList renders unavailable entries as non-interactive aria-disabled
   // divs. A disabled button is a different native component and paint state.
-  const disabledRowClass=[...native.source.matchAll(/\(`div`,\{"aria-disabled":`true`,className:`([^`]+)`/g)]
-    .map(match=>match[1]).find(className=>className.includes('--suggestion-menu-item-padding'));
+  const disabledRowClass=native.disabledRowClass;
   assert.ok(disabledRowClass, 'native unavailable suggestion row contract drifted');
   assert.ok(disabledRowClass.split(/\s+/).includes('opacity-50'), 'native unavailable row opacity drifted');
   const browser = await chromium.launch({ headless: true });
