@@ -22,7 +22,9 @@
 
 e5dc5db0559e4987517160a22372f50ee5cb3d1393b18c7282678023959561d1
 
-使用正式 ZIP 内的注入器实际恢复原生 verified=true；随后同包重新应用时窗口隐藏，返回 deferred=true／verified=false。实际读回活动 v118、dark、scenery、native-page、完整样式与包内源码一致、临时脱敏样式为 0；背景解码按既有策略等待可见性触发。未把该延期状态写成完整前台应用通过，未执行冷启动／卸载。远程发行与回下载结果在实际完成后补记。
+使用正式 ZIP 内的注入器实际恢复原生 verified=true；随后同包重新应用时窗口隐藏，返回 deferred=true／verified=false。实际读回活动 v118、dark、scenery、native-page、完整样式与包内源码一致、临时脱敏样式为 0；背景解码按既有策略等待可见性触发。未把该延期状态写成完整前台应用通过，未执行冷启动／卸载。
+
+GitHub 已回读 v0.18.9 为 Latest，非草稿、非预发行，ZIP 与 SHA256SUMS.txt 均 uploaded。两个正式资产重新下载后的 SHA-256 分别与本地文件及 GitHub 资产 digest 一致，远程 ZIP 同为 4,053,853 字节；校验文件内容匹配 ZIP。发行标签指向修复提交 e4e90a136f9d4cd4d9141733e8bd134eba9ccb60，之后仅补写发行与清理文档；运行代码、测试及包输入保持上述已验证版本。Git 直连曾超时，核验现有本机代理后仅对本次 Git 命令使用，未持久修改网络或 Git 配置。
 
 ## v0.18.8／v117-goal-rail-paint-owner（2026-10-24）
 
