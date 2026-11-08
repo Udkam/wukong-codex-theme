@@ -1,6 +1,6 @@
 # 原生 UI 与主题替换接口
 
-## 标签页标题与完整视图（2026-11-09，v120 开发适配）
+## 标签页标题与完整视图（2026-11-09，v121 沿用 v120 绘制归属）
 
 当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"；标题通过 portal 移到共享 titlebar。右侧 content 槽位同时发布 data-app-shell-focus-area="right-panel" 与 data-app-shell-titlebar-slot="content"，可包含内联 end action，但不是所有注册动作的绘制 owner。
 
@@ -13,6 +13,8 @@
 进入完整视图后只暂停本项目材料样式并隐藏自身 inert 壁纸节点；原生 stylesheet、控件、顶部和侧栏自行绘制。图库参数保留在只含 forge 属性的受管样式中；材料热更新维持暂停，退出后复用原图片与主题。恢复原生移除两份受管样式及全部自有节点。toggle 自身／祖先的隐藏与重挂载触发同步判定，暂停状态不重复写入 hidden 属性。
 
 原生侧栏材料规则排除 data-activity-sidebar-host，adapter 与同一 scope 的主题 CSS 保持一致。额度、goal、Popover 合同保留；不执行账户或客户端业务模块。
+
+主题标记的协调现只增删实际差异，按 MARK_CLASSES 精确成员保留／撤销，不重写原生 class。根主题状态同值不写入；原生条件变化和路由仍重新收集并协调。此项仅减少更新工作，不改变本节语义选择器、绘制材料和几何。
 
 ## 数字资源块与当前模块类名（2026-11-05，v0.18.9／v118）
 

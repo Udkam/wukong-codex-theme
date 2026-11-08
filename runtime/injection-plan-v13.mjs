@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v120-native-tab-header';
+export const RUNTIME_REVISION = 'v121-incremental-paint-marks';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -235,6 +235,7 @@ function applyRuntime(payload, createAdapter) {
     updateLandingAria(element, original === '__forge_absent__' ? null : original);
   };
   let pendingMarkPlan = null;
+  const managedMarkClasses = new Set(markClasses);
   const reconcileMarks = planned => {
     const existing = new Set(document.querySelectorAll('[data-forge-mark]'));
     for (const element of existing) {
@@ -245,17 +246,18 @@ function applyRuntime(payload, createAdapter) {
           element.style.removeProperty('--forge-image-viewer-scene-position');
         }
         restoreLandingCopy(element);
-        element.classList.remove(...markClasses);
+        const obsolete = [...element.classList].filter(name => managedMarkClasses.has(name));
+        if (obsolete.length) element.classList.remove(...obsolete);
         delete element.dataset.forgeMark;
         continue;
       }
-      for (const name of markClasses) {
-        if (!desired.has(name)) element.classList.remove(name);
-      }
+      const obsolete = [...element.classList].filter(name => managedMarkClasses.has(name) && !desired.has(name));
+      if (obsolete.length) element.classList.remove(...obsolete);
     }
     for (const [element, desired] of planned) {
-      element.classList.add(...desired);
-      element.dataset.forgeMark = '1';
+      const missing = [...desired].filter(name => !element.classList.contains(name));
+      if (missing.length) element.classList.add(...missing);
+      if (element.dataset.forgeMark !== '1') element.dataset.forgeMark = '1';
     }
   };
   const mark = (element, name) => {
@@ -266,8 +268,8 @@ function applyRuntime(payload, createAdapter) {
       pendingMarkPlan.set(element, desired);
       return element;
     }
-    element.classList.add(name);
-    element.dataset.forgeMark = '1';
+    if (!element.classList.contains(name)) element.classList.add(name);
+    if (element.dataset.forgeMark !== '1') element.dataset.forgeMark = '1';
     return element;
   };
   const textOf = element => (element?.textContent || '').replace(/\s+/g, ' ').trim();
@@ -1250,9 +1252,10 @@ function applyRuntime(payload, createAdapter) {
       ? state.lockedMode
       : (state.manualBackgroundMode || state.automaticBackgroundMode);
     if (mode !== 'battle' && mode !== 'scenery') mode = state.automaticBackgroundMode;
-    root.dataset.forgeSurface = surface;
-    root.dataset.forgeSettingsVeil = settingsVeil ? 'true' : 'false';
-    root.dataset.forgeMode = mode;
+    if (root.dataset.forgeSurface !== surface) root.dataset.forgeSurface = surface;
+    const settingsVeilValue = settingsVeil ? 'true' : 'false';
+    if (root.dataset.forgeSettingsVeil !== settingsVeilValue) root.dataset.forgeSettingsVeil = settingsVeilValue;
+    if (root.dataset.forgeMode !== mode) root.dataset.forgeMode = mode;
     // Set initial paint state before mounting images; otherwise the first veil
     // transitions from the browser's default opacity instead of its page state.
     const background = ensureBackground();
