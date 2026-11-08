@@ -10,7 +10,7 @@ const css = fs.readFileSync(
 
 const ruleMatch = [
   ...css.matchAll(
-    /\[data-testid="home-icon"\]\[data-forge-mark="1"\]::before\s*\{([\s\S]*?)\n\}/g
+    /\[data-testid="home-icon"\]::before\s*\{([\s\S]*?)\n\}/g
   )
 ].find(([, rule]) => /background-image:\s*var\(/.test(rule));
 
@@ -35,7 +35,7 @@ test('V16 landing mark paints the official Wukong wordmark at threefold scale wi
   assert.doesNotMatch(rule, /(?:^|[;\s])(?:margin|padding|scale)\s*:/);
 
   const hostRule = css.match(
-    /\[data-testid="home-icon"\]\[data-forge-mark="1"\]\s*\{([\s\S]*?)\n\}/
+    /\[data-testid="home-icon"\]\s*\{([\s\S]*?)\n\}/
   );
   assert.ok(hostRule, 'landing mark host rule must exist');
   assert.match(hostRule[1], /overflow:\s*visible/);

@@ -22,6 +22,10 @@
   --forge-nav-muted: #d0d2d3;
   --forge-nav-shadow: none;
   --forge-nav-hover: rgba(255,255,255,.14);
+  --forge-nav-row-hover: rgba(255,255,255,.07);
+  --forge-nav-selected-fill: rgba(224,211,180,.14);
+  --forge-nav-selected-mark: rgba(222,190,126,.84);
+  --forge-nav-selected-sheen: rgba(255,245,218,.035);
   --forge-shell-filter: blur(8px);
   --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
   /* Reading material defaults; custom themes can override these alongside
@@ -50,6 +54,10 @@
   --forge-nav-muted: #303a32;
   --forge-nav-shadow: none;
   --forge-nav-hover: rgba(15,30,22,.13);
+  --forge-nav-row-hover: rgba(15,30,22,.055);
+  --forge-nav-selected-fill: rgba(105,78,35,.11);
+  --forge-nav-selected-mark: rgba(125,87,35,.82);
+  --forge-nav-selected-sheen: rgba(255,255,255,.16);
 }
 
 /* The portalled tab content is clipped around the registered end actions.
@@ -319,6 +327,35 @@
   color: var(--forge-nav-ink) !important;
   text-shadow: var(--forge-nav-shadow);
 }
+/* Shared native rows use one ghost token for project, hover and selection.
+ * Keep hover lighter and give selected chats their own paint. Background layers
+ * leave the link hitbox, focus outline, drop ring and native row contour intact.
+ */
+@media (forced-colors: none) {
+:root.forge-ink-mountain .sidebar-navigation:not([data-activity-sidebar-host]) :is(
+  [data-app-action-sidebar-project-row],
+  [data-app-action-sidebar-thread-row]
+).sidebar-item:not([data-file-drop-active="true"]):not([class~="bg-text-info/10"]):not([data-activity-sidebar-host] *) {
+  --color-background-primary-ghost-hover: var(--forge-nav-row-hover) !important;
+}
+:root.forge-ink-mountain .sidebar-navigation:not([data-activity-sidebar-host]) [data-app-action-sidebar-thread-row].sidebar-item:is(
+  [data-app-action-sidebar-thread-active="true"],
+  [data-app-action-sidebar-thread-selected="true"]
+):not([data-file-drop-active="true"]):not([class~="bg-text-info/10"]):not([data-activity-sidebar-host] *) {
+  background-color: var(--forge-nav-selected-fill) !important;
+  background-image: linear-gradient(var(--forge-nav-selected-mark), var(--forge-nav-selected-mark)),
+    linear-gradient(90deg, var(--forge-nav-selected-sheen), transparent) !important;
+  background-size: 2px calc(100% - 12px), 100% 100% !important;
+  background-position: left center, center !important;
+  background-repeat: no-repeat !important;
+}
+:root.forge-ink-mountain .sidebar-navigation:not([data-activity-sidebar-host]) [data-app-action-sidebar-thread-row].sidebar-item:is(
+  [data-app-action-sidebar-thread-active="true"],
+  [data-app-action-sidebar-thread-selected="true"]
+):not([data-file-drop-active="true"]):not([class~="bg-text-info/10"]):not([data-activity-sidebar-host] *):dir(rtl) {
+  background-position: right center, center !important;
+}
+}
 :root.forge-ink-mountain :is([class^="ApplicationMenuTopBar-"], [class*=" ApplicationMenuTopBar-"]) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
@@ -463,7 +500,7 @@
   border-color: var(--forge-glass-edge) !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
-:root.forge-ink-mountain .forge-composer-panel:is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
+:root.forge-ink-mountain :is(.forge-composer-panel, [data-composer-utility-rail]):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
 }
@@ -628,12 +665,16 @@
   background-image: none !important;
 }
 
-:root.forge-ink-mountain [data-forge-title-copy] {
+/* Native home identity is available in the mounting task, before the delayed
+ * marker scan. Preserve the motion parent's visibility and interactive title;
+ * semantic paint and the later marker use the same replacement from frame one.
+ */
+:root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"]) {
   position: relative !important;
 }
 
-:root.forge-ink-mountain [data-forge-title-copy] > *,
-:root.forge-ink-mountain [data-forge-title-copy] > * * {
+:root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"]) > *,
+:root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"]) > * * {
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
   border-color: transparent !important;
@@ -653,6 +694,7 @@
   pointer-events: none !important;
 }
 
+:root.forge-ink-mountain [data-feature="game-source"]::after,
 :root.forge-ink-mountain [data-forge-title-copy]::after {
   content: attr(data-forge-title-copy);
   position: absolute;
@@ -675,23 +717,26 @@
   );
   pointer-events: none;
 }
+:root.forge-ink-mountain [data-feature="game-source"]:not([data-forge-title-copy])::after {
+  content: "此去，欲破何局？";
+}
 
-:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-forge-title-copy]::after,
-:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-testid="home-icon"][data-forge-mark="1"]::before {
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] :is([data-forge-title-copy], [data-feature="game-source"])::after,
+:root.forge-ink-mountain[data-forge-landing-quote-visible="false"] [data-testid="home-icon"]::before {
   opacity: 0;
   visibility: hidden;
 }
 
-:root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] {
+:root.forge-ink-mountain [data-testid="home-icon"] {
   position: relative !important;
   overflow: visible !important;
 }
 
-:root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] > * {
+:root.forge-ink-mountain [data-testid="home-icon"] > * {
   opacity: 0 !important;
 }
 
-:root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"]::before {
+:root.forge-ink-mountain [data-testid="home-icon"]::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -721,8 +766,8 @@
 
 @media (forced-colors: active) {
   :root.forge-ink-mountain #wukong-codex-theme-background,
-  :root.forge-ink-mountain [data-forge-title-copy]::after,
-  :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"]::before {
+  :root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"])::after,
+  :root.forge-ink-mountain [data-testid="home-icon"]::before {
     display: none !important;
   }
   :root.forge-ink-mountain[data-forge-background-ready="true"],
@@ -730,12 +775,12 @@
   :root.forge-ink-mountain[data-forge-background-ready="true"] #root {
     background: Canvas !important;
   }
-  :root.forge-ink-mountain [data-forge-title-copy] > *,
-  :root.forge-ink-mountain [data-forge-title-copy] > * * {
+  :root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"]) > *,
+  :root.forge-ink-mountain :is([data-forge-title-copy], [data-feature="game-source"]) > * * {
     color: CanvasText !important;
     -webkit-text-fill-color: CanvasText !important;
   }
-  :root.forge-ink-mountain [data-testid="home-icon"][data-forge-mark="1"] > * {
+  :root.forge-ink-mountain [data-testid="home-icon"] > * {
     opacity: 1 !important;
   }
 }

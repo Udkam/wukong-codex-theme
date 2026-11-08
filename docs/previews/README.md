@@ -1,5 +1,14 @@
 # 当前预览
 
+## v122 侧栏与首页首帧（2026-11-09）
+
+以下四张为当前Windows Codex 26.1103.4239.0原生来源的展示夹具，使用测试项目／会话文案及本版主题材料；**不是实际客户端截图，也不是用户视觉验收**。侧栏检查共享row的选中、悬停、焦点和拖放；首页预览展示替换后的稳定外观，标记前后绘制一致由单独的首帧回归验证；不含聊天、账户或本机路径。
+
+| 深色 | 浅色 |
+| --- | --- |
+| ![深色侧栏选中夹具](dark-sidebar-selection-fixture-20261109.png) | ![浅色侧栏选中夹具](light-sidebar-selection-fixture-20261109.png) |
+| ![深色首页首帧夹具](dark-landing-first-paint-fixture-20261109.png) | ![浅色首页首帧夹具](light-landing-first-paint-fixture-20261109.png) |
+
 ## v120／v121 标签页右端背景组件夹具（2026-11-09）
 
 dark-tab-header-endcap-fixture-20261109.png、light-tab-header-endcap-fixture-20261109.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、标题 portal、HeaderAction 注册与 end-slot 渲染关系构成的动态展示夹具。v121 保留同一绘制方案，并随本轮回归重新生成核对。覆盖被原生裁切隔开的独立注册按钮层；只展示测试标签和控件，不含聊天、账户或本机路径。**图片来自自动夹具，不是实际客户端截图，也不是用户视觉验收。**

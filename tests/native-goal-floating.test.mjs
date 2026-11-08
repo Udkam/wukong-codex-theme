@@ -92,7 +92,8 @@ const legacyRailPaint = current => {
     if (rule.selector.includes('[data-composer-rail-item]') && rule.selector.includes('.forge-composer-progress-pill')) {
       rule.selector = ':root.forge-ink-mountain :is(.forge-composer-panel[class*="bg-"], [data-composer-rail-item], .forge-composer-progress-pill[class*="bg-"])';
       restored++;
-    } else if (rule.selector.startsWith(':root.forge-ink-mountain .forge-composer-panel') && rule.nodes.some(node => node.prop === 'backdrop-filter')) {
+    } else if (rule.selector.includes('.forge-composer-panel') && rule.selector.includes('[data-composer-utility-rail]') &&
+        rule.nodes.some(node => node.prop === 'backdrop-filter')) {
       rule.selector = ':root.forge-ink-mountain .forge-composer-panel[class*="bg-"]';
       restored++;
     }

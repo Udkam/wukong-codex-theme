@@ -1,5 +1,13 @@
 # 原生 UI 与主题替换接口
 
+## 侧栏选中与首页首帧（2026-11-09，v122）
+
+当前共享sidebar-item绘制背景来自row自身，active、selected、hover与菜单展开使用ghost token。按data-app-action-sidebar-project-row／thread-row限定局部状态，thread active／selected取原生字符串属性；新增层只改背景，不覆盖row链接的::before hitbox、outline或drop ring。拖放token、activity-sidebar-host与forced-colors被排除，原生contour和尺寸保留。
+
+首页标题game-source是heading div，并非hero布局祖先；其子span可能包含真实项目选择按钮。home-icon是独立motion图标容器，父级通过原生opacity动画进出。主题直接对这两个语义owner绘制，与后续运行时属性共享字标／题字；不强制父级visibility，不改真实标题子控件的点击或布局。quote关闭与高对比路径也覆盖未标记节点。
+
+home UtilityBarSlot仅承担透明motion定位；data-composer-utility-rail实际Item上的原生bg token决定是否拥有材料。只在该表面补齐首帧backdrop-filter，bg-transparent及无背景token的变体仍透明，内部scroll-area和上下定位不参与重复绘制。
+
 ## 标签页标题与完整视图（2026-11-09，v121 沿用 v120 绘制归属）
 
 当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"；标题通过 portal 移到共享 titlebar。右侧 content 槽位同时发布 data-app-shell-focus-area="right-panel" 与 data-app-shell-titlebar-slot="content"，可包含内联 end action，但不是所有注册动作的绘制 owner。
