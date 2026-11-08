@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1029.7803.0.
+/* Native paint boundary, audited against desktop 26.1103.4239.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -52,6 +52,13 @@
   --forge-nav-hover: rgba(15,30,22,.13);
 }
 
+/* The right tab strip can be portalled into the shared titlebar. Give its own
+ * native row a surface even in split view; the conversation header stays themed.
+ */
+:root.forge-ink-mountain #root [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]) {
+  background-color: var(--color-surface, Canvas) !important;
+  background-image: none !important;
+}
 /* Transparent layout carriers. Native controls beneath them keep their own paint. */
 :root.forge-ink-mountain[data-forge-background-ready="true"] #root :is(
   main.bg-surface,
@@ -292,7 +299,7 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"] .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation) {
+:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"] .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation):not([data-activity-sidebar-host]) {
   background-color: var(--forge-navigation-fill) !important;
   background-image: none !important;
   backdrop-filter: var(--forge-navigation-filter) !important;

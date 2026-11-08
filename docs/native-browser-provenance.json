@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1029.7803.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1029.7803.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1029.61003",
+  "installationDirectoryVersion": "26.1103.4239.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1103.32239",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 720736234,
-  "asarSha256": "77ed4ddc5b388ac8b29f5035f9c98f982b095df55aad6fa6c27bb80d763b9691",
-  "capturedAt": "2026-11-05",
-  "captureMode": "read-only installed browser portal source contract audit; Rspack entrypoint/runtime resolves the pinned asynchronous browser and base CSS chunks; no live browser or guest-page acceptance",
+  "sizeBytes": 761023153,
+  "asarSha256": "fb47d6491dc3006b708cb1e14de479b882bf50f88b7daa81818f154c253266aa",
+  "capturedAt": "2026-11-08",
+  "captureMode": "current browser portal source contract and full/split native presentation audit; source contracts and live checks recorded separately",
   "assets": {
     "javascript": {
-      "member": "webview/assets/async/265651.3442ea834c.js",
-      "bytes": 1894404,
-      "sha256": "87de1c6f11cef63c871488c645d0689ed1ba44655f512f274a694d8f9f2f5695"
+      "member": "webview/assets/async/189497.6182e00931.js",
+      "bytes": 1898868,
+      "sha256": "4dddc9cc820c91ba0424caee996047b11c182bbe16c008054b85648eb4afdc78"
     },
     "stylesheet": {
-      "member": "webview/assets/async/361a1f04b890.css",
-      "bytes": 1230466,
-      "sha256": "00ce623384e50a3d3ba0c851ba838cfcb3726bf45ef15544ad8447941f4bef58"
+      "member": "webview/assets/async/e77f816560c6.css",
+      "bytes": 1266495,
+      "sha256": "5ef0186201b63a1882a93c4a567040b80d167562656e39036dc8815657d925d6"
     },
     "entrypoint": {
       "member": "webview/index.html",
-      "bytes": 10028,
-      "sha256": "4f3769793f23b764a4a7ba04d0b972e101b4fc43e2bafc128cba2c26284d15a7"
+      "bytes": 10406,
+      "sha256": "93401a7bcf17d85e445060004f1ae0352b3f84f823f8fb3891312b68bc59d10d"
     },
     "runtime": {
-      "member": "webview/assets/348410.ae8bb87271.js",
-      "bytes": 264006,
-      "sha256": "fd92f29080e85bf7a9208a4e7e69dc38abe10745552606e638ceea504d199ee0"
+      "member": "webview/assets/348410.792d1c9584.js",
+      "bytes": 272412,
+      "sha256": "81365fe5fac4856612c18aeacd8bce046d5fda809ff2829075a3d83f32f4a9d5"
     }
   }
 }

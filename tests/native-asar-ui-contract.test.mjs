@@ -68,7 +68,7 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
     '--composer-layout-surface-background', '--composer-layout-surface-backdrop-filter',
     'data-composer-surface-variant', '.ComposerLayoutRoot-', '.ComposerLayoutBody-',
     '.PageSurface-', '--app-shell-navigation-rail-width',
-    '[data-sticky]:before', '.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']) {
+    '[data-sticky]:before', '.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation,[data-activity-sidebar-host])']) {
     assert.ok(css.includes(token), 'native CSS contract drift: '+token);
   }
   assert.ok(bundle.findModules(['data-user-message-bubble']).some(record => nodes(record.ast)

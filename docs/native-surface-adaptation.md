@@ -1,5 +1,15 @@
 # 原生 UI 与主题替换接口
 
+## 标签页标题与完整视图（2026-11-08，v119 开发适配）
+
+当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条的真实 row 发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"。标题可经原生 portal 移到共享 titlebar，不能依赖 AppShellTabs 的 DOM 祖先；主题只给这一个 row 使用原生 surface 底色并清除背景图，保留左侧 controller、原生几何和按钮。
+
+完整视图不再延伸主题壁纸。原生 right-panel 切换按钮发布 data-app-shell-workspace-layout-toggle="right-panel" 和 aria-pressed，它组合显式 full 布局与独立完整视图覆盖状态。后者允许底层 workspace-layout 仍为 split，早先只判断显式 full 的夹具不足以覆盖实机路径。当前使用可见原生按钮作为优先依据；按钮缺失时才检查活动 workspace 的显式 full 状态，不读取业务 store 或中文按钮文案。
+
+进入完整视图后只暂停本项目材料样式并隐藏自身 inert 壁纸节点；原生 stylesheet、控件、顶部和侧栏均自行绘制。图库参数单独保留在只含 forge 自定义属性的受管样式中，场景选择与解码图像继续有效；材料热更新维持暂停，退出完整视图复用原图片和主题。恢复原生操作移除两份受管样式及全部自有节点。没有新增原生几何覆盖。
+
+当前原生侧栏材料规则还明确排除 data-activity-sidebar-host；adapter 和相同 scope 的主题 CSS 同步遵守该边界。额度、goal、Popover 的测试仅迁移真实匿名导出、包装函数与透明槽位关联，不执行账户或客户端业务模块。
+
 ## 数字资源块与当前模块类名（2026-11-05，v0.18.9／v118）
 
 当前来源 Windows Codex 26.1029.7803.0 已改用 Rspack 数字资源块，入口只有四个 JavaScript 资源，组件及样式经运行时映射异步加载。原来的 app-shared／initial／primary 文件名和下划线模块类名不再是当前接口；不得只刷新来源哈希后沿用旧组件夹具。测试现在静态读取实际 module factory、require／export 关系、入口资源与 CSS 层次，再执行限定的纯展示组件，不执行客户端业务模块。

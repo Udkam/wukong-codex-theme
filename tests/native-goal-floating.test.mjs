@@ -1,13 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { nativeFunction, nativeObject } from './native-bundle-current-helper.mjs';
+import { nativeFunction, nativeObject, ownNodes } from './native-bundle-current-helper.mjs';
 import postcss from 'postcss';
 import { chromium } from '@playwright/test';
 import { loadQuotaNative, quotaNativeSkip, quotaHtml, key, text, prop, nodes } from './native-quota-current-helper.mjs';
 
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const element = (tag, props) => ({ tag, props });
+const frameSlots = frame => {
+  const content = frame.props.children;
+  assert.equal(content?.tag, 'div', 'Native floating section must retain its content transport wrapper');
+  assert.equal(content.props.className, 'contents', 'The resting native content wrapper must not add paint or geometry');
+  assert.equal(content.props.children.length, 4, 'Native floating content must retain background, resize, minimized and composer slots');
+  return content.props.children;
+};
 // Installed Rspack module factories execute only audited presentation code.
 // Memo cache, hooks, motion transport and editor slots are inert boundaries.
 let cached;
@@ -63,13 +70,19 @@ test('native embedded goal rows have no background owner while independent defau
   assert.match(native.renderItem({ variant: 'warning' }, false).props.className, /(?:^|\s)bg-\[/);
   for (const variant of ['controls', 'inline']) assert.ok(!/(?:^|\s)bg-/.test(native.renderItem({ variant }).props.className));
   const section = native.frame.nodes.find(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' && key(node.arguments[0].property) === 'section');
-  assert.ok(section && prop(section.arguments[1], 'children').elements.length === 3);
+  const content = native.frame.nodes.find(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
+    key(node.arguments[0].property) === 'div' && prop(node.arguments[1], 'children')?.type === 'ArrayExpression' &&
+    prop(node.arguments[1], 'children').elements.length === 4);
+  const sectionChild = prop(section?.arguments[1], 'children');
+  assert.ok(content && sectionChild?.type === 'Identifier' && ownNodes(native.frame.ast).some(node =>
+    node.type === 'AssignmentExpression' && node.left.name === sectionChild.name && node.right === content),
+  'The section must directly retain the native content wrapper containing all four floating slots');
   assert.ok(native.frame.nodes.some(node => text(node) === 'overflow-visible'));
   const frame = native.renderFrame({ background: 'panel', prefersCompactPresentation: true, keepSurfaceInset: true,
     isCompact: true, resizable: false, shouldReduceMotion: true, sectionProps: { 'data-quick-chat-drag-handle': true, 'data-pip-obstacle': 'quick-chat' } });
   assert.equal(frame.tag, 'section');
   assert.ok(!/(?:^|\s)bg-/.test(frame.props.className), 'The drag frame must remain unpainted');
-  assert.match(frame.props.children[0].props.className, /(?:^|\s)bg-surface-elevated-secondary(?:\s|$)/);
+  assert.match(frameSlots(frame)[0].props.className, /(?:^|\s)bg-surface-elevated-secondary(?:\s|$)/);
 });
 
 const legacyRailPaint = current => {
@@ -109,7 +122,7 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
           isCompact: layout === 'single-line', resizable: false, shouldReduceMotion: true,
           sectionProps: { id: 'frame', 'data-quick-chat-drag-handle': true, 'data-pip-obstacle': 'quick-chat',
             style: { top: '40px', left: '40px', width: '580px', height: layout === 'single-line' ? '150px' : '230px' } }, children: content });
-        frame.props.children[0].props.id = 'floating-paint';
+        frameSlots(frame)[0].props.id = 'floating-paint';
         const independent = native.renderItem({ id: 'independent', className: 'forge-composer-panel', children: button('independent-control', '独立目标') }, false);
         const warning = native.renderItem({ id: 'warning', className: 'forge-composer-panel', variant: 'warning', children: 'Native warning' }, false);
         const transparentVariants = ['controls', 'inline'].map(variant => native.renderItem({ id: variant, className: 'forge-composer-panel', variant, children: 'Native transparent row' }));

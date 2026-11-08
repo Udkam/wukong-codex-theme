@@ -1,11 +1,13 @@
 /*
- * Native DOM contracts, audited against the packaged 26.1029 UI. Data attributes
+ * Native DOM contracts, audited against the packaged 26.1103 UI. Data attributes
  * describe ownership; utility classes are only retained as bounded fallbacks.
  * Keep this module dependency-free: the factory is serialized into the client.
  */
 export const NATIVE_UI_SELECTORS = Object.freeze({
   pageShell: '[data-app-shell-page-surface]:not([data-app-shell-page-surface="false"])',
   pagePaint: '[class^="PageSurface-"], [class*=" PageSurface-"]',
+  fullViewWorkspace: '[data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"][data-app-shell-header-placement="titlebar"][data-app-shell-page-surface="true"]',
+  fullViewToggle: '[data-app-shell-workspace-layout-toggle="right-panel"]',
   main: '[data-app-shell-main-surface]',
   mainContent: '[data-app-shell-main-content-layout]',
   sidebar: 'aside[data-app-shell-left-panel-appearance], aside.app-shell-left-panel',
@@ -66,6 +68,18 @@ export function createNativeUiAdapter(document, selectors) {
   const structurallyMounted = element => mounted(element, { size: false });
   const first = (selector, scope = document, predicate = visible) => all(selector, scope).find(predicate) || null;
   const workspace = () => first(selectors.main) || first(selectors.mainContent) || first('[role="main"], main');
+  const fullViewActive = () => {
+    // The native full-view command can keep the transcript in split mode.
+    // Its visible right-panel toggle combines both native full-view states.
+    const toggle = first(selectors.fullViewToggle, document, element => visible(element) &&
+      element.closest('[data-app-shell-active-page]')?.getAttribute('data-app-shell-active-page') !== 'false');
+    if (toggle) return toggle.getAttribute('aria-pressed') === 'true';
+    return all(selectors.fullViewWorkspace).some(shell => {
+      const main = first(selectors.main, shell, element => mounted(element, { painted: true }));
+      if (!main) return false;
+      return Boolean(shell.querySelector('[data-app-shell-workspace-layout="full"]'));
+    });
+  };
   const pagePaint = () => {
     for (const shell of all(selectors.pageShell)) {
       // The native PageSurface leaf has no own data attribute. Scope this
@@ -86,6 +100,7 @@ export function createNativeUiAdapter(document, selectors) {
     // The outer navigation owns the glass. Nested list navigation and drag
     // previews must not become independent sampled/painted sidebars.
     return first(selectors.navigation, owner, element => visible(element) &&
+      !element.hasAttribute('data-activity-sidebar-host') &&
       !element.parentElement?.closest(selectors.navigation));
   };
   const utilityContext = (composerRoot, surface) => {
@@ -108,5 +123,5 @@ export function createNativeUiAdapter(document, selectors) {
     }
     return null;
   };
-  return { all, first, mounted, visible, layoutPresent, structurallyMounted, workspace, pagePaint, settingsActive, sidebar, conversationSidebar, utilityContext };
+  return { all, first, mounted, visible, layoutPresent, structurallyMounted, workspace, fullViewActive, pagePaint, settingsActive, sidebar, conversationSidebar, utilityContext };
 }

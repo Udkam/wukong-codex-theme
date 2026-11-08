@@ -127,14 +127,18 @@ test('native in-app browser remains a body portal outside the app root', { skip:
     return matches[0];
   };
   const exportedHost = (record, selector) => {
-    const matches = nodes(record.ast).filter(node => node.type === 'FunctionDeclaration' && node !== record.ast &&
+    const exported = Object.values(bundle.exports(record));
+    const matches = nodes(record.ast).filter(node => /^(?:FunctionDeclaration|FunctionExpression|ArrowFunctionExpression)$/.test(node.type) && node !== record.ast &&
+      exported.some(value => value === node || (node.id && value.type === 'Identifier' && value.name === node.id.name)) &&
       nodes(node).some(call => call.type === 'CallExpression' && call.callee.type === 'MemberExpression' &&
         key(call.callee.property) === 'querySelector' && text(call.arguments[0]) === selector));
     assert.equal(matches.length, 1, `${drift}: ${selector} declaration`);
     const fn = matches[0];
-    assert.ok(Object.values(bundle.exports(record)).some(value => value.type === 'Identifier' && value.name === fn.id.name),
-      `${drift}: ${selector} exported host factory`);
     return fn;
+  };
+  const isHostExport = (record, name, fn) => {
+    const value = bundle.exports(record)[name];
+    return value === fn || Boolean(fn.id && value?.type === 'Identifier' && value.name === fn.id.name);
   };
   const createdDiv = fn => {
     const match = nodes(fn).find(node => node.type === 'VariableDeclarator' && node.id.type === 'Identifier' &&
@@ -164,7 +168,7 @@ test('native in-app browser remains a body portal outside the app root', { skip:
   const hostImports = bundle.imports(hostModule);
   const parentHost = nodes(host).find(node => node.type === 'VariableDeclarator' && node.init?.type === 'CallExpression' &&
     hostImports[calleeMember(node.init.callee)?.object?.name]?.id === outerModule.id &&
-    bundle.exports(outerModule)[key(calleeMember(node.init.callee)?.property)]?.name === outer.id.name);
+    isHostExport(outerModule, key(calleeMember(node.init.callee)?.property), outer));
   assert.ok(parentHost && calls(host, parentHost.id.name, 'append').some(call => call.arguments[0]?.name === hostDiv),
     `${drift}: browser host must remain inside the body-owned embedded host`);
   assert.ok(calls(host, parentHost.id.name, 'querySelector').some(call => text(call.arguments[0]) === '[data-browser-host-root]'),
@@ -194,7 +198,7 @@ test('native in-app browser remains a body portal outside the app root', { skip:
   const defaultHost = calleeMember(mountParameter?.right?.callee);
   assert.equal(mountParameter?.type, 'AssignmentPattern', `${drift}: default browser host`);
   assert.equal(bundle.imports(webviewModule)[defaultHost?.object?.name]?.id, hostModule.id, `${drift}: default browser host import`);
-  assert.equal(bundle.exports(hostModule)[key(defaultHost?.property)]?.name, host.id.name, `${drift}: default browser host export`);
+  assert.ok(isHostExport(hostModule, key(defaultHost?.property), host), `${drift}: default browser host export`);
   const mountedContainer = nodes(mount).find(node => node.type === 'VariableDeclarator' && memberPath(node.init) === 'this.container');
   assert.ok(mountedContainer && calls(mount, mountParameter.left.name, 'prepend').some(call =>
     call.arguments[0]?.name === mountedContainer.id.name), `${drift}: browser container portal prepend`);

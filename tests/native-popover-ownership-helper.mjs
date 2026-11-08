@@ -34,7 +34,8 @@ export const loadPopoverNative = archive => {
     return matches[0];
   };
   const exported = (record, fn) => {
-    const name = Object.entries(bundle.exports(record)).find(([, value]) => value.type === 'Identifier' && value.name === fn.ast.id?.name)?.[0];
+    const name = Object.entries(bundle.exports(record)).find(([, value]) => value === fn.ast ||
+      fn.ast.id?.name && value.type === 'Identifier' && value.name === fn.ast.id.name)?.[0];
     assert.ok(name, 'Native presentation renderer export changed');
     return name;
   };
@@ -56,7 +57,7 @@ export const loadPopoverNative = archive => {
   const popoverRecord = one(['data-slot', 'popover-content', 'text-default z-50 flex origin-']);
   const popover = nativeFunction(popoverRecord, '"popover-content"'), popAlias = exported(popoverRecord, popover);
   const floatingRecord = one(['floatingSurface', 'singleLineSurface', 'asChild'], record =>
-    nodes(record.ast).some(fn => fn.type === 'FunctionDeclaration' && fn !== record.ast &&
+    nodes(record.ast).some(fn => ['FunctionDeclaration', 'FunctionExpression'].includes(fn.type) && fn !== record.ast &&
       nodes(fn).some(node => node.type === 'ObjectPattern' && prop({ type: 'ObjectExpression', properties: node.properties }, 'asChild')) &&
       nodes(fn).some(node => node.type === 'MemberExpression' && key(node.property) === 'cloneElement') &&
       nodes(fn).some(node => node.type === 'MemberExpression' && key(node.property) === 'floatingSurface')));
@@ -70,7 +71,8 @@ export const loadPopoverNative = archive => {
   const menuFn = nativeFunction(menuRecord, 'rounded-full bg-surface-elevated-secondary/90');
   const renderMenu = compileSelected(menuFn);
   const menuWidthExpression = menuExports.xk;
-  const menuWidthDeclaration = nodes(menuRecord.ast).find(node => node.type === 'FunctionDeclaration' && node.id.name === menuWidthExpression?.name);
+  const menuWidthDeclaration = ['FunctionDeclaration', 'FunctionExpression'].includes(menuWidthExpression?.type) ? menuWidthExpression
+    : nodes(menuRecord.ast).find(node => node.type === 'FunctionDeclaration' && node.id?.name === menuWidthExpression?.name);
   assert.ok(menuWidthDeclaration, 'Native menu width renderer export changed');
   const menuWidth = nativeFunction(menuRecord, menuWidthDeclaration.start + 1);
   const widthMapName = menuWidth.nodes.find(node => node.type === 'MemberExpression' && node.computed && node.object.type === 'Identifier')?.object.name;
@@ -174,7 +176,11 @@ export const loadPopoverNative = archive => {
   const avatarClasses = moduleObject(avatarMaterialRecord, avatarClass.object.object.name);
   const checkoutRootClass = checkoutShell.nodes.find(node => node.type === 'MemberExpression' && key(node.property) === 'root');
   const checkoutRootClasses = moduleObject(checkoutShellRecord, checkoutRootClass.object.object.name);
-  const stylesheetAssets = [floatingClasses.floatingSurface, editorSurface, avatarClasses.Material, checkoutClasses.surface, checkoutRootClasses.root].map(name => {
+  // CSS-module composition can export multiple tokens for one native class.
+  // Load every token's stylesheet rather than treating their joined value as
+  // a descendant selector or silently dropping its shared material rules.
+  const stylesheetAssets = [floatingClasses.floatingSurface, editorSurface, avatarClasses.Material, checkoutClasses.surface, checkoutRootClasses.root]
+    .flatMap(value => value.split(/\s+/).filter(Boolean)).map(name => {
     const assets = bundle.stylesheetAssets([`.${name}`]);
     assert.ok(assets.length, `Native painted component stylesheet changed: ${name}`);
     return assets[0];

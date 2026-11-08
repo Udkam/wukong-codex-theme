@@ -1,5 +1,15 @@
 # 当前预览
 
+## v119 完整视图原生外观组件夹具（2026-11-08）
+
+dark-native-full-view-fixture-20261108.png、light-native-full-view-fixture-20261108.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、实际 JSX 根属性及 import／export 关系构成的独立展示夹具，使用确定的外部布局槽位与测试文字，没有执行业务模块。图片是自动回归中暂停主题后的原生内容区域裁图；**不是实际客户端完整视图的截图，也不是用户视觉验收**。地址和卡片均为测试内容，不含聊天、账户或本机路径。
+
+回归按相同状态的未注入原生基线比较背景、文字、滤镜、伪元素、控件矩形和点击，另测退出后恢复同一主题图片。Ego Lite 曾对同源夹具的显式 full 路径做 DOM／输入／切换检查；实际按钮覆盖 split 的分支由最终自动回归验证。Ego 窗口最小化导致截图不可用，不能将这些图片标成 Ego 或实机截图。
+
+| 深色原生组件夹具 | 浅色原生组件夹具 |
+| --- | --- |
+| ![深色完整视图原生组件夹具](dark-native-full-view-fixture-20261108.png) | ![浅色完整视图原生组件夹具](light-native-full-view-fixture-20261108.png) |
+
 ## v0.18.9／v118 底部背景（2026-11-05）
 
 dark-normal-footer-20261105.png、dark-dots-footer-20261105.png、light-normal-footer-20261105.png、light-dots-footer-20261105.png：Windows Codex 26.1029.7803.0 的普通对话／Dots 实际输入区局部，运行时 v118-native-module-families。深色两类均读回 document.hidden=false；浅色通过客户端原生外观设置切换后取图，捕获时 document.hidden=true，不能等同于浅色前台验收。检查后恢复原深色及本聊天。

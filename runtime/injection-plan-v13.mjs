@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v118-native-module-families';
+export const RUNTIME_REVISION = 'v119-native-full-view';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -184,6 +184,16 @@ function applyRuntime(payload, createAdapter) {
     document.head.append(style);
   }
   style.textContent = `${payload.styleSheet}\n${payload.variables}`;
+  // Scene variables remain available while the material sheet is paused. They
+  // use only forge-owned custom properties, so native appearance stays native.
+  let sceneVariables = document.getElementById('wukong-codex-theme-scene-variables');
+  if (!sceneVariables) {
+    sceneVariables = document.createElement('style');
+    sceneVariables.id = 'wukong-codex-theme-scene-variables';
+    sceneVariables.dataset.forgeOwned = 'scene-variables';
+    document.head.append(sceneVariables);
+  }
+  sceneVariables.textContent = payload.variables;
   root.classList.add('forge-ink-mountain');
 
   const updateLandingAria = (element, value) => {
@@ -287,6 +297,12 @@ function applyRuntime(payload, createAdapter) {
     state.transitionEndHandler = null;
   };
   const ensureBackground = () => {
+    // Full-view tabs use the complete native appearance. Keep decoded images
+    // mounted but hidden, and pause only our managed stylesheet so returning to
+    // the conversation restores the same theme without a reload or re-decode.
+    const nativeFullView = nativeUi.fullViewActive();
+    root.dataset.forgePresentation = nativeFullView ? 'native-full-view' : 'theme';
+    style.media = nativeFullView ? 'not all' : '';
     // The client's page paint node owns insets and corner geometry. Mount our
     // inert layer inside it instead of reconstructing that shape from pixels.
     const pageSurface = nativeUi.pagePaint();
@@ -300,6 +316,7 @@ function applyRuntime(payload, createAdapter) {
       overlay = null;
     }
     if (overlay) {
+      if (overlay.hidden !== nativeFullView) overlay.hidden = nativeFullView;
       if (overlay.parentElement !== host) host.prepend(overlay);
       state.backgroundOverlay = overlay;
       const activeImage = overlay.querySelector('[data-forge-active="true"] [data-forge-background-image]');
@@ -319,6 +336,7 @@ function applyRuntime(payload, createAdapter) {
     state.preloadRequests.clear();
     state.activeLayer = 0;
     overlay = document.createElement('div');
+    overlay.hidden = nativeFullView;
     overlay.id = 'wukong-codex-theme-background';
     overlay.dataset.forgeOwned = 'background';
     overlay.setAttribute('aria-hidden', 'true');
@@ -1692,6 +1710,7 @@ function applyRuntime(payload, createAdapter) {
     selectors.turns
   ].join(',');
   const refreshStructureSelector = [
+    selectors.fullViewToggle,
     selectors.settings,
     selectors.catalogHeader,
     selectors.sidebar,
@@ -1900,11 +1919,21 @@ function applyRuntime(payload, createAdapter) {
     }
     return regions.size ? [...regions] : ['all'];
   };
+  const touchesFullViewToggle = node => node instanceof Element &&
+    (node.matches(selectors.fullViewToggle) || Boolean(node.querySelector(selectors.fullViewToggle)));
   const observer = new MutationObserver(records => {
+    const fullViewStructureChanged = records.some(record => record.type === 'attributes'
+      ? ['aria-pressed', 'hidden', 'aria-hidden', 'inert'].includes(record.attributeName) && touchesFullViewToggle(record.target)
+      : record.type === 'childList' && [...record.addedNodes, ...record.removedNodes].some(touchesFullViewToggle));
     // React replaces the page paint host when entering/leaving settings.
     // Reattach decoded layers before the browser paints, not in the delayed
     // region scan (80-520ms later), which exposes an unthemed frame.
-    if (!state.disposed && state.backgroundOverlay && !state.backgroundOverlay.isConnected) {
+    if (!state.disposed && state.backgroundOverlay && (
+      !state.backgroundOverlay.isConnected || fullViewStructureChanged || records.some(record => record.type === 'attributes' &&
+        (['data-app-shell-active-page', 'data-app-shell-unified-tab-strip', 'data-app-shell-workspace-layout',
+          'data-app-shell-header-placement', 'data-app-shell-page-surface'].includes(record.attributeName) ||
+          (record.attributeName === 'aria-pressed' && record.target.matches(selectors.fullViewToggle))))
+    )) {
       ensureBackground();
     }
     const observedRecords = records.filter(record => {
@@ -1985,6 +2014,7 @@ function applyRuntime(payload, createAdapter) {
       'aria-current',
       'aria-selected',
       'aria-expanded',
+      'aria-pressed',
       'aria-label',
       'aria-disabled',
       'aria-hidden',
@@ -1996,6 +2026,11 @@ function applyRuntime(payload, createAdapter) {
       'data-composer-rail-item',
       'data-composer-rail-placement',
       'data-summary-panel-variant',
+      'data-app-shell-active-page',
+      'data-app-shell-unified-tab-strip',
+      'data-app-shell-workspace-layout',
+      'data-app-shell-header-placement',
+      'data-app-shell-page-surface',
       'data-disabled',
       'data-app-action-sidebar-thread-active',
       'data-app-action-sidebar-project-collapsed'
@@ -2086,6 +2121,8 @@ export function makeStyleUpdateExpression({ styleSheet, variables }) {
     if (!style || !window.__wukongCodexThemeRuntimeV13) throw Error('Active theme required');
     const next = ${JSON.stringify(`${styleSheet}\n${variables}`)};
     if (style.textContent !== next) style.textContent = next;
+    const sceneVariables = document.getElementById('wukong-codex-theme-scene-variables');
+    if (sceneVariables) sceneVariables.textContent = ${JSON.stringify(variables)};
     return { updated: true, timeOrigin: performance.timeOrigin };
   })()`;
 }
@@ -2119,6 +2156,9 @@ export const THEME_STATE_EXPRESSION = `(() => {
   ));
   return {
     documentHidden: document.hidden,
+    presentation: document.documentElement.dataset.forgePresentation || null,
+    styleMedia: document.getElementById('wukong-codex-theme-style')?.media || '',
+    backgroundHidden: overlay?.hidden === true,
     stylePresent: Boolean(document.getElementById('wukong-codex-theme-style')),
     rootClass: document.documentElement.classList.contains('forge-ink-mountain'),
     markedElements: document.querySelectorAll('[data-forge-mark]').length,
@@ -2175,6 +2215,7 @@ export const THEME_STATE_EXPRESSION = `(() => {
 })()`;
 
 export const ACTIVE_PROBE_EXPRESSION = `(() => {
+  const style = document.getElementById('wukong-codex-theme-style');
   const overlay = document.getElementById('wukong-codex-theme-background');
   const layers = overlay?.querySelectorAll(':scope > [data-forge-background-layer]') || [];
   const active = overlay?.querySelector('[data-forge-background-layer][data-forge-active="true"]');
@@ -2182,7 +2223,10 @@ export const ACTIVE_PROBE_EXPRESSION = `(() => {
   // Composer nodes may remount before the runtime observer tags them.
   // Their transient paint state must not restart a healthy background runtime.
   return Boolean(
-    document.getElementById('wukong-codex-theme-style') &&
+    style &&
+    (document.documentElement.dataset.forgePresentation === 'native-full-view'
+      ? style.media === 'not all' && overlay?.hidden === true
+      : !style.media && overlay?.hidden !== true) &&
     document.documentElement.classList.contains('forge-ink-mountain') &&
     window.__wukongCodexThemeRuntimeV13 &&
     document.documentElement.dataset.forgeBackgroundReady === 'true' &&
@@ -2195,7 +2239,12 @@ export const ACTIVE_PROBE_EXPRESSION = `(() => {
   );
 })()`;
 
+const presentationMatchesState = state => state.presentation === 'native-full-view'
+  ? state.styleMedia === 'not all' && state.backgroundHidden === true
+  : (!state.styleMedia && state.backgroundHidden !== true);
+
 export const isActiveThemeState = state => Boolean(state) &&
+  presentationMatchesState(state) &&
   state.stylePresent === true &&
   state.rootClass === true &&
   state.backgroundLayerPresent === true &&
@@ -2216,6 +2265,7 @@ export const isActiveThemeState = state => Boolean(state) &&
   state.runtimeV13 === true;
 
 export const isDeferredThemeState = state => Boolean(state) &&
+  presentationMatchesState(state) &&
   state.documentHidden === true &&
   state.stylePresent === true &&
   state.rootClass === true &&
@@ -2262,6 +2312,7 @@ export const RESTORE_EXPRESSION = `(() => {
     delete window[runtimeKey];
   }
   document.getElementById('wukong-codex-theme-style')?.remove();
+  document.getElementById('wukong-codex-theme-scene-variables')?.remove();
   document.getElementById('wukong-forge-style')?.remove();
   document.getElementById('wukong-forge-pet-overlay')?.remove();
   document.getElementById('wukong-forge-motif-overlay')?.remove();
@@ -2286,6 +2337,7 @@ export const RESTORE_EXPRESSION = `(() => {
   delete document.documentElement.dataset.forgeMode;
   delete document.documentElement.dataset.forgeBackgroundReady;
   delete document.documentElement.dataset.forgeBackgroundPlacement;
+  delete document.documentElement.dataset.forgePresentation;
   delete document.documentElement.dataset.forgeSidebarInk;
   delete document.documentElement.dataset.forgeBackgroundLocked;
   delete document.documentElement.dataset.forgeLandingQuoteVisible;

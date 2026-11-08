@@ -61,6 +61,37 @@ test('settings state follows mounted settings and excludes schedule dialogs', as
   } finally { await page.close(); }
 });
 
+test('activity sidebar keeps its native paint and cannot become the conversation navigation owner', async () => {
+  const page = await browser.newPage();
+  try {
+    // The current renderer uses the same sidebar-navigation class for the
+    // activity gutter, with this explicit marker separating paint ownership.
+    await page.setContent(`<style>
+      aside{height:320px}.sidebar-navigation{height:80px;border-radius:13px}
+      #activity{background:rgb(47,61,73);background-image:linear-gradient(90deg,rgb(47,61,73),rgb(57,71,83))}
+    </style><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default">
+      <div id="activity" class="sidebar-navigation" data-activity-sidebar-host="true"><button>Activity action</button></div>
+      <div id="conversation" class="sidebar-navigation"><div id="nested" class="sidebar-navigation">Nested list</div></div>
+    </aside>`);
+    await page.evaluate(adapterExpression);
+    assert.equal(await page.evaluate(() => adapter.conversationSidebar()?.id), 'conversation');
+    const read = () => page.locator('#activity').evaluate(element => {
+      const style = getComputedStyle(element), rect = element.getBoundingClientRect();
+      return { rect: [rect.x, rect.y, rect.width, rect.height], radius: style.borderRadius,
+        paint: [style.backgroundColor, style.backgroundImage, style.backdropFilter] };
+    });
+    const before = await read();
+    await page.addStyleTag({ content: css });
+    await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
+    assert.deepEqual(await read(), before, 'Activity retains its own gutter fill, gradient and native geometry');
+    assert.notEqual(await page.locator('#conversation').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)',
+      'The ordinary conversation navigation still receives its reading material');
+    await page.locator('#conversation').evaluate(element => element.remove());
+    assert.equal(await page.evaluate(() => adapter.conversationSidebar()), null,
+      'An activity-only sidebar has no conversation navigation owner');
+  } finally { await page.close(); }
+});
+
 test('new composer rails map through attributes without native spacing or font tokens', async () => {
   const page = await browser.newPage();
   try {

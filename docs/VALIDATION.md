@@ -1,5 +1,25 @@
 # 当前适配验证
 
+## v119-native-full-view（2026-11-08 开发适配）
+
+当前来源 Windows Codex 26.1103.4239.0，包内 26.1103.32239；ASAR 761,023,153 字节，SHA-256 为 fb47d6491dc3006b708cb1e14de479b882bf50f88b7daa81818f154c253266aa。浏览器 portal 的新资源和入口／运行时／CSS 解析关系已逐项核对；同一原生来源的布局、Dots、额度、goal、Popover 与材料边界合同保留。
+
+按用户最新要求，右侧标签条在分栏时也使用原生 surface，完整视图暂停全部主题材料并隐藏壁纸，包含顶部和侧栏在内的界面由原生绘制。右侧 row／controller 标记跨 titlebar portal 仍有效，不依赖 Tabs.Root 祖先；不调整宽高、边距、字体、定位、圆角或外部网页。
+
+原生命令可先保留 split 布局，再开启独立完整视图覆盖状态。当前优先读取可见 right-panel toggle 的 aria-pressed，它组合这两个状态；main toggle 同时 pressed 不能否定右侧完整视图。可见 right-panel=false 保留普通主题，隐藏、非活动页、inert 按钮不触发；按钮缺失时保留活动 workspace 的显式 full 回退。属性变更直接同步暂停状态，不等待普通材料扫描。
+
+新原生组件专项 6/6 通过、0 失败／跳过，约 24.8 秒：实际 JSX 根、require／export、按钮状态、原生样式和标题 portal 均有合同；深浅色、900／1280px 检查原生背景、文字、滤镜、伪元素、控件几何、禁用、输入和点击。完整视图保持未注入基线，切回分栏复用同一 overlay／图片，重入解码为 0；图库、材料热更新与恢复原生后的零残留均通过。保留旧 CSS 顶部露壁纸、旧完整视图谓词漏判两种负控制，没有通过删除保护或固定编译模块名掩盖问题。
+
+启动探测结束后的转换回归另外覆盖 toggle 自身／祖先隐藏、aria-hidden、inert 和移除／重挂载，确认暂停及恢复均及时、解码实例保持，并用隔离旧 observer 的负控制复现状态残留。壁纸隐藏属性只在值变化时写入，暂停状态 refreshCount 保持稳定，不通过重复扫描掩盖退出路径缺口。
+
+原生 activity sidebar 新材料排除同步到 adapter 与同一 scope 的 CSS，夹具检查其原有背景、渐变、几何和 activity-only 分支。测试入口迁移当前匿名导出、lazy transport、状态读取包装及透明四槽位，保持原有额度／goal／Popover 行为断言；不执行账户、feature-gate 网络、支付或客户端业务模块。
+
+两张新图为当前原生组件展示夹具，非实机截图。Ego Lite 本地检查覆盖显式 full 路径下的深浅 DOM／输入／切换；其最小化窗口无法截图，真实按钮覆盖 split 的最终分支以独立自动回归为准。用户实际截图确认了顶部残留；后续电脑控制被物理 Esc 停止，未将最终客户端完整视图写成前台视觉验收。
+
+精确暂存的 22 个相关路径与其他已跟踪源码导出到独立目录，未导出工作区无关未跟踪材料。最终 npm run check 为 **188/188 通过，0 失败、0 跳过，约 56.4 秒**；同一输入的 Studio E2E 通过，22 个输入文件逐一核对根目录与导出源码哈希一致。最后只补写验证及清理文档，运行时代码、测试和来源锁保持该精确输入。
+
+已从这份独立源码再次执行本机注入，活动 v119-native-full-view、完整样式与源码一致、scene variables 样式存在、临时诊断样式为 0。应用时渲染器隐藏，返回 deferred=true／verified=false，背景解码等待可见性；随后实际读回 presentation=native-full-view、材料 stylesheet media="not all"、壁纸 hidden=true，确认当前真实完整视图已触发暂停。读取时 document.hidden 仍为 true，因此这是实机 DOM／安装状态，不是前台视觉验收。未执行冷启动／卸载或新的账户业务操作。临时源码、测试包与重复诊断已按 [清理记录](CLEANUP.md) 收尾；本轮没有创建新正式发行。
+
 ## v0.18.9／v118-native-module-families（2026-11-05）
 
 当前原生来源 Windows Codex 26.1029.7803.0，内部版本 26.1029.61003；ASAR 720,736,234 字节，SHA-256 为 77ed4ddc5b388ac8b29f5035f9c98f982b095df55aad6fa6c27bb80d763b9691。资源已变为数字 Rspack chunks，CSS 模块类变为 name-hash，旧 app-shared／initial／primary 与下划线类的定位失效。来源锁、真实 module factory 的 require／export 关系、CSS 层次和异步资源可达性均按当前包重新关联，不通过静默跳过或只刷新哈希掩盖漂移。
