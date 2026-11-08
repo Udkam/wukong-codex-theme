@@ -23,6 +23,33 @@ legacySheet.walkRules(rule => {
 });
 assert.equal(removedHeaderRules, 1, 'The legacy material must remove exactly the newly introduced right-header mapping');
 const legacyTheme = legacySheet.toString();
+const rowOnlySheet = postcss.parse(theme);
+let restoredRowOnlyRules = 0;
+rowOnlySheet.walkRules(rule => {
+  if (rule.selector.includes('[data-app-shell-titlebar-slot="content"]') &&
+    rule.selector.includes('[data-app-shell-tab-row]') && rule.selector.includes('[data-app-shell-tab-strip-controller="right"]')) {
+    rule.selector = ':root.forge-ink-mountain #root [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])';
+    restoredRowOnlyRules++;
+  }
+});
+assert.equal(restoredRowOnlyRules, 1, 'The endcap negative control must preserve row paint while removing the complete slot owner');
+const rowOnlyTheme = rowOnlySheet.toString();
+const missingEndSheet = postcss.parse(theme), wholeEndGridSheet = postcss.parse(theme);
+let missingEndRules = 0, wholeEndGridRules = 0;
+missingEndSheet.walkRules(rule => {
+  if (!rule.selector.includes('[data-app-shell-header-slot="end"]') || !rule.selector.includes('[data-app-shell-workspace-layout-toggle="right-panel"]')) return;
+  assert.ok(rule.selector.includes('[data-app-shell-titlebar-slot="content"]') && rule.selector.includes('[data-app-shell-tab-row]'));
+  rule.selector = ':root.forge-ink-mountain #root :is([data-app-shell-focus-area="right-panel"][data-app-shell-titlebar-slot="content"], [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]))';
+  missingEndRules++;
+});
+wholeEndGridSheet.walkRules(rule => {
+  if (!rule.selector.includes('[data-app-shell-header-slot="end"]')) return;
+  assert.equal(rule.selector.split(' > .h-full.w-max.justify-self-end').length, 2);
+  rule.selector = rule.selector.replace(' > .h-full.w-max.justify-self-end', ''); wholeEndGridRules++;
+});
+assert.equal(missingEndRules, 1, 'The live endcap control must remove only the registered end owner');
+assert.equal(wholeEndGridRules, 1, 'The overpaint control must widen exactly the measured carrier to its entire grid');
+const missingEndTheme = missingEndSheet.toString(), wholeEndGridTheme = wholeEndGridSheet.toString();
 // Disable only the newly audited full-workspace predicate. This preserves the
 // actual legacy runtime's continued wallpaper/paint in a full-view native tab.
 const legacyExpression = [NATIVE_UI_SELECTORS.fullViewWorkspace, NATIVE_UI_SELECTORS.fullViewToggle]
@@ -46,18 +73,25 @@ test('current native browser separates new-tab canvas, transparent toolbar and i
   // runs no app code and does not freeze compiled module IDs or chunk hashes.
 });
 
-const geometry = page => page.locator('#main,#paint,#native-tabstrip,#full-toggle,#right-tabstrip,#left-tabstrip,#tabs-body,#browser-panel,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#guest').evaluateAll(elements => elements.map(element => {
+const geometry = page => page.locator('#main,#paint,#native-tabstrip,#right-header-slot,#right-header-track,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#tabs-body,#browser-panel,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
   const s = getComputedStyle(element), r = element.getBoundingClientRect();
   return { id: element.id, rect: [r.x, r.y, r.width, r.height], radius: s.borderRadius, corner: s.cornerShape,
     border: s.borderWidth, padding: s.padding, margin: s.margin, position: s.position, overflow: s.overflow,
     font: s.font, opacity: s.opacity, disabled: element.disabled, tabIndex: element.tabIndex };
 }));
-const nativePaint = page => page.locator('html,body,#root,#layout,#main,#native-tabstrip,#right-tabstrip,#left-tabstrip,#workspace-content,#tabs-body,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#guest').evaluateAll(elements => elements.map(element => {
+const nativePaint = page => page.locator('html,body,#root,#layout,#main,#native-tabstrip,#right-header-slot,#right-header-track,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#workspace-content,#tabs-body,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
   const s = getComputedStyle(element), before = getComputedStyle(element, '::before'); return { id: element.id || element.tagName, background: s.backgroundColor,
     image: s.backgroundImage, shadow: s.boxShadow, blur: s.backdropFilter, color: s.color, opacity: s.opacity,
     borderColor: s.borderColor, clip: s.clipPath, before: { display: before.display, background: before.backgroundColor, image: before.backgroundImage, zIndex: before.zIndex } };
 }));
-const pixel = (buffer, x, y) => { const png = PNG.sync.read(buffer), index = (Math.floor(y) * png.width + Math.floor(x)) * 4; return [...png.data.subarray(index, index + 3)]; };
+// Each immutable screenshot is decoded once, including the continuous endcap row.
+const screenshotPixels = new WeakMap();
+const pixel = (buffer, x, y) => {
+  let png = screenshotPixels.get(buffer);
+  if (!png) { png = PNG.sync.read(buffer); screenshotPixels.set(buffer, png); }
+  const index = (Math.floor(y) * png.width + Math.floor(x)) * 4;
+  return [...png.data.subarray(index, index + 3)];
+};
 const active = page => page.waitForFunction(() => {
   const overlay = document.getElementById('wukong-codex-theme-background'), image = overlay?.querySelector('[data-forge-active="true"] img');
   return overlay?.parentElement?.id === 'paint' && !overlay.hidden && document.documentElement.dataset.forgeBackgroundReady === 'true' && image?.naturalWidth > 0;
@@ -377,5 +411,210 @@ test('settled full-view command visibility and remounts resume theme without pol
       assert.equal(await negative.evaluate(() => window.__wukongCodexThemeRuntimeV13.refreshCount), count,
         'The old observer failure must not be masked by startup probes or a hidden-overlay refresh loop');
     } finally { await negative.close(); }
+  } finally { await browser.close(); }
+});
+
+test('complete right titlebar paint covers the portal gap and both end actions without touching the left header', async () => {
+  const native = loadBrowserSurfaceNative(), browser = await chromium.launch({ headless: true });
+  const headerPoints = page => page.evaluate(() => {
+    const rect = id => document.getElementById(id).getBoundingClientRect();
+    const owner = rect('right-header-slot'), row = rect('right-tabstrip'), actions = rect('right-header-actions');
+    const full = rect('full-toggle'), split = rect('split-toggle'), y = owner.y + owner.height / 2;
+    return { rowTail: [row.right - 4, y], gap: [(row.right + actions.left) / 2, y],
+      fullSurround: [full.left - 2, full.y + full.height / 2], betweenActions: [(full.right + split.left) / 2, y],
+      splitSurround: [split.right + 2, split.y + split.height / 2], endcap: [owner.right - 2, y] };
+  });
+  const leftPaint = async page => (await nativePaint(page)).filter(item => ['left-header-slot', 'left-tabstrip', 'left-header-action'].includes(item.id));
+  try {
+    for (const mode of ['dark', 'light']) for (const width of [900, 1280]) for (const layout of ['split', 'full']) {
+      const page = await browser.newPage({ viewport: { width, height: 760 }, colorScheme: mode });
+      try {
+        await page.setContent(browserSurfaceFixture(native, { mode, layout }));
+        const before = await geometry(page), left = await leftPaint(page), baseline = await page.screenshot();
+        const surface = await page.locator('#toolbar-carrier').evaluate(element => getComputedStyle(element).backgroundColor);
+        const surfaceRgb = await page.evaluate(value => {
+          const canvas = document.createElement('canvas'), context = canvas.getContext('2d');
+          canvas.width = canvas.height = 1; context.fillStyle = value; context.fillRect(0, 0, 1, 1);
+          return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+        }, surface);
+        await page.evaluate(expression);
+        if (layout === 'full') await suspended(page); else await active(page);
+        let expectedClicks = 0, expectedLeftClicks = 0;
+        for (const remounted of [false, true]) {
+          if (remounted) await page.evaluate(() => {
+            // G.l mounts the same shared content container into its current
+            // host. Recreate only that host, keeping the real end-action
+            // sibling outside the portalled tab row throughout the move.
+            const oldHost = document.getElementById('right-header-portal'), host = oldHost.cloneNode(false);
+            oldHost.before(host); host.append(document.getElementById('shared-titlebar-content')); oldHost.remove();
+          });
+          const label = `${mode}/${width}/${layout}/portal-remount=${remounted}`;
+          assert.deepEqual(await geometry(page), before, `${label}: all owner, control and page geometry`);
+          assert.deepEqual(await leftPaint(page), left, `${label}: independent left slot/action paint`);
+          const points = await headerPoints(page), painted = await page.screenshot();
+          for (const [name, point] of Object.entries(points)) {
+            const expected = layout === 'full' ? pixel(baseline, ...point) : surfaceRgb;
+            assert.deepEqual(pixel(painted, ...point), expected, `${label}: native continuous ${name}`);
+          }
+          if (layout === 'split') {
+            await page.evaluate(makeStyleUpdateExpression({ styleSheet: rowOnlyTheme, variables }));
+            const oldPaint = await page.screenshot();
+            assert.deepEqual(pixel(oldPaint, ...points.rowTail), surfaceRgb, `${label}: old row-only paint must remain effective`);
+            for (const name of ['gap', 'fullSurround', 'splitSurround', 'endcap']) {
+              assert.notDeepEqual(pixel(oldPaint, ...points[name]), surfaceRgb, `${label}: old row-only paint must expose wallpaper at ${name}`);
+            }
+            assert.deepEqual(await geometry(page), before);
+            assert.deepEqual(await leftPaint(page), left);
+            await page.evaluate(makeStyleUpdateExpression({ styleSheet: theme, variables }));
+          }
+          if (layout === 'split') {
+            await page.locator('#full-toggle').click(); await suspended(page);
+            await page.locator('#split-toggle').click(); await active(page);
+            await page.locator('#left-header-action').click();
+            expectedLeftClicks++;
+          } else {
+            await page.locator('#split-toggle').click(); await active(page);
+            await page.locator('#full-toggle').click(); await suspended(page);
+          }
+          expectedClicks += 2;
+          assert.deepEqual(await page.evaluate(() => ({ right: fixtureClicks, left: leftClicks })),
+            { right: expectedClicks, left: expectedLeftClicks }, `${label}: end actions and independent chat action remain clickable`);
+          assert.deepEqual(await geometry(page), before);
+        }
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('registered end-slot paints its complete 81px carrier beyond the content clip while preserving visible tab text', async () => {
+  const native = loadBrowserSurfaceNative(), browser = await chromium.launch({ headless: true });
+  const contrastPixels = (buffer, box, background) => {
+    const png = PNG.sync.read(buffer); let count = 0;
+    for (let y = Math.ceil(box.y + 2); y < Math.floor(box.y + box.height - 2); y++) {
+      for (let x = Math.ceil(box.x + 2); x < Math.floor(box.x + box.width - 2); x++) {
+        const at = (y * png.width + x) * 4;
+        if (background.some((value, channel) => Math.abs(png.data[at + channel] - value) > 20)) count++;
+      }
+    }
+    return count;
+  };
+  try {
+    for (const mode of ['dark', 'light']) for (const width of [900, 1280]) for (const layout of ['split', 'full']) {
+      const page = await browser.newPage({ viewport: { width, height: 760 }, colorScheme: mode });
+      try {
+        await page.setContent(browserSurfaceFixture(native, { mode, layout, registeredEndSlot: true }));
+        const before = await geometry(page), left = (await nativePaint(page)).filter(item => item.id.startsWith('left-'));
+        const baseline = await page.screenshot(), carrier = await page.locator('#registered-end-measure').boundingBox();
+        const grid = await page.locator('#registered-end-slot').boundingBox();
+        assert.equal(carrier.width, 81, 'Live capture input: full-height padding carrier is 81 CSS px, including both controls and trailing padding');
+        assert.equal(carrier.height, 52);
+        assert.ok(grid.width > carrier.width * 2, 'The native end grid spans the pane and must not become a solid overlay');
+        assert.equal(await page.locator('#right-header-clip').evaluate(element => getComputedStyle(element).clipPath), 'inset(0px 81px 0px 6px)');
+        const surface = await page.locator('#toolbar-carrier').evaluate(element => getComputedStyle(element).backgroundColor);
+        const rgb = await page.evaluate(value => {
+          const canvas = document.createElement('canvas'), context = canvas.getContext('2d'); canvas.width = canvas.height = 1;
+          context.fillStyle = value; context.fillRect(0, 0, 1, 1); return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+        }, surface);
+        await page.evaluate(expression);
+        if (layout === 'full') await suspended(page); else await active(page);
+        for (const remounted of [false, true]) {
+          if (remounted) await page.evaluate(() => {
+            const old = document.getElementById('right-header-portal'), next = old.cloneNode(false);
+            old.before(next); next.append(document.getElementById('shared-titlebar-content')); old.remove();
+          });
+          const label = `${mode}/${width}/${layout}/registered-portal=${remounted}`;
+          assert.deepEqual(await geometry(page), before, `${label}: source-owned boxes and controls`);
+          assert.deepEqual((await nativePaint(page)).filter(item => item.id.startsWith('left-')), left, `${label}: left chat header remains independent`);
+          const actual = await page.screenshot(), y = carrier.y + carrier.height - 4;
+          // This row lies below the 28px buttons. Sampling all 81 columns
+          // protects the entire 52px carrier, including its native pe-2 edge.
+          for (let x = carrier.x; x < carrier.x + carrier.width; x++) {
+            assert.deepEqual(pixel(actual, x, y), layout === 'full' ? pixel(baseline, x, y) : rgb, `${label}: continuous native endcap column ${x - carrier.x}`);
+          }
+          if (width === 1280 && layout === 'split' && !remounted && process.env.WUKONG_HEADER_PREVIEW_DIRECTORY) {
+            fs.mkdirSync(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY, { recursive: true });
+            const clip = await page.locator('#right-header-slot').boundingBox();
+            fs.writeFileSync(path.join(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY,
+              `${mode}-tab-header-endcap-fixture-20261109.png`), await page.screenshot({ clip }));
+          }
+          const tab = await page.locator('#right-tabstrip button[role="tab"]').boundingBox();
+          assert.ok(contrastPixels(actual, tab, rgb) > 5, `${label}: native tab text remains visibly painted below the end-grid layer`);
+          if (layout === 'split') {
+            await page.evaluate(makeStyleUpdateExpression({ styleSheet: missingEndTheme, variables }));
+            const missing = await page.screenshot();
+            for (let x = carrier.x; x < carrier.x + carrier.width; x++) {
+              assert.notDeepEqual(pixel(missing, x, y), rgb, `${label}: the previous content-slot rule must leave this exact 81px strip showing wallpaper`);
+            }
+            assert.equal(await page.locator('#right-header-slot').evaluate(element => getComputedStyle(element).backgroundColor), surface,
+              'The negative control preserves the previous successful content-slot paint; clipping alone reveals the missing owner');
+            await page.evaluate(makeStyleUpdateExpression({ styleSheet: wholeEndGridTheme, variables }));
+            assert.equal(contrastPixels(await page.screenshot(), tab, rgb), 0,
+              `${label}: painting the pane-wide end grid must reproduce covered tab text`);
+            assert.deepEqual(await geometry(page), before);
+            await page.evaluate(makeStyleUpdateExpression({ styleSheet: theme, variables }));
+          }
+        }
+        if (layout === 'split') {
+          await page.locator('#full-toggle').click(); await suspended(page);
+          await page.locator('#split-toggle').click(); await active(page);
+        } else {
+          await page.locator('#split-toggle').click(); await active(page);
+          await page.locator('#full-toggle').click(); await suspended(page);
+        }
+        assert.equal(await page.evaluate(() => fixtureClicks), 2, 'Registered main-focus actions remain clickable across the presentation switch');
+        assert.deepEqual(await geometry(page), before);
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
+
+
+test('native pane portal remounts preserve stylesheet media and root presentation without redundant writes', async () => {
+  const native = loadBrowserSurfaceNative(), browser = await chromium.launch({ headless: true });
+  const guarded = 'if (style.media !== media) style.media = media;';
+  assert.equal(expression.split(guarded).length, 2);
+  const previous = expression.replace(guarded, 'style.media = media;');
+  try {
+    for (const mode of ['dark', 'light']) for (const legacy of [false, true]) {
+      const page = await browser.newPage({ viewport: { width: 1100, height: 760 }, colorScheme: mode });
+      try {
+        await page.setContent(browserSurfaceFixture(native, { mode, registeredEndSlot: true }));
+        await page.evaluate(legacy ? previous : expression); await active(page);
+        await page.waitForTimeout(1100);
+        await page.evaluate(() => {
+          window.presentationWrites = { media: 0, root: 0 };
+          const count = records => records.forEach(record => presentationWrites[record.attributeName === 'media' ? 'media' : 'root']++);
+          window.mediaObserver = new MutationObserver(count);
+          mediaObserver.observe(document.getElementById('wukong-codex-theme-style'), { attributes: true, attributeFilter: ['media'] });
+          window.presentationObserver = new MutationObserver(count);
+          presentationObserver.observe(document.documentElement, { attributes: true,
+            attributeFilter: ['data-forge-presentation', 'data-forge-background-placement', 'data-forge-background-ready'] });
+          window.paneOverlay = document.getElementById('wukong-codex-theme-background');
+          window.paneImage = paneOverlay.querySelector('[data-forge-active="true"] img');
+        });
+        await page.evaluate(async () => {
+          for (let index = 0; index < 12; index++) {
+            const carrier = document.getElementById('registered-end-measure'), parent = carrier.parentElement;
+            carrier.remove(); parent.append(carrier);
+            await new Promise(requestAnimationFrame);
+          }
+          await new Promise(requestAnimationFrame);
+        });
+        const writes = await page.evaluate(() => ({ ...presentationWrites }));
+        if (legacy) {
+          assert.ok(writes.media >= 12, mode + ': old same-value setter must reproduce repeated stylesheet media writes');
+        } else {
+          assert.deepEqual(writes, { media: 0, root: 0 }, mode + ': pane portal remounts must not invalidate unchanged presentation');
+          await page.locator('#full-toggle').click(); await suspended(page);
+          assert.equal(await page.evaluate(() => presentationWrites.media), 1, 'Entering full view still pauses material once');
+          await page.locator('#split-toggle').click(); await active(page);
+          assert.equal(await page.evaluate(() => presentationWrites.media), 2, 'Returning still restores material once');
+          assert.deepEqual(await page.evaluate(() => ({ overlay: paneOverlay === document.getElementById('wukong-codex-theme-background'),
+            image: paneImage === paneOverlay.querySelector('[data-forge-active="true"] img'), generation: __wukongCodexThemeRuntimeV13.overlayGeneration })),
+            { overlay: true, image: true, generation: 1 });
+        }
+        await page.evaluate(() => { mediaObserver.disconnect(); presentationObserver.disconnect(); });
+      } finally { await page.close(); }
+    }
   } finally { await browser.close(); }
 });

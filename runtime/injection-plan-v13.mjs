@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v119-native-full-view';
+export const RUNTIME_REVISION = 'v120-native-tab-header';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -301,13 +301,19 @@ function applyRuntime(payload, createAdapter) {
     // mounted but hidden, and pause only our managed stylesheet so returning to
     // the conversation restores the same theme without a reload or re-decode.
     const nativeFullView = nativeUi.fullViewActive();
-    root.dataset.forgePresentation = nativeFullView ? 'native-full-view' : 'theme';
-    style.media = nativeFullView ? 'not all' : '';
+    const presentation = nativeFullView ? 'native-full-view' : 'theme';
+    const media = nativeFullView ? 'not all' : '';
+    // Portal mounts can call this during the native pane transition. Rewriting
+    // the same stylesheet media/root state needlessly invalidates its paint
+    // immediately before pagePaint() reads layout.
+    if (root.dataset.forgePresentation !== presentation) root.dataset.forgePresentation = presentation;
+    if (style.media !== media) style.media = media;
     // The client's page paint node owns insets and corner geometry. Mount our
     // inert layer inside it instead of reconstructing that shape from pixels.
     const pageSurface = nativeUi.pagePaint();
     const host = pageSurface || document.body;
-    root.dataset.forgeBackgroundPlacement = pageSurface ? 'native-page' : 'viewport';
+    const placement = pageSurface ? 'native-page' : 'viewport';
+    if (root.dataset.forgeBackgroundPlacement !== placement) root.dataset.forgeBackgroundPlacement = placement;
     // Keep decoded layers across React shell replacement. A detached native
     // paint host must not force the same large wallpaper through decode again.
     let overlay = document.getElementById('wukong-codex-theme-background') || state.backgroundOverlay;
@@ -320,7 +326,7 @@ function applyRuntime(payload, createAdapter) {
       if (overlay.parentElement !== host) host.prepend(overlay);
       state.backgroundOverlay = overlay;
       const activeImage = overlay.querySelector('[data-forge-active="true"] [data-forge-background-image]');
-      if (overlay.dataset.forgeReady === 'true' && activeImage?.dataset.forgeDecoded === 'true' && activeImage.naturalWidth > 0) {
+      if (root.dataset.forgeBackgroundReady !== 'true' && overlay.dataset.forgeReady === 'true' && activeImage?.dataset.forgeDecoded === 'true' && activeImage.naturalWidth > 0) {
         root.dataset.forgeBackgroundReady = 'true';
       }
       return overlay;

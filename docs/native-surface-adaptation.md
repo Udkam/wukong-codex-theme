@@ -1,14 +1,18 @@
 # 原生 UI 与主题替换接口
 
-## 标签页标题与完整视图（2026-11-08，v119 开发适配）
+## 标签页标题与完整视图（2026-11-09，v120 开发适配）
 
-当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条的真实 row 发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"。标题可经原生 portal 移到共享 titlebar，不能依赖 AppShellTabs 的 DOM 祖先；主题只给这一个 row 使用原生 surface 底色并清除背景图，保留左侧 controller、原生几何和按钮。
+当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"；标题通过 portal 移到共享 titlebar。右侧 content 槽位同时发布 data-app-shell-focus-area="right-panel" 与 data-app-shell-titlebar-slot="content"，可包含内联 end action，但不是所有注册动作的绘制 owner。
 
-完整视图不再延伸主题壁纸。原生 right-panel 切换按钮发布 data-app-shell-workspace-layout-toggle="right-panel" 和 aria-pressed，它组合显式 full 布局与独立完整视图覆盖状态。后者允许底层 workspace-layout 仍为 split，早先只判断显式 full 的夹具不足以覆盖实机路径。当前使用可见原生按钮作为优先依据；按钮缺失时才检查活动 workspace 的显式 full 状态，不读取业务 store 或中文按钮文案。
+实机另有被 content overlay 裁切避让的全局注册动作：HeaderAction 的 unified-workspace-controls 以 align=end、slotPosition=right 注册到 titlebar；其 focus-area 可为 main。end-slot 使用 data-app-shell-header-slot="end" 与 data-app-shell-header-obstacle="true"，包含 h-full／w-max／justify-self-end 的 live measured 直接子节点，再包 h-full padding 载体及 data-app-shell-header-slot-content。注册 grid 宽度可能覆盖整个右侧标题段且绘制在标签内容之后，不能直接给整个 grid 涂不透明背景。
 
-进入完整视图后只暂停本项目材料样式并隐藏自身 inert 壁纸节点；原生 stylesheet、控件、顶部和侧栏均自行绘制。图库参数单独保留在只含 forge 自定义属性的受管样式中，场景选择与解码图像继续有效；材料热更新维持暂停，退出完整视图复用原图片和主题。恢复原生操作移除两份受管样式及全部自有节点。没有新增原生几何覆盖。
+主题在上述 end-slot 含原生 right-panel toggle 时只给实际整高 measured 子节点使用原生 surface 并清除背景图；右侧 content 槽位与非 portal row 保留对应覆盖。选择器不依赖模块 hash、按钮中文文案或固定像素，不改裁切、尺寸与定位，不匹配左侧标题或外部网页。源码合同保护 measured 子节点的实际类与注册／渲染关系。
 
-当前原生侧栏材料规则还明确排除 data-activity-sidebar-host；adapter 和相同 scope 的主题 CSS 同步遵守该边界。额度、goal、Popover 的测试仅迁移真实匿名导出、包装函数与透明槽位关联，不执行账户或客户端业务模块。
+完整视图不延伸主题壁纸。原生 right-panel 切换按钮的 aria-pressed 组合显式 full 布局与独立完整视图覆盖状态；后者允许 workspace-layout 仍为 split。当前使用可见原生按钮作为优先依据，按钮缺失时才检查活动 workspace 的显式 full 状态。
+
+进入完整视图后只暂停本项目材料样式并隐藏自身 inert 壁纸节点；原生 stylesheet、控件、顶部和侧栏自行绘制。图库参数保留在只含 forge 属性的受管样式中；材料热更新维持暂停，退出后复用原图片与主题。恢复原生移除两份受管样式及全部自有节点。toggle 自身／祖先的隐藏与重挂载触发同步判定，暂停状态不重复写入 hidden 属性。
+
+原生侧栏材料规则排除 data-activity-sidebar-host，adapter 与同一 scope 的主题 CSS 保持一致。额度、goal、Popover 合同保留；不执行账户或客户端业务模块。
 
 ## 数字资源块与当前模块类名（2026-11-05，v0.18.9／v118）
 

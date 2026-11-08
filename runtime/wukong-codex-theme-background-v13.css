@@ -52,10 +52,15 @@
   --forge-nav-hover: rgba(15,30,22,.13);
 }
 
-/* The right tab strip can be portalled into the shared titlebar. Give its own
- * native row a surface even in split view; the conversation header stays themed.
+/* The portalled tab content is clipped around the registered end actions.
+ * Paint both native header owners, including their gaps and full-height padding;
+ * retain a row fallback for non-portalled tabs. Native geometry stays intact.
  */
-:root.forge-ink-mountain #root [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]) {
+:root.forge-ink-mountain #root :is(
+  [data-app-shell-focus-area="right-panel"][data-app-shell-titlebar-slot="content"],
+  [data-app-shell-titlebar] [data-app-shell-header-slot="end"][data-app-shell-header-obstacle="true"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .h-full.w-max.justify-self-end,
+  [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])
+) {
   background-color: var(--color-surface, Canvas) !important;
   background-image: none !important;
 }

@@ -1,24 +1,24 @@
 # 当前适配验证
 
-## v119-native-full-view（2026-11-08 开发适配）
+## v120-native-tab-header（2026-11-09 开发适配）
 
-当前来源 Windows Codex 26.1103.4239.0，包内 26.1103.32239；ASAR 761,023,153 字节，SHA-256 为 fb47d6491dc3006b708cb1e14de479b882bf50f88b7daa81818f154c253266aa。浏览器 portal 的新资源和入口／运行时／CSS 解析关系已逐项核对；同一原生来源的布局、Dots、额度、goal、Popover 与材料边界合同保留。
+当前来源 Windows Codex 26.1103.4239.0，包内 26.1103.32239；ASAR 761,023,153 字节，SHA-256 为 fb47d6491dc3006b708cb1e14de479b882bf50f88b7daa81818f154c253266aa，本轮再次校验一致。来源锁及同一客户端的 Dots、额度、goal、Popover 与材料边界合同保留。
 
-按用户最新要求，右侧标签条在分栏时也使用原生 surface，完整视图暂停全部主题材料并隐藏壁纸，包含顶部和侧栏在内的界面由原生绘制。右侧 row／controller 标记跨 titlebar portal 仍有效，不依赖 Tabs.Root 祖先；不调整宽高、边距、字体、定位、圆角或外部网页。
+用户截图证明 v119 只修标签行仍不完整。保持页面时的实际客户端读取表明：右侧 content 槽位已有原生 rgb(24,24,24)，但其上层 overlay 使用原生 clip-path 避让末端 81 CSS px；完整视图／分栏按钮另经全局 HeaderAction 注册到独立 end-slot，按钮祖先的 focus-area 为 main。此前只根据 contentTitlebarEndAction 内联分支推断共同 owner 的夹具不足以覆盖该实机状态，未将该结果继续记为已修复。
 
-原生命令可先保留 split 布局，再开启独立完整视图覆盖状态。当前优先读取可见 right-panel toggle 的 aria-pressed，它组合这两个状态；main toggle 同时 pressed 不能否定右侧完整视图。可见 right-panel=false 保留普通主题，隐藏、非活动页、inert 按钮不触发；按钮缺失时保留活动 workspace 的显式 full 回退。属性变更直接同步暂停状态，不等待普通材料扫描。
+当前源码合同沿实际 HeaderAction 的 align=end／slotPosition=right 注册，绑定 end-slot grid、live measured 整高直接子节点、padding 载体、slot-content、main focus-area 与原生按钮。end-slot grid 可以覆盖整个右侧标题段并后绘制，因此只给其含 right-panel toggle 的实际 measured 子节点使用原生 surface；保留 content 槽位及非 portal row 的对应覆盖。没有新增尺寸、边距、圆角、裁切、字体或定位覆盖。
 
-新原生组件专项 6/6 通过、0 失败／跳过，约 24.8 秒：实际 JSX 根、require／export、按钮状态、原生样式和标题 portal 均有合同；深浅色、900／1280px 检查原生背景、文字、滤镜、伪元素、控件几何、禁用、输入和点击。完整视图保持未注入基线，切回分栏复用同一 overlay／图片，重入解码为 0；图库、材料热更新与恢复原生后的零残留均通过。保留旧 CSS 顶部露壁纸、旧完整视图谓词漏判两种负控制，没有通过删除保护或固定编译模块名掩盖问题。
+完整视图仍优先读取可见原生 right-panel toggle 的 aria-pressed，兼容底层仍标记 split 的覆盖路径；排除隐藏／非活动／inert 页面，按钮缺失时回退到显式 full。暂停本项目材料及壁纸，切回分栏复用原有图片；图库、热更新、恢复原生、toggle 自身／祖先隐藏和重挂载保护保留。原生活动侧栏材料仍不覆盖。
 
-启动探测结束后的转换回归另外覆盖 toggle 自身／祖先隐藏、aria-hidden、inert 和移除／重挂载，确认暂停及恢复均及时、解码实例保持，并用隔离旧 observer 的负控制复现状态残留。壁纸隐藏属性只在值变化时写入，暂停状态 refreshCount 保持稳定，不通过重复扫描掩盖退出路径缺口。
+用户已人工核验右侧标签页背景修复通过，随后反馈打开／收起标签页的过渡略有卡顿。运行时将 ensureBackground 的材料 media、presentation、placement 和 ready 属性改为仅值变化时写入，避免同状态 portal 挂载时重复写入后立即读取布局。此项验证只证明重复工作被移除，不等同于实测帧率改善。
 
-原生 activity sidebar 新材料排除同步到 adapter 与同一 scope 的 CSS，夹具检查其原有背景、渐变、几何和 activity-only 分支。测试入口迁移当前匿名导出、lazy transport、状态读取包装及透明四槽位，保持原有额度／goal／Popover 行为断言；不执行账户、feature-gate 网络、支付或客户端业务模块。
+本轮原生专项 **9/9 通过、0 失败／跳过**。深浅色、900／1280px、分栏／完整视图、portal 重挂载检查连续末端背景、原生几何、左侧隔离、标签文字与按钮点击。保留内联动作分支，并用两个独立负控制重现漏掉 end-slot 的蓝边与错误填充整个 grid 的文字遮盖。
 
-两张新图为当前原生组件展示夹具，非实机截图。Ego Lite 本地检查覆盖显式 full 路径下的深浅 DOM／输入／切换；其最小化窗口无法截图，真实按钮覆盖 split 的最终分支以独立自动回归为准。用户实际截图确认了顶部残留；后续电脑控制被物理 Esc 停止，未将最终客户端完整视图写成前台视觉验收。
+过渡专项在启动探测结束后反复重挂载真实右侧按钮载体 12 次：同状态的 media 和根 presentation／placement／ready 写入均为 0；旧 media setter 负控制每次都会重复写入。真正进入／退出完整视图时 media 仍各写一次，overlay／image 身份与 generation 保持。该结果证明减少重复工作，没有测量实机帧率或将用户的过渡体验记为已验收。
 
-精确暂存的 22 个相关路径与其他已跟踪源码导出到独立目录，未导出工作区无关未跟踪材料。最终 npm run check 为 **188/188 通过，0 失败、0 跳过，约 56.4 秒**；同一输入的 Studio E2E 通过，22 个输入文件逐一核对根目录与导出源码哈希一致。最后只补写验证及清理文档，运行时代码、测试和来源锁保持该精确输入。
+精确暂存的 13 个相关路径及其他已跟踪源码导出到独立目录，无关未跟踪材料未参与。最终独立 npm run check 为 **191/191 通过、0 失败、0 跳过，约 60.7 秒**；Studio E2E 通过。运行时代码、原生合同、回归及两张新预览共 6 个输入文件与独立源码逐一哈希一致，最后只补写结果和清理文档。连续像素检查对同一截图只解码一次，不改变采样或断言。
 
-已从这份独立源码再次执行本机注入，活动 v119-native-full-view、完整样式与源码一致、scene variables 样式存在、临时诊断样式为 0。应用时渲染器隐藏，返回 deferred=true／verified=false，背景解码等待可见性；随后实际读回 presentation=native-full-view、材料 stylesheet media="not all"、壁纸 hidden=true，确认当前真实完整视图已触发暂停。读取时 document.hidden 仍为 true，因此这是实机 DOM／安装状态，不是前台视觉验收。未执行冷启动／卸载或新的账户业务操作。临时源码、测试包与重复诊断已按 [清理记录](CLEANUP.md) 收尾；本轮没有创建新正式发行。
+已从已验证的独立源码注入 **v120-native-tab-header**，完整活动样式与源码一致。当前渲染器 document.hidden=true，返回 deferred=true／verified=false，图片等待窗口可见后加载；这不等于优化已完成前台验收。背景修复已有用户人工核验，新增过渡优化的实机感受尚未复核。本轮安全预览为动态原生结构夹具，非实机截图；没有继续电脑控制、重启客户端、冷启动、卸载、账户业务操作或新正式发行。临时源码、测试包及重复诊断已按 [清理记录](CLEANUP.md) 收尾。
 
 ## v0.18.9／v118-native-module-families（2026-11-05）
 

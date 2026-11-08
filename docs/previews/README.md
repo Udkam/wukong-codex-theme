@@ -1,5 +1,13 @@
 # 当前预览
 
+## v120 标签页右端背景组件夹具（2026-11-09）
+
+dark-tab-header-endcap-fixture-20261109.png、light-tab-header-endcap-fixture-20261109.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、标题 portal、HeaderAction 注册与 end-slot 渲染关系构成的动态展示夹具。覆盖被原生裁切隔开的独立注册按钮层；只展示测试标签和控件，不含聊天、账户或本机路径。**图片来自自动夹具，不是实际客户端截图，也不是用户视觉验收。**
+
+| 深色标签页顶部夹具 | 浅色标签页顶部夹具 |
+| --- | --- |
+| ![深色标签页右端原生背景夹具](dark-tab-header-endcap-fixture-20261109.png) | ![浅色标签页右端原生背景夹具](light-tab-header-endcap-fixture-20261109.png) |
+
 ## v119 完整视图原生外观组件夹具（2026-11-08）
 
 dark-native-full-view-fixture-20261108.png、light-native-full-view-fixture-20261108.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、实际 JSX 根属性及 import／export 关系构成的独立展示夹具，使用确定的外部布局槽位与测试文字，没有执行业务模块。图片是自动回归中暂停主题后的原生内容区域裁图；**不是实际客户端完整视图的截图，也不是用户视觉验收**。地址和卡片均为测试内容，不含聊天、账户或本机路径。
