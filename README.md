@@ -2,7 +2,7 @@
 
 为 Windows Codex / ChatGPT 桌面客户端带来悟空背景与玻璃材质，支持深色和浅色主题。内置 10 张战斗图与 3 张风景图，可用快捷键切换。
 
-**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.9/Wukong-Codex-Theme-0.18.9-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
+**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.10/Wukong-Codex-Theme-0.18.10-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
 
 ## 效果预览
 
@@ -28,4 +28,4 @@
 
 ---
 
-[开发文档](docs/DEVELOPMENT.md) · [当前适配说明](docs/RELEASE_NEXT.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)
+[开发文档](docs/DEVELOPMENT.md) · [当前发行说明](docs/RELEASE_0.18.10.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)

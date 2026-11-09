@@ -10,3 +10,7 @@
 深浅色侧栏、新聊天和标签页的示例来自原生组件测试夹具。 [预览](previews/README.md) · [验证记录](VALIDATION.md)
 
 解压 Windows 运行包后，完全退出桌面客户端，再双击 `start.cmd`。 [使用说明](QUICK_START.txt)
+
+[GitHub 正式发行](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.10) · [Windows ZIP](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.10/Wukong-Codex-Theme-0.18.10-Windows.zip) · [SHA256SUMS.txt](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.10/SHA256SUMS.txt)
+
+独立发行源码 195/195 项检查及 Studio E2E 通过；37 个包内文件的源码、ZIP 与解压内容一致。两个上传资产已重新下载，SHA-256 与本地文件和 GitHub digest 一致。ZIP SHA-256 为 `2e7cebd3f7cb54b426b4c78ba528b0ebd9afeaf6f0f25d9ad3f4ce8eb9585bc8`。

@@ -1,5 +1,13 @@
 # 当前适配验证
 
+## v0.18.10 正式发行（2026-11-09）
+
+标签对应 `4cd32388e59829fcdbb7bed360f42bd2978b350f`。从 169 个已跟踪文件的精确暂存树导出独立源码；`npm run check` **195/195 通过**，0 失败或跳过，约 65.8 秒；同一输入的 Studio E2E 通过。ZIP 共 37 个文件、4,053,449 字节，白名单与上一版一致。逐项比对源码、打包目录、ZIP 条目和解压内容，确认 Windows 入口及包版本。
+
+解压包中的注入器恢复原生 `verified=true`，独立原生断言通过。重新应用时窗口隐藏，`deferred=true`、`verified=false`；实际渲染器读回 v123、完整样式一致、当前聊天冷色底与 1 px 内描边。此结果为后台安装及样式验证；未执行冷启动、卸载或前台首帧捕获。
+
+GitHub Latest 为 [v0.18.10](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.10)，非草稿、非预发行。ZIP 与校验文件已重新下载，两者的本地、回下载与 GitHub digest 一致。ZIP SHA-256 为 `2e7cebd3f7cb54b426b4c78ba528b0ebd9afeaf6f0f25d9ad3f4ce8eb9585bc8`，校验文件 SHA-256 为 `cc8ec7907b4fbde0dc88a799be1119ec40b2faf56a5fd2c0472690b8aa25e1df`。标签之后仅同步发行文档。
+
 ## v123-sidebar-current-outline（2026-11-09 开发适配）
 
 Windows Codex 26.1103.4239.0（包内 26.1103.32239）的 ASAR 哈希与来源锁一致。侧栏专项使用实际共享行渲染器与聊天状态属性，在深浅色、300／380 CSS px 下验证项目悬停、当前聊天和多选聊天三种绘制。旧共享灰底可复现；新版仅当前聊天有 1 CSS px 内描边。行、链接与按钮尺寸、键盘焦点、菜单与点击、文件及会话拖放反馈、活动侧栏隔离、RTL 与强制颜色均通过。
