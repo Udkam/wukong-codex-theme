@@ -1,8 +1,8 @@
 # 原生 UI 与主题替换接口
 
-## 侧栏选中与首页首帧（2026-11-09，v122）
+## 侧栏选中与首页首帧（2026-11-09，v123）
 
-当前共享sidebar-item绘制背景来自row自身，active、selected、hover与菜单展开使用ghost token。按data-app-action-sidebar-project-row／thread-row限定局部状态，thread active／selected取原生字符串属性；新增层只改背景，不覆盖row链接的::before hitbox、outline或drop ring。拖放token、activity-sidebar-host与forced-colors被排除，原生contour和尺寸保留。
+共享 sidebar-item 行使用原生 active、selected、hover 和菜单状态。主题按 data-app-action-sidebar-project-row／thread-row 区分项目与聊天：项目悬停和菜单用局部 ghost token，selected 聊天用淡冷色底，active 聊天覆盖为更清晰的冷色底及 1 CSS px 内描边。内描边由行自身的 inset box-shadow 绘制，沿用原生圆角，不占用链接的 ::before 热区或键盘焦点轮廓。拖放状态、activity-sidebar-host 和 forced-colors 保持原生绘制；左右书写方向使用同样的完整描边。
 
 首页标题game-source是heading div，并非hero布局祖先；其子span可能包含真实项目选择按钮。home-icon是独立motion图标容器，父级通过原生opacity动画进出。主题直接对这两个语义owner绘制，与后续运行时属性共享字标／题字；不强制父级visibility，不改真实标题子控件的点击或布局。quote关闭与高对比路径也覆盖未标记节点。
 

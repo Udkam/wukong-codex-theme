@@ -560,7 +560,7 @@ const sidebarFixture = (native, mode, width) => {
     isActive: active, isDropTarget: drop, hasNavigationLink: true, onPress: () => {},
     children: [child('div', { className: native.threadContentClass, children: [child('a', { id: id + '-link', href: '#fixture', 'data-interactive-row-link': 'true',
       className: 'flex min-w-0 flex-1 before:pointer-events-auto before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] focus-visible:before:outline focus-visible:before:outline-2 focus-visible:before:outline-offset-[-2px] focus-visible:before:outline-ring',
-      children: child('span', { className: 'ps-8 truncate', children: active ? '选中的示例聊天' : selected ? '多选中的示例聊天' : '未选中的示例聊天' }) }),
+      children: child('span', { className: 'ps-8 truncate', children: active ? '当前示例聊天' : selected ? '已多选的示例聊天' : '未选中的示例聊天' }) }),
       child('button', { id: id + '-menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false', className: 'px-1', children: '⋯' })] })]
   });
   return '<!doctype html><html class="electron-' + mode + '" data-theme="' + mode + '" style="color-scheme:' + mode + '"><head><style>' + native.css + '</style><style>' +
@@ -571,11 +571,11 @@ const sidebarFixture = (native, mode, width) => {
     '<div id="outside">' + html(thread('outside-row', { active: true, selected: true })) + '</div></div><script>window.fixtureMenuClicks=0;window.fixtureLinkClicks=0;document.querySelectorAll("button[aria-haspopup=menu]").forEach(e=>e.onclick=event=>{event.stopPropagation();fixtureMenuClicks++;e.setAttribute("aria-expanded",String(e.getAttribute("aria-expanded")!=="true"))});document.querySelectorAll("a").forEach(e=>e.onclick=event=>{event.preventDefault();fixtureLinkClicks++})</script></body></html>';
 };
 
-test('current native sidebar distinguishes selected chats from project hover without changing focus, drop or row geometry', async () => {
+test('current native sidebar distinguishes the current chat, multi-selection and project hover without changing native interactions', async () => {
   const native = loadSidebarRowNative(), browser = await chromium.launch({ headless: true });
   const old = postcss.parse(theme); let removed = 0;
   old.walkRules(rule => { if (rule.selector.includes('[data-app-action-sidebar-thread-row]') || rule.selector.includes('[data-app-action-sidebar-project-row]')) { rule.remove(); removed++; } });
-  assert.equal(removed, 3, 'The previous-paint negative control must remove only the three new row mappings');
+  assert.equal(removed, 3, 'The shared-native-paint control must remove only the three sidebar row mappings');
   const previousTheme = old.toString(), report = [];
   const geometry = page => page.locator('#selection-sidebar .sidebar-item,#selection-sidebar a,#selection-sidebar button').evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect(), s = getComputedStyle(e); return { id: e.id, rect: [r.x, r.y, r.width, r.height], radius: s.borderRadius,
@@ -592,28 +592,36 @@ test('current native sidebar distinguishes selected chats from project hover wit
       const page = await browser.newPage({ viewport: { width: 800, height: 650 }, colorScheme: mode });
       try {
         await page.setContent(sidebarFixture(native, mode, width));
-        const baseline = await geometry(page), nativeFocus = await focus(page), drop = await paint(page, 'drop');
+        const baseline = await geometry(page), nativeFocus = await focus(page);
+        const drop = await paint(page, 'drop'), fileDrop = await paint(page, 'file-drop');
         const outside = await paint(page, 'outside-row'), activity = await paint(page, 'activity-row');
         assert.ok(nativeFocus.focused && nativeFocus.visible, 'Exercise the native link pseudo-element focus indicator');
         const sheet = await page.addStyleTag({ content: previousTheme });
         await sheet.evaluate(e => e.id = 'theme-under-test');
         await page.evaluate(value => { document.documentElement.classList.add('forge-ink-mountain'); document.documentElement.dataset.forgeNativeTheme = value; }, mode);
-        const previous = { project: await paint(page, 'project'), active: await paint(page, 'active') };
+        const previous = { project: await paint(page, 'project'), active: await paint(page, 'active'), selected: await paint(page, 'selected') };
         assert.equal(previous.project.background, previous.active.background, 'The old shared ghost token must reproduce stacked equal project/thread fill');
+        assert.equal(previous.active.background, previous.selected.background, 'The native ghost token also fills multi-selected rows');
+        assert.equal(previous.active.shadow, previous.selected.shadow, 'The native rows lack a distinct current-chat edge');
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, theme);
         await page.locator('#project').hover();
         const current = { project: await paint(page, 'project'), active: await paint(page, 'active'), selected: await paint(page, 'selected') };
-        assert.notEqual(current.project.background, current.active.background, 'Project hover is weaker than selected chat paint');
-        assert.notEqual(current.active.image, 'none');
-        assert.equal(current.active.background, current.selected.background, 'Active and multi-selected rows share the selection fill');
-        assert.notEqual(current.selected.image, 'none');
+        assert.notEqual(current.project.background, current.active.background, 'Project hover and current-chat fills are distinct');
+        assert.notEqual(current.project.background, current.selected.background, 'Project hover and multi-selection fills are distinct');
+        assert.notEqual(current.active.background, current.selected.background, 'The current chat has its own fill');
+        assert.equal(current.active.image, 'none');
+        assert.equal(current.selected.image, 'none');
+        assert.match(current.active.shadow, / 0px 0px 0px 1px inset$/, 'Only the current chat receives a 1px inset edge');
+        assert.equal(current.selected.shadow, previous.selected.shadow, 'A multi-selected row keeps its native shadow');
+        await page.locator('#active').evaluate(e => e.setAttribute('data-app-action-sidebar-thread-selected', 'false'));
+        assert.deepEqual(await paint(page, 'active'), current.active, 'The current chat has the same paint outside multi-selection');
+        await page.locator('#active').evaluate(e => e.setAttribute('data-app-action-sidebar-thread-selected', 'true'));
         assert.deepEqual(await geometry(page), baseline, mode + '/' + width + ': native row and control geometry');
         assert.deepEqual(await focus(page), nativeFocus, 'Native anchor focus outline and hitbox remain intact');
         assert.deepEqual(await paint(page, 'outside-row'), outside, 'Semantic-looking rows outside conversation navigation remain untouched');
         assert.deepEqual(await paint(page, 'activity-row'), activity, 'Activity navigation remains native');
-        const themedDrop = await paint(page, 'drop');
-        assert.equal(themedDrop.background, drop.background); assert.equal(themedDrop.shadow, drop.shadow); assert.equal(themedDrop.image, drop.image);
-        assert.equal((await paint(page, 'file-drop')).image, 'none', 'File-drop feedback must not acquire the selection stripe');
+        assert.deepEqual(await paint(page, 'drop'), drop, 'Drag-and-drop retains its native paint and ring');
+        assert.deepEqual(await paint(page, 'file-drop'), fileDrop, 'File drop retains its native paint');
         await page.locator('#inactive-project-menu').click(); await page.mouse.move(770, 620);
         assert.equal(await page.locator('#inactive-project-menu').getAttribute('aria-expanded'), 'true');
         assert.notEqual((await paint(page, 'inactive-project')).background, 'rgba(0, 0, 0, 0)', 'An expanded native action menu retains row feedback');
@@ -621,18 +629,23 @@ test('current native sidebar distinguishes selected chats from project hover wit
         assert.deepEqual(await page.evaluate(() => ({ menus: fixtureMenuClicks, links: fixtureLinkClicks })), { menus: 1, links: 1 });
         if (width === 300 && process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY) {
           fs.mkdirSync(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, { recursive: true });
-          const box = await page.locator('#selection-sidebar nav').boundingBox(), lastRow = await page.locator('#inactive').boundingBox();
+          await page.evaluate(() => document.activeElement.blur());
+          await page.mouse.move(770, 620);
+          const box = await page.locator('#selection-sidebar nav').boundingBox(), lastRow = await page.locator('#selected').boundingBox();
           fs.writeFileSync(path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, mode + '-sidebar-selection-fixture-20261109.png'), await page.screenshot({ clip: { ...box, height: lastRow.y + lastRow.height - box.y } }));
         }
         await page.locator('#selection-sidebar').evaluate(e => e.dir = 'rtl');
         const rtlBefore = await geometry(page);
-        assert.ok((await paint(page, 'active')).position.startsWith('100%'), 'Selection stripe follows the logical start edge in RTL');
+        assert.deepEqual(await paint(page, 'active'), current.active, 'The inset edge and fill are symmetric in RTL');
+        assert.deepEqual(await paint(page, 'selected'), current.selected, 'Multi-selection paint is symmetric in RTL');
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, previousTheme);
         assert.deepEqual(await geometry(page), rtlBefore);
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, theme);
         await page.emulateMedia({ forcedColors: 'active' });
-        assert.equal((await paint(page, 'active')).image, 'none', 'Forced-colors uses the native selection and focus presentation');
-        report.push({ mode, width, previous, current, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true });
+        const forced = { active: await paint(page, 'active'), selected: await paint(page, 'selected') };
+        await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, previousTheme);
+        assert.deepEqual(forced, { active: await paint(page, 'active'), selected: await paint(page, 'selected') }, 'Forced-colors retains native selection paint');
+        report.push({ mode, width, previous, current, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true, forcedColorsPreserved: true, rtlPaintPreserved: true });
       } finally { await page.close(); }
     }
     fs.writeFileSync(new URL('../artifacts/test-runs/native-boundary-20260920/sidebar-selection.json', import.meta.url), JSON.stringify(report, null, 2), 'utf8');
