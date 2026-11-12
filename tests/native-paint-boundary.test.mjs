@@ -236,6 +236,11 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     '--color-background-secondary-ghost-hover'
   ];
   const sidebarHoverSeen = new Set();
+  const navigationHoverSelector = `:root.forge-ink-mountain .sidebar-navigation nav:is([class^="Navigation-"], [class*=" Navigation-"]) .sidebar-item:is(
+  [class~="hover:bg-secondary-ghost-hover"],
+  [class~="hover:before:bg-secondary-ghost-hover"]
+):not([data-app-action-sidebar-project-row], [data-app-action-sidebar-thread-row], [data-file-drop-active="true"], [class~="bg-text-info/10"], [class~="bg-text-accent/10"], [data-activity-sidebar-host] *)`;
+  let navigationHoverSeen = false;
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
     // Only the independent recovery notice may adopt the adjacent native
@@ -257,6 +262,15 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
       assert.equal(d.parent.parent.params, '(forced-colors: none)');
       assert.ok(!sidebarHoverSeen.has(d.prop), `Duplicate sidebar hover token: ${d.prop}`);
       sidebarHoverSeen.add(d.prop);
+      return;
+    }
+    if (s === navigationHoverSelector) {
+      assert.equal(d.prop, '--color-background-secondary-ghost-hover');
+      assert.equal(d.value, 'var(--forge-nav-hover)');
+      assert.equal(d.important, true);
+      assert.equal(d.parent.parent.params, '(forced-colors: none)');
+      assert.equal(navigationHoverSeen, false);
+      navigationHoverSeen = true;
       return;
     }
     const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
@@ -286,6 +300,7 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
   assert.deepEqual([...quotaContourSeen].sort(), [...quotaContourValues.keys()].sort(),
     'The bounded quota contour rule retains both native variable declarations');
   assert.deepEqual([...sidebarHoverSeen].sort(), sidebarHoverTokens, 'Native hover tokens stay in the bounded row rule');
+  assert.equal(navigationHoverSeen, true, 'The native navigation item receives its own bounded hover token');
 });
 
 test('current client CSS: native geometry/semantic colours, home paint boundaries and popup first paint', {
@@ -543,7 +558,25 @@ const loadSidebarRowNative = () => {
   assert.ok(css.includes('.' + hoverClass + '{background-color:var(--color-background-secondary-ghost-hover)'));
   assert.ok(rowFunction.source.includes('bg-text-accent/10 ring-2 ring-inset ring-ring'), 'Native drop target fill and ring changed');
   assert.ok(rowFunction.source.includes('"aria-current":'));
-  return { css, renderRow, projectAttributes, threadAttributes, selectClass, fileDropClass, threadContentClass };
+  const navRecords = bundle.findModules(['data-sidebar-navigation-root', 'sidebarElectron.newThread']);
+  assert.equal(navRecords.length, 1, 'Native New Chat navigation owner changed');
+  const [navRecord] = navRecords;
+  const newChat = nativeFunction(navRecord, 'sidebarElectron.newThread');
+  const itemCall = newChat.nodes.find(node => node.type === 'CallExpression' &&
+    text(prop(node.arguments[1], 'animatedIcon')) === 'sidebar-new-chat');
+  const itemImport = bundle.imports(navRecord)[itemCall?.arguments[0].object.name];
+  assert.ok(itemImport, 'New Chat must still use the shared navigation item');
+  const itemRecord = bundle.module(itemImport.id), itemExport = bundle.exports(itemRecord)[key(itemCall.arguments[0].property)];
+  const itemClasses = nodes(itemExport).map(text);
+  const navClass = nodes(navRecord.ast).map(text).find(value => /^Navigation-\S+$/.test(value));
+  const navItem = itemClasses.find(value => value.startsWith('sidebar-item relative shrink-0'));
+  const navElementHover = itemClasses.find(value => value.startsWith('hover:bg-secondary-ghost-hover '));
+  const navPseudoHover = itemClasses.find(value => value.startsWith('hover:before:bg-secondary-ghost-hover '));
+  const navPseudoBase = itemClasses.find(value => value.includes('before:pointer-events-none before:absolute before:inset-0'));
+  assert.ok(navClass && navItem && navElementHover && navPseudoHover && navPseudoBase,
+    'Native shared navigation item paint ownership changed');
+  return { css, renderRow, projectAttributes, threadAttributes, selectClass, fileDropClass, threadContentClass,
+    navClass, navItem, navElementHover, navPseudoHover, navPseudoBase };
 };
 
 const sidebarFixture = (native, mode, width) => {
@@ -574,8 +607,11 @@ const sidebarFixture = (native, mode, width) => {
   });
   return '<!doctype html><html class="electron-' + mode + '" data-theme="' + mode + '" style="color-scheme:' + mode + '"><head><style>' + native.css + '</style><style>' +
     'body{margin:0;min-height:650px;background:' + (mode === 'dark' ? '#29333a' : '#e4e9e7') + '}#selection-sidebar{position:absolute;left:16px;top:16px;width:' + width + 'px;height:600px}.sidebar-navigation{height:100%}#outside{position:absolute;left:460px;top:16px;width:260px}#activity{margin-top:18px}.fixture-heading{padding:8px;font-size:11px;opacity:.7}#selection-sidebar nav{padding:8px}button{cursor:pointer}</style></head><body><div id="root">' +
-    '<aside id="selection-sidebar" class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation"><nav>' +
-    '<p class="fixture-heading">原生行展示夹具 · 非实机</p>' + html(project('project', true)) + html(thread('active', { active: true, selected: true })) + html(thread('inactive')) + html(thread('selected', { selected: true })) + html(project('inactive-project', false)) + html(thread('drop', { active: true, selected: true, drop: true })) + html(thread('file-drop', { active: true, selected: true, fileDrop: true })) +
+    '<aside id="selection-sidebar" class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation">' +
+    '<nav class="' + native.navClass + '"><p class="fixture-heading">原生行展示夹具 · 非实机</p>' +
+    '<button id="new-chat" class="' + native.navItem + ' ' + native.navElementHover + ' w-full px-2 py-1.5">新聊天</button>' +
+    '<button id="nav-destination" class="' + native.navItem + ' ' + native.navPseudoBase + ' ' + native.navPseudoHover + ' w-full px-2 py-1.5">导航示例</button>' +
+    html(project('project', true)) + html(thread('active', { active: true, selected: true })) + html(thread('inactive')) + html(thread('selected', { selected: true })) + html(project('inactive-project', false)) + html(thread('drop', { active: true, selected: true, drop: true })) + html(thread('file-drop', { active: true, selected: true, fileDrop: true })) +
     '</nav><div id="activity" class="sidebar-navigation" data-activity-sidebar-host="true">' + html(thread('activity-row', { active: true, selected: true })) + '</div></div></aside>' +
     '<div id="outside">' + html(thread('outside-row', { active: true, selected: true })) + '</div></div><script>window.fixtureMenuClicks=0;window.fixtureLinkClicks=0;document.querySelectorAll("button[aria-haspopup=menu]").forEach(e=>e.onclick=event=>{event.stopPropagation();fixtureMenuClicks++;e.setAttribute("aria-expanded",String(e.getAttribute("aria-expanded")!=="true"))});document.querySelectorAll("a").forEach(e=>e.onclick=event=>{event.preventDefault();fixtureLinkClicks++})</script></body></html>';
 };
@@ -583,7 +619,7 @@ const sidebarFixture = (native, mode, width) => {
 test('current native sidebar distinguishes the current chat, multi-selection and project hover without changing native interactions', async () => {
   const native = loadSidebarRowNative(), browser = await chromium.launch({ headless: true });
   const old = postcss.parse(theme); let removed = 0;
-  old.walkRules(rule => { if (rule.selector.includes('[data-app-action-sidebar-thread-row]') || rule.selector.includes('[data-app-action-sidebar-project-row]')) { rule.remove(); removed++; } });
+  old.walkRules(rule => { if (rule.selector.includes('.sidebar-navigation:not([data-activity-sidebar-host])')) { rule.remove(); removed++; } });
   assert.equal(removed, 3, 'The shared-native-paint control must remove only the three sidebar row mappings');
   const previousTheme = old.toString(), report = [];
   const primaryOnly = postcss.parse(theme);
@@ -597,6 +633,24 @@ test('current native sidebar distinguishes the current chat, multi-selection and
   const focus = async page => {
     await page.locator('#active-menu').focus(); await page.keyboard.press('Shift+Tab');
     return page.locator('#active-link').evaluate(e => { const s = getComputedStyle(e, '::before'); return { focused: document.activeElement === e, visible: e.matches(':focus-visible'), outline: s.outline, pointer: s.pointerEvents, position: s.position, inset: s.inset }; });
+  };
+  const navigationHover = async page => {
+    const observations = [];
+    for (const [id, pseudo] of [['new-chat', null], ['nav-destination', '::before']]) {
+      const item = page.locator('#' + id);
+      await item.hover();
+      observations.push(await item.evaluate((element, selector) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--forge-nav-hover)';
+        element.append(probe);
+        const result = { id: element.id, hover: getComputedStyle(element, selector).backgroundColor,
+          expected: getComputedStyle(probe).backgroundColor };
+        probe.remove();
+        return result;
+      }, pseudo));
+    }
+    await page.mouse.move(770, 620);
+    return observations;
   };
   const feedback = async page => {
     const observations = [];
@@ -648,11 +702,15 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         assert.equal(previous.active.background, previous.selected.background, 'The native ghost token also fills multi-selected rows');
         assert.equal(previous.active.shadow, previous.selected.shadow, 'The native rows lack a distinct current-chat edge');
         await sheet.evaluate((e, css) => e.textContent = css, primaryOnly.toString());
+        const oldNavigation = await navigationHover(page);
+        for (const item of oldNavigation) assert.notEqual(item.hover, item.expected, 'Primary alone misses general navigation hover');
         const previousFeedback = await feedback(page);
         for (const row of previousFeedback) {
           assert.notEqual(row.hover, row.expected, 'The primary-only theme reproduces the missed secondary hover and expanded-menu paint');
         }
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, theme);
+        const newNavigation = await navigationHover(page);
+        for (const item of newNavigation) assert.equal(item.hover, item.expected, 'Both native navigation hover carriers use theme paint');
         const currentFeedback = await feedback(page);
         for (const row of currentFeedback) {
           assert.equal(row.hover, row.expected, 'The current theme restores the intended hover and expanded-menu paint');
@@ -683,9 +741,9 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         if (width === 300 && process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY) {
           fs.mkdirSync(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, { recursive: true });
           await page.evaluate(() => document.activeElement.blur());
-          await page.mouse.move(770, 620);
+          await page.locator('#new-chat').hover();
           const box = await page.locator('#selection-sidebar nav').boundingBox(), lastRow = await page.locator('#selected').boundingBox();
-          fs.writeFileSync(path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, mode + '-sidebar-selection-fixture-20261113.png'), await page.screenshot({ clip: { ...box, height: lastRow.y + lastRow.height - box.y } }));
+          fs.writeFileSync(path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, mode + '-sidebar-navigation-hover-fixture-20261113.png'), await page.screenshot({ clip: { ...box, height: lastRow.y + lastRow.height - box.y } }));
         }
         await page.locator('#selection-sidebar').evaluate(e => e.dir = 'rtl');
         const rtlBefore = await geometry(page);
@@ -696,11 +754,17 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, theme);
         await page.emulateMedia({ forcedColors: 'active' });
         const forced = { active: await paint(page, 'active'), selected: await paint(page, 'selected') };
+        const forcedNavigation = await navigationHover(page);
+        await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, primaryOnly.toString());
+        assert.deepEqual(await navigationHover(page), forcedNavigation, 'Forced-colors retains native navigation hover');
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, previousTheme);
         assert.deepEqual(forced, { active: await paint(page, 'active'), selected: await paint(page, 'selected') }, 'Forced-colors retains native selection paint');
-        report.push({ mode, width, previous, current, previousFeedback, currentFeedback, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true, forcedColorsPreserved: true, rtlPaintPreserved: true });
+        report.push({ mode, width, previous, current, previousFeedback, currentFeedback, oldNavigation, newNavigation, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true, forcedColorsPreserved: true, rtlPaintPreserved: true });
       } finally { await page.close(); }
     }
-    fs.writeFileSync(new URL('../artifacts/test-runs/native-boundary-20260920/sidebar-selection.json', import.meta.url), JSON.stringify(report, null, 2), 'utf8');
+    const reportFile = process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY
+      ? path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, 'sidebar-selection.json')
+      : new URL('../artifacts/test-runs/native-boundary-20260920/sidebar-selection.json', import.meta.url);
+    fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), 'utf8');
   } finally { await browser.close(); }
 });

@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import { chromium } from '@playwright/test';
 import { NATIVE_UI_SELECTORS, createNativeUiAdapter } from '../runtime/native-ui-contract.mjs';
 import { makeApplyExpression, RESTORE_EXPRESSION } from '../runtime/injection-plan-v13.mjs';
+import { loadNativeBundle, nativeFunction, nodes, ownNodes, prop, text, key } from './native-bundle-current-helper.mjs';
 
 const css = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const image = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="32"><path fill="#546c7f" d="M0 0h48v32H0z"/></svg>');
@@ -62,34 +63,65 @@ test('settings state follows mounted settings and excludes schedule dialogs', as
 });
 
 test('activity sidebar keeps its native paint and cannot become the conversation navigation owner', async () => {
-  const page = await browser.newPage();
-  try {
-    // The current renderer uses the same sidebar-navigation class for the
-    // activity gutter, with this explicit marker separating paint ownership.
-    await page.setContent(`<style>
-      aside{height:320px}.sidebar-navigation{height:80px;border-radius:13px}
-      #activity{background:rgb(47,61,73);background-image:linear-gradient(90deg,rgb(47,61,73),rgb(57,71,83))}
-    </style><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default">
-      <div id="activity" class="sidebar-navigation" data-activity-sidebar-host="true"><button>Activity action</button></div>
-      <div id="conversation" class="sidebar-navigation"><div id="nested" class="sidebar-navigation">Nested list</div></div>
-    </aside>`);
-    await page.evaluate(adapterExpression);
-    assert.equal(await page.evaluate(() => adapter.conversationSidebar()?.id), 'conversation');
-    const read = () => page.locator('#activity').evaluate(element => {
-      const style = getComputedStyle(element), rect = element.getBoundingClientRect();
-      return { rect: [rect.x, rect.y, rect.width, rect.height], radius: style.borderRadius,
-        paint: [style.backgroundColor, style.backgroundImage, style.backdropFilter] };
-    });
-    const before = await read();
-    await page.addStyleTag({ content: css });
-    await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
-    assert.deepEqual(await read(), before, 'Activity retains its own gutter fill, gradient and native geometry');
-    assert.notEqual(await page.locator('#conversation').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)',
-      'The ordinary conversation navigation still receives its reading material');
-    await page.locator('#conversation').evaluate(element => element.remove());
-    assert.equal(await page.evaluate(() => adapter.conversationSidebar()), null,
-      'An activity-only sidebar has no conversation navigation owner');
-  } finally { await page.close(); }
+  const bundle = loadNativeBundle();
+  const shells = bundle.findModules(['data-sidebar-navigation-root', 'data-slate-sidebar-content', 'app-shell-floating-left-panel']);
+  const activities = bundle.findModules(['ActivitySidebar:', 'activity-sidebar-toolbar-button']);
+  assert.equal(shells.length, 1);
+  assert.equal(activities.length, 1);
+  const [shell] = shells, [activity] = activities;
+  const jsx = node => node.type === 'CallExpression' && node.arguments[1]?.type === 'ObjectExpression';
+  const navigation = nodes(shell.ast).find(node => jsx(node) && prop(node.arguments[1], 'data-sidebar-navigation-root'));
+  const slate = nodes(shell.ast).find(node => jsx(node) && prop(node.arguments[1], 'data-slate-sidebar-content'));
+  const floatingShell = nodes(shell.ast).find(node => jsx(node) && text(node.arguments[0]) === 'aside' &&
+    text(prop(node.arguments[1], 'data-testid')) === 'app-shell-floating-left-panel');
+  const owner = nativeFunction(shell, navigation.start);
+  const activityCall = ownNodes(owner.ast).find(node => jsx(node) && prop(node.arguments[1], 'showBack') &&
+    node.arguments[0]?.type === 'MemberExpression' && key(node.arguments[0].property) === 'S');
+  const provider = bundle.imports(shell)[activityCall?.arguments[0].object.name];
+  assert.ok(provider && bundle.module(provider.id).source.includes(`"${activity.id}"`), 'Activity is mounted by the shared sidebar owner');
+  const navigationClass = nodes(prop(navigation.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden sidebar-navigation'));
+  const slateClass = text(prop(slate.arguments[1], 'className'));
+  const floatingClass = nodes(prop(floatingShell.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden bg-surface'));
+  const activitySection = nodes(activity.ast).find(node => jsx(node) && text(node.arguments[0]) === 'section' && prop(node.arguments[1], 'aria-label'));
+  const activityOwner = nativeFunction(activity, activitySection.start);
+  const activityClass = ownNodes(activityOwner.ast).find(node => node.type === 'AssignmentExpression' &&
+    node.left.name === prop(activitySection.arguments[1], 'className').name && node.right.type === 'Literal')?.right.value;
+  assert.ok(navigationClass && slateClass.includes('sidebar-navigation') && floatingClass && activityClass?.split(' ').includes('font-openai-sans'));
+  const nativeCss = bundle.css(['.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']);
+  const activityViews = [
+    '<header><button class="activity-sidebar-toolbar-button">Filter</button></header><button data-activity-id="fixture">Entry</button>',
+    '<header><button class="activity-sidebar-toolbar-button">Filter</button></header><div role="status">Empty</div>',
+    '<header><button>Back</button></header><div>Detail</div>'
+  ];
+  for (const mode of ['dark', 'light']) {
+    const page = await browser.newPage({ colorScheme: mode });
+    try {
+      for (const [floating, wrap] of [[false, false], [false, true], [true, true]]) for (const view of activityViews) {
+        const section = `<section id="activity" class="${activityClass}" aria-label="Fixture activity">${view}</section>`;
+        const children = wrap ? `<div id="slate" data-slate-sidebar-content="true" class="${slateClass}"><div>${section}</div></div>` : section;
+        const shellAttributes = floating ? `class="${floatingClass}" data-testid="app-shell-floating-left-panel"` : 'class="app-shell-left-panel"';
+        await page.setContent(`<html class="electron-${mode}" data-theme="${mode}" style="color-scheme:${mode}"><style>${nativeCss}</style>
+          <style>aside{display:flex;height:320px;width:300px}</style><aside ${shellAttributes} data-app-shell-left-panel-appearance="default">
+          <div id="shared" class="${navigationClass}" data-sidebar-navigation-root="true">${children}</div></aside></html>`);
+        await page.evaluate(adapterExpression);
+        const read = () => page.locator('#shared,#slate,#activity').evaluateAll(elements => elements.map(element => {
+          const style = getComputedStyle(element), rect = element.getBoundingClientRect();
+          return { id: element.id, rect: [rect.x, rect.y, rect.width, rect.height], radius: style.borderRadius,
+            paint: [style.backgroundColor, style.backgroundImage, style.backdropFilter] };
+        }));
+        const before = await read();
+        await page.addStyleTag({ content: css });
+        await page.evaluate(value => { document.documentElement.classList.add('forge-ink-mountain'); document.documentElement.dataset.forgeNativeTheme = value; }, mode);
+        assert.deepEqual(await read(), before, 'Activity retains native gutter paint and geometry across list, empty and detail');
+        assert.equal(await page.evaluate(() => adapter.conversationSidebar()), null, 'The activity branch is excluded from conversation sampling');
+        if (floating) assert.match(await page.locator('aside').evaluate(element => getComputedStyle(element).backdropFilter), /^blur\(/,
+          'The floating shell keeps its separate glass material');
+        await page.locator('#activity').evaluate(element => element.replaceWith(document.createElement('nav')));
+        assert.equal(await page.evaluate(() => adapter.conversationSidebar()?.id), 'shared');
+        if (!floating) assert.match((await read())[0].paint[2], /^blur\(/, 'The docked wrapper resumes conversation material on return');
+      }
+    } finally { await page.close(); }
+  }
 });
 
 test('new composer rails map through attributes without native spacing or font tokens', async () => {

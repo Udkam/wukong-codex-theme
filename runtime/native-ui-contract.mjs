@@ -1,5 +1,5 @@
 /*
- * Native DOM contracts, audited against the packaged 26.1103 UI. Data attributes
+ * Native DOM contracts, audited against the packaged 26.1106 UI. Data attributes
  * describe ownership; utility classes are only retained as bounded fallbacks.
  * Keep this module dependency-free: the factory is serialized into the client.
  */
@@ -13,6 +13,7 @@ export const NATIVE_UI_SELECTORS = Object.freeze({
   sidebar: 'aside[data-app-shell-left-panel-appearance], aside.app-shell-left-panel',
   floatingSidebar: 'aside[data-testid="app-shell-floating-left-panel"], [data-testid="app-shell-floating-left-panel"] > aside',
   navigation: '.sidebar-navigation',
+  activityNavigation: ':is([data-sidebar-navigation-root], [data-slate-sidebar-content]).sidebar-navigation:has(section.font-openai-sans[aria-label])',
   settings: '[data-settings-mobile-header], [class~="group/settings"]',
   catalogHeader: '[data-sticky][style*="--app-shell-titlebar-left-inset"]',
   conversation: '[data-thread-find-target="conversation"]',
@@ -101,6 +102,7 @@ export function createNativeUiAdapter(document, selectors) {
     // previews must not become independent sampled/painted sidebars.
     return first(selectors.navigation, owner, element => visible(element) &&
       !element.hasAttribute('data-activity-sidebar-host') &&
+      !element.matches(selectors.activityNavigation) &&
       !element.parentElement?.closest(selectors.navigation));
   };
   const utilityContext = (composerRoot, surface) => {

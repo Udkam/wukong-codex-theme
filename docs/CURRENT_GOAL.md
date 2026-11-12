@@ -1,6 +1,6 @@
 # 当前目标与发行状态
 
-更新：2026-11-13。开发版 **v124-sidebar-hover-paint** 适配 Windows Codex 26.1106.6628.0（包内 26.1106.51428），恢复侧栏悬停和菜单展开的浅底色，保留新版原生拖放反馈。范围见 [开发变更](RELEASE_NEXT.md)。
+更新：2026-11-13。开发版 **v125-native-surfaces-and-reduced-motion** 适配 Windows Codex 26.1106.6628.0（包内 26.1106.51428）。修正语音专注模式底部、活动侧栏和普通导航的绘制，减少动态效果时在解码完成后直接切换壁纸。范围见 [开发变更](RELEASE_NEXT.md)。
 
 最新正式版为 **[v0.18.10](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.10)**，运行时 v123-sidebar-current-outline，原生来源 Windows Codex 26.1103.4239.0（包内 26.1103.32239）。
 

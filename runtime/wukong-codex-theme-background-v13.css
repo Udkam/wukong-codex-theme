@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1103.4239.0.
+/* Native paint boundary, audited against desktop 26.1106.6628.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -115,11 +115,15 @@
 :root.forge-ink-mountain #root .pointer-events-none[aria-hidden="true"][style*="position-anchor:"][style*="--orbit-messaging-header-"]:empty {
   background-image: none !important;
 }
-/* ThreadScrollLayout now paints a separate inert footer plate. Scope to its
- * semantic owner, including focus mode; never clear cards inside the composer. */
+/* ThreadScrollLayout paints a separate inert footer plate. Scope to its
+ * semantic owner so cards inside the composer keep their own paint. */
 :root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"],
 :root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none {
   background: transparent !important;
+}
+/* The voice focus stage gives the outer footer shell its own solid fill. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] .pointer-events-none[class~="has-[[data-thread-focus-mode]]:bg-surface"]:has(> [data-thread-scroll-footer="true"] [data-thread-focus-mode]) {
+  background-color: transparent !important;
 }
 /* Your dot uses the native messaging shell rather than the Codex thread shell.
  * Clear only layout paint. Preserve message bubbles, menus and drop overlays. */
@@ -312,7 +316,12 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"] .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation):not([data-activity-sidebar-host]) {
+/* The current activity section mounts inside shared conversation navigation,
+ * including the optional slate wrapper. Leave both owners on native paint. */
+:root.forge-ink-mountain aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"] .sidebar-navigation:not(.sidebar-navigation .sidebar-navigation):not(
+  [data-activity-sidebar-host],
+  :is([data-sidebar-navigation-root], [data-slate-sidebar-content]):has(section.font-openai-sans[aria-label])
+) {
   background-color: var(--forge-navigation-fill) !important;
   background-image: none !important;
   backdrop-filter: var(--forge-navigation-filter) !important;
@@ -332,6 +341,14 @@
  * Native drop rows keep their own paint and ring.
  */
 @media (forced-colors: none) {
+/* New Chat and the shared navigation item can paint on the row or its pseudo.
+ * Scope the secondary token to those owners so native drag feedback survives. */
+:root.forge-ink-mountain .sidebar-navigation nav:is([class^="Navigation-"], [class*=" Navigation-"]) .sidebar-item:is(
+  [class~="hover:bg-secondary-ghost-hover"],
+  [class~="hover:before:bg-secondary-ghost-hover"]
+):not([data-app-action-sidebar-project-row], [data-app-action-sidebar-thread-row], [data-file-drop-active="true"], [class~="bg-text-info/10"], [class~="bg-text-accent/10"], [data-activity-sidebar-host] *) {
+  --color-background-secondary-ghost-hover: var(--forge-nav-hover) !important;
+}
 :root.forge-ink-mountain .sidebar-navigation:not([data-activity-sidebar-host]) :is(
   [data-app-action-sidebar-project-row],
   [data-app-action-sidebar-thread-row]
@@ -754,6 +771,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root.forge-ink-mountain {
+    --forge-background-transition: 0ms !important;
+  }
   :root.forge-ink-mountain #wukong-codex-theme-background > [data-forge-background-layer],
   :root.forge-ink-mountain [data-forge-background-veil] {
     transition: none !important;

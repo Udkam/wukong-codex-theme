@@ -6,6 +6,8 @@
 
 Windows Codex 26.1106.6628.0 使用 secondary ghost 变量绘制悬停和展开菜单。v124 在两类侧栏行内同时映射新版 secondary 和旧版 primary 变量。新版以 `bg-text-accent/10` 标记拖放目标，主题在此状态让出底色和描边，文件拖放继续由 `data-file-drop-active` 隔离。
 
+v125 将普通导航入口的 secondary ghost 变量映射到通用悬停底色，涵盖行与行的伪元素。当前活动侧栏把有无障碍标签的 Activity section 挂在共享导航或其 slate 包装中。主题按该结构识别活动内容，让共享导航保留原生绘制，并从对话侧栏的采样范围排除。浮动侧栏外壳继续使用独立材质。
+
 首页标题game-source是heading div，并非hero布局祖先；其子span可能包含真实项目选择按钮。home-icon是独立motion图标容器，父级通过原生opacity动画进出。主题直接对这两个语义owner绘制，与后续运行时属性共享字标／题字；不强制父级visibility，不改真实标题子控件的点击或布局。quote关闭与高对比路径也覆盖未标记节点。
 
 home UtilityBarSlot仅承担透明motion定位；data-composer-utility-rail实际Item上的原生bg token决定是否拥有材料。只在该表面补齐首帧backdrop-filter，bg-transparent及无背景token的变体仍透明，内部scroll-area和上下定位不参与重复绘制。
@@ -31,6 +33,8 @@ home UtilityBarSlot仅承担透明motion定位；data-composer-utility-rail实�
 当前来源 Windows Codex 26.1029.7803.0 已改用 Rspack 数字资源块，入口只有四个 JavaScript 资源，组件及样式经运行时映射异步加载。原来的 app-shared／initial／primary 文件名和下划线模块类名不再是当前接口；不得只刷新来源哈希后沿用旧组件夹具。测试现在静态读取实际 module factory、require／export 关系、入口资源与 CSS 层次，再执行限定的纯展示组件，不执行客户端业务模块。
 
 共享底部组件仍有 fade、surface、combined 三个分支，真实空装饰叶使用 background- 与对应 part 的类名 token。普通线程独立挂载 fade／surface，Dots 使用 combined／免责声明 surface，工作区预览通过 portal 挂载语义 footer 和独立间隙中的 fade。主题仅在明确布局／输入区 owner 下，匹配空、aria-hidden、pointer-events-none 的这组叶子，同时清除实体背景和渐变。显式 footer／composer owner 可在 body portal 中生效；无 owner、非空、交互、伪状态类及外部网页继续隔离。
+
+语音专注模式在语义 footer 内挂载 `data-thread-focus-mode`。它触发直接外壳的原生实色规则。v125 只在壁纸就绪后清除带该原生绘制类的外壳底色，保留内层语音控件和布局。
 
 PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、侧栏与额度提示的模块回退标记已迁移到当前未加前缀的 name- token 边界。页面壁纸仍挂到实际 PageSurface 中，保留原生 inset／圆角；代码工具栏与材质归属沿用原生结构。没有新增尺寸、位置、裁切或控件几何覆盖。
 

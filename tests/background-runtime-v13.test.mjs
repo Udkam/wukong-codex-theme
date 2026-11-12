@@ -1424,6 +1424,55 @@ test('V53 has no timer rotation and automatically selects battle for New Task an
   await page.evaluate(RESTORE_EXPRESSION);
 });
 
+test('reduced motion commits consecutive decoded wallpapers without arming a crossfade', async t => {
+  const page = await browser.newPage({ reducedMotion: 'reduce' });
+  t.after(() => page.close());
+  await page.route('http://wukong-reduced-motion.test/**', route => route.fulfill({
+    body: runtimeFixtureHtml,
+    contentType: 'text/html; charset=utf-8'
+  }));
+  await page.goto('http://wukong-reduced-motion.test/');
+  await page.evaluate(orderedExpression);
+  const [first, ...nextScenes] = sequenceFor('battle').slice(0, 3).map(Number);
+  await waitForRuntime(page, 'scene', first);
+  await page.evaluate(() => {
+    const nativeDecode = HTMLImageElement.prototype.decode;
+    window.wallpaperDecodeGates = [];
+    HTMLImageElement.prototype.decode = function (...args) {
+      return nativeDecode.apply(this, args).then(() => new Promise(resolve => {
+        window.wallpaperDecodeGates.push(resolve);
+      }));
+    };
+  });
+  let previous = first;
+  for (const [index, scene] of nextScenes.entries()) {
+    await page.keyboard.press('Control+Alt+F');
+    await page.waitForFunction(count => window.wallpaperDecodeGates.length === count, index + 1);
+    assert.equal((await currentBackground(page)).scene, String(previous), 'The previous image remains visible until decode completes');
+    const committed = await page.evaluate(async gate => {
+      window.wallpaperDecodeGates[gate]();
+      // Resolve the decode and its commit without advancing to a paint frame.
+      for (let i = 0; i < 8; i++) await Promise.resolve();
+      const state = window.__wukongCodexThemeRuntimeV13;
+      const overlay = document.getElementById('wukong-codex-theme-background');
+      const layers = [...overlay.querySelectorAll('[data-forge-background-layer]')];
+      const active = layers.find(layer => layer.dataset.forgeActive === 'true');
+      return {
+        scene: state.currentScene,
+        transitioning: state.transitionInFlight || overlay.hasAttribute('data-forge-transitioning'),
+        scheduled: Boolean(state.transitionFrameA || state.transitionFrameB || state.transitionArmTimer || state.transitionTimer),
+        queued: Boolean(state.pendingSceneStyle),
+        loaded: layers.filter(layer => layer.querySelector('[data-forge-background-image]').hasAttribute('src')).length,
+        opacity: getComputedStyle(active).opacity
+      };
+    }, index);
+    assert.deepEqual(committed, {
+      scene, transitioning: false, scheduled: false, queued: false, loaded: 1, opacity: '1'
+    });
+    previous = scene;
+  }
+});
+
 test('V53 follows all 13 active numbered assets and keeps per-scene thread veils on both crossfade layers', async () => {
   const page = await browser.newPage({ colorScheme: 'dark', viewport: { width: 1280, height: 760 } });
   const expectedBattle = sequenceFor('battle');

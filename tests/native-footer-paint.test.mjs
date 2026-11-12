@@ -11,6 +11,7 @@ const provenance = JSON.parse(fs.readFileSync(new URL('../docs/native-asar-prove
 const archive = process.env.CODEX_LOCAL_ASAR || path.join(process.env.ProgramFiles || '', 'WindowsApps', provenance.packageDirectoryName, provenance.asarRelativePath);
 const skip = !fs.existsSync(archive) && 'Requires the audited installed ASAR';
 const member = (content, name) => content.find(node => node.type === 'MemberExpression' && key(node.property) === name && node.object.type === 'Identifier')?.object.name;
+const escapeAttribute = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
 
 let cached;
 const loadNative = () => {
@@ -48,7 +49,7 @@ const loadNative = () => {
     return calls.length ? [{ ...item, calls }] : [];
   });
   assert.ok(consumers.length, 'Current footer consumers must import its resolved module/export');
-  cached = { css: bundle.css([classes.background]), render, classes, record, consumers };
+  cached = { bundle, css: bundle.css([classes.background]), render, classes, record, consumers };
   return cached;
 };
 
@@ -94,7 +95,8 @@ const legacyFooterSelectors = current => {
     if (rule.selector.includes('background-') && rule.selector.includes('combined-')) {
       rule.selector = ':root.forge-ink-mountain #root :is([data-app-shell-main-content-layout], .thread-scroll-container, [data-thread-scroll-footer="true"], [data-codex-composer-root]) [aria-hidden="true"].pointer-events-none:empty[class*="_background_"]:is([class*="_fade_"],[class*="_surface_"],[class*="_combined_"])';
       replaced++;
-    } else if (rule.selector.includes('[data-forge-background-ready="true"]') && rule.selector.includes('[data-thread-scroll-footer="true"]')) {
+    } else if (rule.selector.includes('[data-forge-background-ready="true"]') &&
+      rule.selector.includes('[data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none')) {
       rule.selector = ':root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"], :root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none';
       replaced++;
     }
@@ -105,8 +107,7 @@ const legacyFooterSelectors = current => {
 
 test('current footer paint clears in thread, Dots and body portals without changing geometry, controls or unrelated leaves', { skip }, async () => {
   const native = loadNative(), oldTheme = legacyFooterSelectors(theme);
-  const escape = value => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
-  const paint = (id, part, children = '') => `<div id="${id}" aria-hidden="true" class="${escape(native.render({ part }).props.className)}">${children}</div>`;
+  const paint = (id, part, children = '') => `<div id="${id}" aria-hidden="true" class="${escapeAttribute(native.render({ part }).props.className)}">${children}</div>`;
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage({ viewport: { width: 1260, height: 920 } });
@@ -132,8 +133,8 @@ test('current footer paint clears in thread, Dots and body portals without chang
         <div id="image-preview" aria-hidden="true" class="pointer-events-none test-gradient"><img alt="Preview"></div>
         <div id="no-module" aria-hidden="true" class="pointer-events-none test-gradient"></div>
         ${paint('with-children', 'fade', '<span>Native content</span>')}
-        <button id="interactive" class="${escape(native.render({}).props.className)}">Control</button>
-        <div id="no-hidden" class="${escape(native.render({}).props.className)}"></div>
+        <button id="interactive" class="${escapeAttribute(native.render({}).props.className)}">Control</button>
+        <div id="no-hidden" class="${escapeAttribute(native.render({}).props.className)}"></div>
         <div id="no-pointer" aria-hidden="true" class="${native.classes.background} ${native.classes.combined}"></div>
         <div id="no-variant" aria-hidden="true" class="pointer-events-none ${native.classes.background} test-gradient"></div>
         <div id="hover-family" aria-hidden="true" class="pointer-events-none hover:${native.classes.background} ${native.classes.fade} test-gradient"></div>
@@ -184,5 +185,81 @@ test('current footer paint clears in thread, Dots and body portals without chang
     assert.equal(await page.locator('#message').inputValue(), 'Still editable');
     await page.locator('#call').click();
     assert.equal(await page.locator('#call').evaluate(element => element === document.activeElement), true);
+  } finally { await browser.close(); }
+});
+
+test('voice focus clears only the native outer footer plate once the wallpaper is ready', { skip }, async () => {
+  const native = loadNative();
+  const focusMarker = 'data-thread-focus-mode';
+  const focusUtility = `has-[[${focusMarker}]]:bg-surface`;
+  const outerFooters = native.consumers.flatMap(record => nodes(record.ast).flatMap(node => {
+    if (node.type !== 'CallExpression' || text(node.arguments[0]) !== 'div') return [];
+    const props = node.arguments[1];
+    const child = prop(props, 'children');
+    if (child?.type !== 'CallExpression' || text(prop(child.arguments[1], 'data-thread-scroll-footer')) !== 'true') return [];
+    const classes = nodes(prop(props, 'className')).map(text);
+    const utility = classes.find(value => value.split(/\s+/).includes(focusUtility));
+    const moduleClass = classes.find(value => /^footer-\S+$/.test(value));
+    return utility && moduleClass ? [`${moduleClass} ${utility} bottom-0`] : [];
+  }));
+  assert.equal(outerFooters.length, 1, 'Native focus paint must sit on the parent of the semantic thread footer');
+  assert.ok(native.bundle.findModules([`"${focusMarker}"`]).some(record => nodes(record.ast)
+    .some(node => node.type === 'Property' && key(node.key) === focusMarker)), 'Native voice stage must emit the focus marker');
+  const [outerClass] = outerFooters;
+  const sheets = new Set([
+    ...native.bundle.baseStylesheets(),
+    ...native.bundle.stylesheetAssets([native.classes.background]),
+    ...native.bundle.stylesheetAssets([`has([${focusMarker}])`])
+  ]);
+  const css = `${native.bundle.layerOrder}\n${[...sheets].map(asset => native.bundle.read(asset)).join('\n')}`;
+  const section = (id, classes, content, style = '') => `<section class="host"><div id="${id}" class="${escapeAttribute(classes)}" style="${style}">${content}</div></section>`;
+  const footer = (content, id = '') => `<div ${id ? `id="${id}"` : ''} data-thread-scroll-footer="true" class="relative w-full shrink-0 fixture-footer">${content}</div>`;
+  const marked = `<div ${focusMarker}="true"></div>`;
+  const body = section('focus-outer', outerClass, footer('<div id="voice-stage"><button id="voice-control" class="pointer-events-auto">Voice action</button></div>', 'focus-inner')) +
+    section('nested-decoy', outerClass, `<div>${footer(marked)}</div>`) +
+    section('interactive-decoy', outerClass.replace('pointer-events-none ', ''), footer(marked)) +
+    section('paint-decoy', outerClass.replace(focusUtility, ''), footer(marked), 'background-color:rgb(40,60,80)');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 960, height: 640 } });
+    await page.setContent(`<html data-codex-window-type="electron"><head><style>${css}</style><style>${theme}</style><style>
+      body{margin:0}.host{position:relative;height:120px}.fixture-footer{height:86px}
+      #voice-control{margin:16px;padding:6px 12px;background-color:rgb(35,65,85);color:white}
+    </style></head><body><div id="root"><main data-app-shell-main-content-layout>${body}</main></div></body></html>`);
+    const transparent = 'rgba(0, 0, 0, 0)';
+    const state = ({ mode, themed, ready, focused }) => page.evaluate(({ mode, themed, ready, focused, focusMarker }) => {
+      const root = document.documentElement;
+      root.className = `electron-${mode}${themed ? ' forge-ink-mountain' : ''}`;
+      Object.assign(root.dataset, { theme: mode, forgeNativeTheme: mode, forgeBackgroundReady: String(ready) });
+      document.getElementById('voice-stage').toggleAttribute(focusMarker, focused);
+    }, { mode, themed, ready, focused, focusMarker });
+    const read = () => page.locator('.host [id]').evaluateAll(elements => Object.fromEntries(elements.map(element => {
+      const css = getComputedStyle(element), rect = element.getBoundingClientRect();
+      return [element.id, { color: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow,
+        rect: [rect.x, rect.y, rect.width, rect.height], position: css.position, radius: css.borderRadius,
+        pointerEvents: css.pointerEvents, disabled: element.disabled, tabIndex: element.tabIndex }];
+    })));
+    for (const mode of ['dark', 'light']) {
+      await page.emulateMedia({ colorScheme: mode });
+      await state({ mode, themed: false, ready: true, focused: false });
+      const normal = await read();
+      assert.equal(normal['focus-outer'].color, transparent, `${mode}: ordinary footer has no outer plate`);
+      await state({ mode, themed: true, ready: true, focused: false });
+      assert.deepEqual(await read(), normal, `${mode}: ordinary footer stays unchanged`);
+      await state({ mode, themed: false, ready: true, focused: true });
+      const focused = await read();
+      for (const id of ['focus-outer', 'nested-decoy', 'interactive-decoy', 'paint-decoy']) {
+        assert.notEqual(focused[id].color, transparent, `${mode}: ${id} must actually paint`);
+      }
+      await state({ mode, themed: true, ready: false, focused: true });
+      assert.deepEqual(await read(), focused, `${mode}: keep native focus paint until the wallpaper is ready`);
+      await state({ mode, themed: true, ready: true, focused: true });
+      assert.deepEqual(await read(), { ...focused, 'focus-outer': { ...focused['focus-outer'], color: transparent } },
+        `${mode}: clear only the outer focus plate and preserve geometry, controls, and unrelated carriers`);
+      await page.locator('#voice-control').click();
+      assert.equal(await page.locator('#voice-control').evaluate(element => element === document.activeElement), true);
+      await state({ mode, themed: true, ready: true, focused: false });
+      assert.deepEqual(await read(), normal, `${mode}: leaving focus restores the ordinary footer`);
+    }
   } finally { await browser.close(); }
 });

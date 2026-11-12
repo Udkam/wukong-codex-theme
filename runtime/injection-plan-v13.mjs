@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v124-sidebar-hover-paint';
+export const RUNTIME_REVISION = 'v125-native-surfaces-and-reduced-motion';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -695,12 +695,17 @@ function applyRuntime(payload, createAdapter) {
     root.dataset.forgeScene = String(sceneStyle.scene);
     root.dataset.forgeMode = sceneStyle.mode;
 
-    if (initial) {
-      nextLayer.style.transition = 'none';
+    const shouldFade = !initial && transitionDuration() > 0;
+    if (!shouldFade) {
+      if (initial) nextLayer.style.transition = 'none';
       nextLayer.dataset.forgeActive = 'true';
       nextLayer.style.opacity = '1';
-      nextLayer.getBoundingClientRect();
-      nextLayer.style.removeProperty('transition');
+      if (initial) {
+        nextLayer.getBoundingClientRect();
+        nextLayer.style.removeProperty('transition');
+      } else {
+        clearLayer(previousLayer);
+      }
     } else {
       state.transitionInFlight = true;
       overlay.dataset.forgeTransitioning = 'true';
@@ -723,7 +728,7 @@ function applyRuntime(payload, createAdapter) {
     state.resolveInitialReady?.(true);
     state.resolveInitialReady = null;
 
-    if (!initial) {
+    if (shouldFade) {
       const generation = state.overlayGeneration;
       const finishTransition = () => {
         if (generation !== state.overlayGeneration || !overlay.isConnected) return;
