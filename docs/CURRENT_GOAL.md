@@ -1,6 +1,8 @@
 # 当前目标与发行状态
 
-更新：2026-11-09。**[v0.18.10](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.10) 已发布为 GitHub Latest**，运行时 **v123-sidebar-current-outline**，原生来源 Windows Codex 26.1103.4239.0（包内 26.1103.32239）。
+更新：2026-11-13。开发版 **v124-sidebar-hover-paint** 适配 Windows Codex 26.1106.6628.0（包内 26.1106.51428），恢复侧栏悬停和菜单展开的浅底色，保留新版原生拖放反馈。范围见 [开发变更](RELEASE_NEXT.md)。
+
+最新正式版为 **[v0.18.10](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.10)**，运行时 v123-sidebar-current-outline，原生来源 Windows Codex 26.1103.4239.0（包内 26.1103.32239）。
 
 当前聊天改用冷色底和细内描边，多选用更淡的底色；新聊天的图标、题字及项目条在首帧应用主题。右侧标签条和按钮区恢复原生底色，完整视图暂时停用主题壁纸和材料。具体范围见 [发行说明](RELEASE_0.18.10.md) 和 [预览来源](previews/README.md)。
 

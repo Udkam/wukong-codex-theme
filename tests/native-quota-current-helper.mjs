@@ -10,10 +10,56 @@ export const quotaArchive = process.env.CODEX_LOCAL_ASAR || path.join(process.en
   provenance.packageDirectoryName, provenance.asarRelativePath);
 export const quotaNativeSkip = !fs.existsSync(quotaArchive) && 'Requires the audited quota-recovery ASAR';
 
+const jsxImport = (node, imports) => {
+  const component = node.arguments[0];
+  if (component?.type !== 'MemberExpression' || component.object.type !== 'Identifier') return null;
+  const imported = imports[component.object.name];
+  return imported && { id: imported.id, exportName: key(component.property) };
+};
+
+const recoveryButtonBinding = (bundle, noticeRecord) => {
+  // Follow the reset offer's real CTA through its wrapper to the Button.
+  // Read the offer and wrapper as source only. Neither account flow executes.
+  const offers = bundle.findModules(['codex.rateLimitResetPromptModal.upgradePlan', 'reset_usage', 'customCtas']);
+  const actions = offers.flatMap(record => {
+    const imports = bundle.imports(record);
+    const calls = nodes(record.ast).filter(node => node.type === 'CallExpression');
+    if (!calls.some(call => prop(call.arguments[1], 'customCtas') && jsxImport(call, imports)?.id === noticeRecord.id)) return [];
+    return calls.filter(call => {
+      const kind = prop(call.arguments[1], 'kind');
+      return kind?.type === 'ConditionalExpression' && text(kind.consequent) === 'upgrade' && text(kind.alternate) === 'action' &&
+        nodes(kind.test).some(node => text(node) === 'open_pricing_dialog');
+    }).map(call => jsxImport(call, imports)).filter(Boolean);
+  });
+  assert.equal(actions.length, 1, 'Native quota reset offer must resolve its action and upgrade CTA wrapper');
+  const [action] = actions;
+  const actionRecord = bundle.module(action.id), imports = bundle.imports(actionRecord);
+  const renderer = nativeFunction(actionRecord, '"recoveryAction"');
+  const exportedRenderer = bundle.exports(actionRecord)[action.exportName];
+  assert.ok(exportedRenderer === renderer.ast || (renderer.ast.id && exportedRenderer?.name === renderer.ast.id.name),
+    'Native recovery CTA must resolve to its imported presentation export');
+  const recovery = renderer.nodes.find(node => node.type === 'ConditionalExpression' &&
+    nodes(node.test).some(child => text(child) === 'recovery'));
+  const recoveryValues = nodes(recovery?.consequent).map(text);
+  assert.ok(['recoveryAction', 'full', 'outlineGhost', 'upgrade'].every(value => recoveryValues.includes(value)),
+    'Native recovery CTA size, radius and colors changed');
+  const buttons = renderer.nodes.filter(node => node.type === 'CallExpression' &&
+    ['color', 'size', 'radius'].every(name => prop(node.arguments[1], name)) && !prop(node.arguments[1], 'target'))
+    .map(call => jsxImport(call, imports)).filter(Boolean);
+  assert.equal(buttons.length, 1, 'Native recovery CTA must resolve its Button import');
+  const [button] = buttons;
+  const buttonRecord = bundle.module(button.id), buttonNodes = nodes(buttonRecord.ast);
+  assert.ok(bundle.exports(buttonRecord)[button.exportName] &&
+    buttonNodes.some(node => prop(node, 'recoveryAction') && prop(node, 'composer')) &&
+    buttonNodes.some(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'button'),
+  'Native Button must retain the quota and composer presentation variants');
+  return button;
+};
+
 let cached;
 export const loadQuotaNative = () => {
   if (cached) return cached;
-  const bundle = loadNativeBundle({ archive: quotaArchive }), harness = presentationHarness(bundle);
+  const bundle = loadNativeBundle({ archive: quotaArchive });
   const recovery = bundle.findModules(['aria-live', 'banner-', 'value:"recovery"']).filter(record => record.source.length < 10000);
   assert.equal(recovery.length, 1, 'Native recovery presentation module must be unique');
   const bannerRecord = recovery[0], banner = nativeFunction(bannerRecord, 'role:"status"');
@@ -24,6 +70,8 @@ export const loadQuotaNative = () => {
   const noticeRecord = bundle.findModules(['"composerContext"', '"recovery"', 'attachedToComposer']).filter(record => record.source.length < 50000);
   assert.equal(noticeRecord.length, 1, 'Native generic notice module changed');
   const notice = nativeFunction(noticeRecord[0], 'attachedToComposer');
+  const button = recoveryButtonBinding(bundle, noticeRecord[0]);
+  const harness = presentationHarness(bundle, [button.id]);
   const placementCall = banner.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'children') === aside && node.arguments[0]?.type === 'MemberExpression');
   const placementImport = placementCall && bundle.imports(bannerRecord)[placementCall.arguments[0].object.name];
   assert.ok(placementImport, 'Native quota placement boundary changed');
@@ -111,7 +159,7 @@ export const loadQuotaNative = () => {
     finally { harness.contexts.delete(harness.load(composerRecord[0].id).k); }
   };
   cached = { bundle, harness, css, classes, banner, bannerRecord, aside, placement, notice,
-    renderBanner: harness.load(bannerRecord.id)[exportedName(bannerRecord, banner)], renderButton: harness.load('ygO2').$,
+    renderBanner: harness.load(bannerRecord.id)[exportedName(bannerRecord, banner)], renderButton: harness.load(button.id)[button.exportName],
     composerRoot, composerBody, composerClasses, renderComposerRoot: primitiveRegistry, renderComposerBody: primitiveRegistry.Body,
     host, renderHost: harness.load(hostRecord[0].id)[exportedName(hostRecord[0], host)], renderLayout, layoutRenderer, surfaceRenderer,
     ownerClass, cssEntries, layerOrder: bundle.layerOrder };

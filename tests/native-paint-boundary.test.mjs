@@ -230,8 +230,12 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
   const sidebarHoverSelector = `:root.forge-ink-mountain .sidebar-navigation:not([data-activity-sidebar-host]) :is(
   [data-app-action-sidebar-project-row],
   [data-app-action-sidebar-thread-row]
-).sidebar-item:not([data-file-drop-active="true"]):not([class~="bg-text-info/10"]):not([data-activity-sidebar-host] *)`;
-  let sidebarHoverSeen = 0;
+).sidebar-item:not([data-file-drop-active="true"]):not([class~="bg-text-info/10"], [class~="bg-text-accent/10"]):not([data-activity-sidebar-host] *)`;
+  const sidebarHoverTokens = [
+    '--color-background-primary-ghost-hover',
+    '--color-background-secondary-ghost-hover'
+  ];
+  const sidebarHoverSeen = new Set();
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
     // Only the independent recovery notice may adopt the adjacent native
@@ -244,14 +248,15 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
       quotaContourSeen.add(d.prop);
       return;
     }
-    // The current shared sidebar row owns this hover token. Keep the exception
+    // The shared sidebar row owns these hover tokens. Keep the exception
     // on its audited semantic rows, excluding drop/activity/high-contrast paths.
-    if (s === sidebarHoverSelector && d.prop === '--color-background-primary-ghost-hover') {
+    if (s === sidebarHoverSelector && sidebarHoverTokens.includes(d.prop)) {
       assert.equal(d.value, 'var(--forge-nav-row-hover)');
       assert.equal(d.important, true);
       assert.equal(d.parent.parent.type, 'atrule');
       assert.equal(d.parent.parent.params, '(forced-colors: none)');
-      sidebarHoverSeen++;
+      assert.ok(!sidebarHoverSeen.has(d.prop), `Duplicate sidebar hover token: ${d.prop}`);
+      sidebarHoverSeen.add(d.prop);
       return;
     }
     const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
@@ -280,7 +285,7 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
   });
   assert.deepEqual([...quotaContourSeen].sort(), [...quotaContourValues.keys()].sort(),
     'The bounded quota contour rule retains both native variable declarations');
-  assert.equal(sidebarHoverSeen, 1, 'The native hover token stays in one bounded row rule');
+  assert.deepEqual([...sidebarHoverSeen].sort(), sidebarHoverTokens, 'Native hover tokens stay in the bounded row rule');
 });
 
 test('current client CSS: native geometry/semantic colours, home paint boundaries and popup first paint', {
@@ -514,12 +519,14 @@ const loadSidebarRowNative = () => {
   assert.ok(bundle.imports(rowRecord)[pressMember.object.name]);
   const harness = presentationHarness(bundle);
   const renderRow = harness.compile(rowFunction, { [pressMember.object.name]: { [key(pressMember.property)]: () => ({}) } });
-  const selectClass = 'data-[app-action-sidebar-thread-selected=true]:bg-primary-ghost-hover';
+  const hoverClass = 'bg-secondary-ghost-hover';
+  const selectClass = 'data-[app-action-sidebar-thread-selected=true]:' + hoverClass;
+  const fileDropClass = 'data-[file-drop-active=true]:' + hoverClass;
   const threadRecords = bundle.findModules(selectClass);
   assert.equal(threadRecords.length, 1, 'Native selected-thread paint class changed');
   const threadRecord = threadRecords[0];
   assert.ok(Object.values(bundle.imports(threadRecord)).some(ref => ref.id === rowRecord.id), 'Thread presentation must use the shared row');
-  assert.ok(threadRecord.source.includes('data-[file-drop-active=true]:bg-primary-ghost-hover'), 'Native file-drop feedback changed');
+  assert.ok(threadRecord.source.includes(fileDropClass), 'Native file-drop feedback changed');
   assert.ok(threadRecord.source.includes('before:pointer-events-auto before:absolute before:inset-0'), 'Native link hitbox changed');
   const threadContentClass = nodes(threadRecord.ast).map(text).find(value => value.startsWith('flex h-full w-full items-center text-sm leading-4'));
   assert.ok(threadContentClass, 'Native thread link and trailing action layout carrier changed');
@@ -531,10 +538,12 @@ const loadSidebarRowNative = () => {
   assert.ok(folderRecord && Object.values(bundle.imports(folderRecord)).some(ref => ref.id === rowRecord.id), 'Project row must use the same native interaction renderer');
   const css = bundle.css();
   assert.ok(css.includes('.sidebar-item{border-radius:var(--radius-lg);corner-shape:var(--codex-corner-shape)}'));
-  assert.ok(rowFunction.source.includes('has-[[aria-haspopup=menu][aria-expanded=true]]:bg-primary-ghost-hover'));
-  assert.ok(rowFunction.source.includes('bg-text-info/10 ring-2 ring-inset ring-text-info'));
+  assert.ok(rowFunction.source.includes('hover:' + hoverClass), 'Native row hover utility changed');
+  assert.ok(rowFunction.source.includes('has-[[aria-haspopup=menu][aria-expanded=true]]:' + hoverClass), 'Native expanded menu utility changed');
+  assert.ok(css.includes('.' + hoverClass + '{background-color:var(--color-background-secondary-ghost-hover)'));
+  assert.ok(rowFunction.source.includes('bg-text-accent/10 ring-2 ring-inset ring-ring'), 'Native drop target fill and ring changed');
   assert.ok(rowFunction.source.includes('"aria-current":'));
-  return { css, renderRow, projectAttributes, threadAttributes, selectClass, threadContentClass };
+  return { css, renderRow, projectAttributes, threadAttributes, selectClass, fileDropClass, threadContentClass };
 };
 
 const sidebarFixture = (native, mode, width) => {
@@ -556,7 +565,7 @@ const sidebarFixture = (native, mode, width) => {
   const thread = (id, { active = false, selected = false, drop = false, fileDrop = false } = {}) => native.renderRow({
     id, ...native.threadAttributes({ active, selected, id, kind: 'local', pinned: false }),
     ...(fileDrop ? { 'data-file-drop-active': 'true' } : {}),
-    className: native.selectClass + ' data-[file-drop-active=true]:bg-primary-ghost-hover px-2 py-row-y',
+    className: native.selectClass + ' ' + native.fileDropClass + ' px-2 py-row-y',
     isActive: active, isDropTarget: drop, hasNavigationLink: true, onPress: () => {},
     children: [child('div', { className: native.threadContentClass, children: [child('a', { id: id + '-link', href: '#fixture', 'data-interactive-row-link': 'true',
       className: 'flex min-w-0 flex-1 before:pointer-events-auto before:absolute before:inset-0 before:-z-10 before:rounded-[inherit] focus-visible:before:outline focus-visible:before:outline-2 focus-visible:before:outline-offset-[-2px] focus-visible:before:outline-ring',
@@ -577,6 +586,8 @@ test('current native sidebar distinguishes the current chat, multi-selection and
   old.walkRules(rule => { if (rule.selector.includes('[data-app-action-sidebar-thread-row]') || rule.selector.includes('[data-app-action-sidebar-project-row]')) { rule.remove(); removed++; } });
   assert.equal(removed, 3, 'The shared-native-paint control must remove only the three sidebar row mappings');
   const previousTheme = old.toString(), report = [];
+  const primaryOnly = postcss.parse(theme);
+  primaryOnly.walkDecls('--color-background-secondary-ghost-hover', declaration => declaration.remove());
   const geometry = page => page.locator('#selection-sidebar .sidebar-item,#selection-sidebar a,#selection-sidebar button').evaluateAll(elements => elements.map(e => {
     const r = e.getBoundingClientRect(), s = getComputedStyle(e); return { id: e.id, rect: [r.x, r.y, r.width, r.height], radius: s.borderRadius,
       corner: s.cornerShape, padding: s.padding, margin: s.margin, font: s.font, border: s.borderWidth, pointer: s.pointerEvents, tab: e.tabIndex, overflow: s.overflow };
@@ -586,6 +597,39 @@ test('current native sidebar distinguishes the current chat, multi-selection and
   const focus = async page => {
     await page.locator('#active-menu').focus(); await page.keyboard.press('Shift+Tab');
     return page.locator('#active-link').evaluate(e => { const s = getComputedStyle(e, '::before'); return { focused: document.activeElement === e, visible: e.matches(':focus-visible'), outline: s.outline, pointer: s.pointerEvents, position: s.position, inset: s.inset }; });
+  };
+  const feedback = async page => {
+    const observations = [];
+    for (const id of ['inactive-project', 'inactive']) {
+      const row = page.locator('#' + id);
+      const menu = row.locator('button[aria-haspopup="menu"]');
+      await row.hover();
+      const hover = (await paint(page, id)).background;
+      await page.mouse.move(770, 620);
+      const idle = (await paint(page, id)).background;
+      await menu.evaluate(button => button.setAttribute('aria-expanded', 'true'));
+      const menuOpen = (await paint(page, id)).background;
+      await menu.evaluate(button => button.setAttribute('aria-expanded', 'false'));
+      const colors = await row.evaluate(element => {
+        const probe = document.createElement('span');
+        element.append(probe);
+        const resolve = token => {
+          probe.style.backgroundColor = 'var(' + token + ')';
+          return getComputedStyle(probe).backgroundColor;
+        };
+        const values = {
+          expected: resolve('--forge-nav-row-hover'),
+          nativeUtility: resolve('--color-background-secondary-ghost-hover')
+        };
+        probe.remove();
+        return values;
+      });
+      assert.equal(idle, 'rgba(0, 0, 0, 0)', 'The idle row remains transparent');
+      assert.equal(hover, colors.nativeUtility, 'Hover uses the actual native secondary utility');
+      assert.equal(menuOpen, colors.nativeUtility, 'Expanded menu paints even when the pointer is outside the row');
+      observations.push({ id, hover, menuOpen, ...colors });
+    }
+    return observations;
   };
   try {
     for (const mode of ['dark', 'light']) for (const width of [300, 380]) {
@@ -603,7 +647,16 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         assert.equal(previous.project.background, previous.active.background, 'The old shared ghost token must reproduce stacked equal project/thread fill');
         assert.equal(previous.active.background, previous.selected.background, 'The native ghost token also fills multi-selected rows');
         assert.equal(previous.active.shadow, previous.selected.shadow, 'The native rows lack a distinct current-chat edge');
+        await sheet.evaluate((e, css) => e.textContent = css, primaryOnly.toString());
+        const previousFeedback = await feedback(page);
+        for (const row of previousFeedback) {
+          assert.notEqual(row.hover, row.expected, 'The primary-only theme reproduces the missed secondary hover and expanded-menu paint');
+        }
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, theme);
+        const currentFeedback = await feedback(page);
+        for (const row of currentFeedback) {
+          assert.equal(row.hover, row.expected, 'The current theme restores the intended hover and expanded-menu paint');
+        }
         await page.locator('#project').hover();
         const current = { project: await paint(page, 'project'), active: await paint(page, 'active'), selected: await paint(page, 'selected') };
         assert.notEqual(current.project.background, current.active.background, 'Project hover and current-chat fills are distinct');
@@ -624,7 +677,7 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         assert.deepEqual(await paint(page, 'file-drop'), fileDrop, 'File drop retains its native paint');
         await page.locator('#inactive-project-menu').click(); await page.mouse.move(770, 620);
         assert.equal(await page.locator('#inactive-project-menu').getAttribute('aria-expanded'), 'true');
-        assert.notEqual((await paint(page, 'inactive-project')).background, 'rgba(0, 0, 0, 0)', 'An expanded native action menu retains row feedback');
+        assert.equal((await paint(page, 'inactive-project')).background, currentFeedback[0].expected, 'Clicking the native action button applies the intended open-menu feedback');
         await page.locator('#active-link').click();
         assert.deepEqual(await page.evaluate(() => ({ menus: fixtureMenuClicks, links: fixtureLinkClicks })), { menus: 1, links: 1 });
         if (width === 300 && process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY) {
@@ -632,7 +685,7 @@ test('current native sidebar distinguishes the current chat, multi-selection and
           await page.evaluate(() => document.activeElement.blur());
           await page.mouse.move(770, 620);
           const box = await page.locator('#selection-sidebar nav').boundingBox(), lastRow = await page.locator('#selected').boundingBox();
-          fs.writeFileSync(path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, mode + '-sidebar-selection-fixture-20261109.png'), await page.screenshot({ clip: { ...box, height: lastRow.y + lastRow.height - box.y } }));
+          fs.writeFileSync(path.join(process.env.WUKONG_SIDEBAR_PREVIEW_DIRECTORY, mode + '-sidebar-selection-fixture-20261113.png'), await page.screenshot({ clip: { ...box, height: lastRow.y + lastRow.height - box.y } }));
         }
         await page.locator('#selection-sidebar').evaluate(e => e.dir = 'rtl');
         const rtlBefore = await geometry(page);
@@ -645,7 +698,7 @@ test('current native sidebar distinguishes the current chat, multi-selection and
         const forced = { active: await paint(page, 'active'), selected: await paint(page, 'selected') };
         await page.locator('#theme-under-test').evaluate((e, css) => e.textContent = css, previousTheme);
         assert.deepEqual(forced, { active: await paint(page, 'active'), selected: await paint(page, 'selected') }, 'Forced-colors retains native selection paint');
-        report.push({ mode, width, previous, current, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true, forcedColorsPreserved: true, rtlPaintPreserved: true });
+        report.push({ mode, width, previous, current, previousFeedback, currentFeedback, geometryPreserved: true, nativeFocusPreserved: true, nativeDropPreserved: true, forcedColorsPreserved: true, rtlPaintPreserved: true });
       } finally { await page.close(); }
     }
     fs.writeFileSync(new URL('../artifacts/test-runs/native-boundary-20260920/sidebar-selection.json', import.meta.url), JSON.stringify(report, null, 2), 'utf8');

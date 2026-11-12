@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1103.4239.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1103.32239",
+  "installationDirectoryVersion": "26.1106.6628.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1106.6628.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1106.51428",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 761023153,
-  "asarSha256": "fb47d6491dc3006b708cb1e14de479b882bf50f88b7daa81818f154c253266aa",
-  "capturedAt": "2026-11-08",
-  "captureMode": "current browser portal source contract and full/split native presentation audit; source contracts and live checks recorded separately",
+  "sizeBytes": 772825694,
+  "asarSha256": "54b74a9131680fc9eead711ed5d9f718f6127c22222ca60d2e3b577a707e2485",
+  "capturedAt": "2026-11-13",
+  "captureMode": "installed browser portal source contract and full/split presentation fixtures",
   "assets": {
     "javascript": {
-      "member": "webview/assets/async/189497.6182e00931.js",
-      "bytes": 1898868,
-      "sha256": "4dddc9cc820c91ba0424caee996047b11c182bbe16c008054b85648eb4afdc78"
+      "member": "webview/assets/async/514766.2d2f1ddc86.js",
+      "bytes": 1885115,
+      "sha256": "943016fbef25cbfe62703ea7ab5ee7d2e9971b8db3681147fb983e7bd12e6f39"
     },
     "stylesheet": {
-      "member": "webview/assets/async/e77f816560c6.css",
-      "bytes": 1266495,
-      "sha256": "5ef0186201b63a1882a93c4a567040b80d167562656e39036dc8815657d925d6"
+      "member": "webview/assets/async/9ec44337a842.css",
+      "bytes": 1339815,
+      "sha256": "2cb9b48f61a47328f5fede2c368cee0ab6efdaedffdb93ec17532983abb0375d"
     },
     "entrypoint": {
       "member": "webview/index.html",
-      "bytes": 10406,
-      "sha256": "93401a7bcf17d85e445060004f1ae0352b3f84f823f8fb3891312b68bc59d10d"
+      "bytes": 9840,
+      "sha256": "975ffae52e3dcca88face76cb45c21b252504d4a823fdbd0129113fdcba3b462"
     },
     "runtime": {
-      "member": "webview/assets/348410.792d1c9584.js",
-      "bytes": 272412,
-      "sha256": "81365fe5fac4856612c18aeacd8bce046d5fda809ff2829075a3d83f32f4a9d5"
+      "member": "webview/assets/348410.1a97dde15f.js",
+      "bytes": 274333,
+      "sha256": "2f366e7066e7dabb445e1e583917f57aa787d04e9c9dcfe684c9c7af47bb0b52"
     }
   }
 }

@@ -70,7 +70,7 @@ export const nativeObject = (record, expression) => {
   return resolve(expression);
 };
 
-export const presentationHarness = bundle => {
+export const presentationHarness = (bundle, auditedPresentationModules = []) => {
   const contexts = new Map(), loaded = new Map(), createdContexts = [];
   const element = (tag, props) => {
     assert.notEqual(tag, undefined, 'An unaudited presentation dependency reached JSX');
@@ -116,7 +116,7 @@ export const presentationHarness = bundle => {
     h6hS: { o: pass }, l2oX: { x: pass },
     suct: { N: pass },
   };
-  const pure = new Set(['osar', 'cI4i', 'rsCP', 'uWmg', 'ygO2', 'Ips7', 'FmJi']);
+  const pure = new Set(['osar', 'cI4i', 'rsCP', 'uWmg', 'Ips7', 'FmJi', ...auditedPresentationModules]);
   const load = id => {
     if (Object.hasOwn(modules, id)) return modules[id];
     if (loaded.has(id)) return loaded.get(id);
@@ -180,7 +180,7 @@ export const loadNativeBundle = (options = {}) => {
   };
   const index = read('webview/index.html');
   const entryScripts = [...index.matchAll(/<script\b[^>]*\bsrc="([^"?#]+\.js)"[^>]*>/g)].map(match => `webview/${match[1].replace(/^\//, '')}`);
-  const layerOrder = index.match(/@layer\s+theme,\s*base,\s*components,\s*utilities\s*;/)?.[0];
+  const layerOrder = index.match(/@layer\s+(?:properties,\s*)?theme,\s*base,\s*components,\s*utilities\s*;/)?.[0];
   assert.ok(layerOrder && entryScripts.length, 'Native entrypoint/CSS layer prelude changed');
   const entrySource = entryScripts.map(entry => read(entry)).join('\n');
   const modulesInAsset = asset => {

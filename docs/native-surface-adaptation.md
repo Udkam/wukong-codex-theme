@@ -1,8 +1,10 @@
 # 原生 UI 与主题替换接口
 
-## 侧栏选中与首页首帧（2026-11-09，v123）
+## 侧栏行材质与首页首帧
 
 共享 sidebar-item 行使用原生 active、selected、hover 和菜单状态。主题按 data-app-action-sidebar-project-row／thread-row 区分项目与聊天：项目悬停和菜单用局部 ghost token，selected 聊天用淡冷色底，active 聊天覆盖为更清晰的冷色底及 1 CSS px 内描边。内描边由行自身的 inset box-shadow 绘制，沿用原生圆角，不占用链接的 ::before 热区或键盘焦点轮廓。拖放状态、activity-sidebar-host 和 forced-colors 保持原生绘制；左右书写方向使用同样的完整描边。
+
+Windows Codex 26.1106.6628.0 使用 secondary ghost 变量绘制悬停和展开菜单。v124 在两类侧栏行内同时映射新版 secondary 和旧版 primary 变量。新版以 `bg-text-accent/10` 标记拖放目标，主题在此状态让出底色和描边，文件拖放继续由 `data-file-drop-active` 隔离。
 
 首页标题game-source是heading div，并非hero布局祖先；其子span可能包含真实项目选择按钮。home-icon是独立motion图标容器，父级通过原生opacity动画进出。主题直接对这两个语义owner绘制，与后续运行时属性共享字标／题字；不强制父级visibility，不改真实标题子控件的点击或布局。quote关闭与高对比路径也覆盖未标记节点。
 

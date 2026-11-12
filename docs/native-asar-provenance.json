@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packageName": "OpenAI.Codex",
-  "packageVersion": "26.1103.4239.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1103.4239.0_x64__2p2nqsd0c76g0",
+  "packageVersion": "26.1106.6628.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1106.6628.0_x64__2p2nqsd0c76g0",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 761023153,
-  "sha256": "FB47D6491DC3006B708CB1E14DE479B882BF50F88B7DAA81818F154C253266AA",
-  "capturedAt": "2026-11-08",
-  "captureMode": "current native Workspace/PageSurface and Browser full-view source audit; contracts and live checks recorded separately"
+  "sizeBytes": 772825694,
+  "sha256": "54B74A9131680FC9EEAD711ED5D9F718F6127C22222CA60D2E3B577A707E2485",
+  "capturedAt": "2026-11-13",
+  "captureMode": "installed native UI source and component fixture audit for the new CSS layer order"
 }

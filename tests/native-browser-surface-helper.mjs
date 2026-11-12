@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { loadNativeBundle, nodes, prop, text, key, nativeFunction, nativeObject } from './native-bundle-current-helper.mjs';
+import { loadNativeBundle, nodes, ownNodes, prop, text, key, nativeFunction, nativeObject } from './native-bundle-current-helper.mjs';
 
 const jsxNodes = record => nodes(record.ast).filter(node => node.type === 'CallExpression' && node.arguments[1]?.type === 'ObjectExpression');
 const marked = (record, marker) => jsxNodes(record).find(node => prop(node.arguments[1], marker));
@@ -21,11 +21,11 @@ export const loadBrowserSurfaceNative = () => {
   const bundle = loadNativeBundle();
   // Only candidate chunks with these presentation interfaces are parsed. No
   // module factory, hook, navigation command or native transport is executed.
-  const records = bundle.findModules([/data-new-tab-scroll-root|data-browser-sidebar-toolbar|data-browser-sidebar-chrome-expanded|data-app-shell-unified-tab-strip|data-app-shell-active-page|data-app-shell-workspace-layout-toggle|relative h-12 w-full border-b border-default bg-surface/]);
+  const records = bundle.findModules([/data-new-tab-scroll-root|data-browser-sidebar-toolbar|data-browser-sidebar-chrome-expanded|data-app-shell-unified-tab-strip|data-app-shell-active-page|data-app-shell-workspace-layout-toggle|relative min-h-12 w-full border-b border-default bg-surface/]);
   const newTab = unique(records, record => !!marked(record, 'data-new-tab-scroll-root'), 'new-tab renderer');
   const toolbar = unique(records, record => !!marked(record, 'data-browser-sidebar-toolbar'), 'toolbar renderer');
   const browser = unique(records, record => !!marked(record, 'data-browser-sidebar-chrome-expanded'), 'panel renderer');
-  const frameClass = 'relative h-12 w-full border-b border-default bg-surface';
+  const frameClass = 'relative min-h-12 w-full border-b border-default bg-surface';
   const frame = unique(records, record => jsxNodes(record).some(node => text(prop(node.arguments[1], 'className')) === frameClass), 'toolbar paint carrier');
   const workspace = unique(records, record => !!marked(record, 'data-app-shell-unified-tab-strip'), 'unified workspace');
   const activePage = unique(records, record => jsxNodes(record).some(node =>
@@ -91,8 +91,15 @@ export const loadBrowserSurfaceNative = () => {
 
   const classMember = prop(workspaceNode.arguments[1], 'className');
   assert.equal(classMember?.type, 'MemberExpression');
-  const cssModule = bundle.module(bundle.imports(workspace)[classMember.object.object.name].id);
-  const classes = nativeObject(cssModule, bundle.exports(cssModule)[key(classMember.object.property)]);
+  assert.equal(key(classMember.property), 'Workspace');
+  const workspaceFn = nativeFunction(workspace, workspaceNode.start);
+  const classRegistry = ownNodes(workspaceFn.ast).find(node => node.type === 'VariableDeclarator' &&
+    node.id.name === classMember.object.name)?.init;
+  assert.equal(classRegistry?.type, 'MemberExpression', 'Native workspace must read its CSS module through the renderer alias');
+  const cssImport = bundle.imports(workspace)[classRegistry.object.name];
+  assert.ok(cssImport, 'Native workspace CSS module import changed');
+  const cssModule = bundle.module(cssImport.id);
+  const classes = nativeObject(cssModule, bundle.exports(cssModule)[key(classRegistry.property)]);
   for (const name of ['Workspace', 'WorkspaceContent', 'MainContentClip', 'MainContentSurface', 'MainContentViewport', 'PageSurface', 'Layout', 'PageSurfaceLayout']) {
     assert.ok(classes[name], `Native workspace class interface changed: ${name}`);
   }
