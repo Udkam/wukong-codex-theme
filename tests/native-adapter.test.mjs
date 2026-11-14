@@ -65,10 +65,8 @@ test('settings state follows mounted settings and excludes schedule dialogs', as
 test('activity sidebar keeps its native paint and cannot become the conversation navigation owner', async () => {
   const bundle = loadNativeBundle();
   const shells = bundle.findModules(['data-sidebar-navigation-root', 'data-slate-sidebar-content', 'app-shell-floating-left-panel']);
-  const activities = bundle.findModules(['ActivitySidebar:', 'activity-sidebar-toolbar-button']);
   assert.equal(shells.length, 1);
-  assert.equal(activities.length, 1);
-  const [shell] = shells, [activity] = activities;
+  const [shell] = shells;
   const jsx = node => node.type === 'CallExpression' && node.arguments[1]?.type === 'ObjectExpression';
   const navigation = nodes(shell.ast).find(node => jsx(node) && prop(node.arguments[1], 'data-sidebar-navigation-root'));
   const slate = nodes(shell.ast).find(node => jsx(node) && prop(node.arguments[1], 'data-slate-sidebar-content'));
@@ -76,21 +74,32 @@ test('activity sidebar keeps its native paint and cannot become the conversation
     text(prop(node.arguments[1], 'data-testid')) === 'app-shell-floating-left-panel');
   const owner = nativeFunction(shell, navigation.start);
   const activityCall = ownNodes(owner.ast).find(node => jsx(node) && prop(node.arguments[1], 'showBack') &&
-    node.arguments[0]?.type === 'MemberExpression' && key(node.arguments[0].property) === 'S');
-  const provider = bundle.imports(shell)[activityCall?.arguments[0].object.name];
-  assert.ok(provider && bundle.module(provider.id).source.includes(`"${activity.id}"`), 'Activity is mounted by the shared sidebar owner');
+    node.arguments[0]?.type === 'MemberExpression');
+  const providerImport = bundle.imports(shell)[activityCall?.arguments[0].object.name];
+  assert.ok(providerImport, 'Activity is mounted by the shared sidebar owner');
+  const provider = bundle.module(providerImport.id);
+  const providerExport = bundle.exports(provider)[key(activityCall.arguments[0].property)];
+  const providerRenderer = ownNodes(provider.ast).find(node => node.type === 'FunctionDeclaration' && node.id.name === providerExport?.name);
+  const lazyCall = ownNodes(providerRenderer).find(node => jsx(node) && node.arguments[0]?.type === 'Identifier' &&
+    node.arguments[1].properties.some(property => property.type === 'SpreadElement'));
+  const lazyDeclaration = ownNodes(provider.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === lazyCall?.arguments[0].name);
+  const activityLoad = nodes(lazyDeclaration).find(node => node.type === 'MemberExpression' && key(node.property) === 'ActivitySidebar');
+  const activityBind = nodes(activityLoad).find(node => node.type === 'CallExpression' && key(node.callee.property) === 'bind' && text(node.arguments[1]));
+  assert.ok(activityBind, 'The shared sidebar must render the lazy ActivitySidebar export');
+  const activity = bundle.module(text(activityBind.arguments[1]));
   const navigationClass = nodes(prop(navigation.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden sidebar-navigation'));
   const slateClass = text(prop(slate.arguments[1], 'className'));
   const floatingClass = nodes(prop(floatingShell.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden bg-surface'));
   const activitySection = nodes(activity.ast).find(node => jsx(node) && text(node.arguments[0]) === 'section' && prop(node.arguments[1], 'aria-label'));
   const activityOwner = nativeFunction(activity, activitySection.start);
+  assert.equal(activityOwner.ast.id.name, bundle.exports(activity).ActivitySidebar?.name, 'The native ActivitySidebar export owns the labelled section');
   const activityClass = ownNodes(activityOwner.ast).find(node => node.type === 'AssignmentExpression' &&
     node.left.name === prop(activitySection.arguments[1], 'className').name && node.right.type === 'Literal')?.right.value;
   assert.ok(navigationClass && slateClass.includes('sidebar-navigation') && floatingClass && activityClass?.split(' ').includes('font-openai-sans'));
   const nativeCss = bundle.css(['.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']);
   const activityViews = [
-    '<header><button class="activity-sidebar-toolbar-button">Filter</button></header><button data-activity-id="fixture">Entry</button>',
-    '<header><button class="activity-sidebar-toolbar-button">Filter</button></header><div role="status">Empty</div>',
+    '<header><button>Filter</button></header><button data-activity-id="fixture">Entry</button>',
+    '<header><button>Filter</button></header><div role="status">Empty</div>',
     '<header><button>Back</button></header><div>Detail</div>'
   ];
   for (const mode of ['dark', 'light']) {

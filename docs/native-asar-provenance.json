@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packageName": "OpenAI.Codex",
-  "packageVersion": "26.1106.6628.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1106.6628.0_x64__2p2nqsd0c76g0",
+  "packageVersion": "26.1111.2228.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1111.2228.0_x64__2p2nqsd0c76g0",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 772825694,
-  "sha256": "54B74A9131680FC9EEAD711ED5D9F718F6127C22222CA60D2E3B577A707E2485",
-  "capturedAt": "2026-11-13",
-  "captureMode": "installed native UI source and component fixture audit for the new CSS layer order"
+  "sizeBytes": 783750654,
+  "sha256": "2551CBA1057A05CDC5CF5D75B146FAC4092BFF4CE77A10C43E3286C88D24C82D",
+  "capturedAt": "2026-11-15",
+  "captureMode": "installed native UI source and component fixture audit of thread and Dots footer paint"
 }

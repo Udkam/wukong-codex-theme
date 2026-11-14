@@ -64,7 +64,7 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
   // Native dimensions may change without breaking paint replacement. Protect
   // the available interfaces, not a frozen copy of the client's pixel values.
   for (const token of ['--height-toolbar:', '--height-toolbar-sm:',
-    '--spacing-token-sidebar:', '--radius-token-composer-single-line:',
+    '--sidebar-row-label-inset:', '--radius-token-composer-single-line:',
     '--composer-layout-surface-background', '--composer-layout-surface-backdrop-filter',
     'data-composer-surface-variant', '.ComposerLayoutRoot-', '.ComposerLayoutBody-',
     '.PageSurface-', '--app-shell-navigation-rail-width',

@@ -40,12 +40,12 @@ const aliasResolver = fn => {
   }
   // Follow compiler-cache aliases only. In particular, do not look through a
   // newly inserted JSX wrapper: the CSS depends on this direct-child relation.
-  const resolves = (expression, target, visited = new Set()) => {
-    if (expression === target) return true;
+  const matches = (expression, predicate, visited = new Set()) => {
+    if (predicate(expression)) return true;
     if (expression?.type !== 'Identifier' || visited.has(expression.name)) return false;
-    return (values.get(expression.name) || []).some(value => resolves(value, target, new Set([...visited, expression.name])));
+    return (values.get(expression.name) || []).some(value => matches(value, predicate, new Set([...visited, expression.name])));
   };
-  return { resolves, values };
+  return { matches, resolves: (expression, target) => matches(expression, value => value === target) };
 };
 
 let cachedNative;
@@ -56,13 +56,14 @@ const loadNative = () => {
   const records = bundle.findModules(['pointer-events-none sticky top-0 isolate z-10 shrink-0 select-none', 'from-surface-elevated-secondary']);
   assert.equal(records.length, 1, drift);
   const record = records[0], renderer = nativeFunction(record, 'pointer-events-none sticky top-0 isolate z-10 shrink-0 select-none');
-  const exported = Object.entries(bundle.exports(record)).find(([, node]) => node.name === renderer.ast.id?.name)?.[0];
+  const exported = Object.entries(bundle.exports(record)).find(([, node]) => node === renderer.ast ||
+    (renderer.ast.id && node.name === renderer.ast.id.name))?.[0];
   assert.ok(exported, drift);
   const consumers = bundle.findModules([`"${record.id}"`, 'portalContainer:']).map(record => {
     const imported = bundle.imports(record);
     const calls = nodes(record.ast).filter(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
       imported[node.arguments[0].object.name]?.id === records[0].id && key(node.arguments[0].property) === exported && node.arguments[1]?.type === 'ObjectExpression');
-    return { code: record.source, ast: record.ast, calls, record };
+    return { ast: record.ast, calls, record };
   }).filter(record => record.calls.length);
   const summaryRecords = bundle.findModules(['group/summary-panel', '"data-summary-panel-variant"']);
   assert.equal(summaryRecords.length, 1, drift);
@@ -98,7 +99,6 @@ test('installed summary fade renderer retains default, solid and portal branches
   assert.ok(calls.some(call => text(prop(call.arguments[1], 'variant')) === 'solid' && prop(call.arguments[1], 'children')?.value === null), `${native.drift}: profile identity solid plate missing`);
   assert.ok(calls.some(call => prop(call.arguments[1], 'portalContainer') && prop(call.arguments[1], 'fadeOpacity')), `${native.drift}: animated task title missing`);
   assert.ok(calls.some(call => prop(call.arguments[1], 'portalContainer') && !prop(call.arguments[1], 'fadeOpacity')), `${native.drift}: compact task title missing`);
-  assert.ok(native.consumers.some(consumer => consumer.code.includes('"data-orbit-profile-identity"') && nodes(consumer.ast).some(node => node.type === 'Property' && key(node.key) === 'variant' && text(node.value) === 'dynamic-isle')), `${native.drift}: collapsed profile owner changed`);
 });
 
 test('native task portals and collapsed identity paints remain inside their actual summary owners', { skip }, () => {
@@ -126,8 +126,9 @@ test('native task portals and collapsed identity paints remain inside their actu
   const forwardedChildren = contentNodes.find(node => node.type === 'ConditionalExpression' && node.test?.name === scrollableDefault?.id.name && node.alternate?.name === childrenParameter?.name);
   assert.ok(scrollableDefault && forwardedChildren && contentAliases.resolves(prop(contentPaint.arguments[1], 'children'), forwardedChildren),
     `${native.drift}: non-scrolling Content must forward its children directly inside the semantic summary owner`);
-  const isContent = node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
-    node.arguments[0].object.type === 'MemberExpression' && node.arguments[0].object.object.name === summaryName && key(node.arguments[0].object.property) === summaryExport && key(node.arguments[0].property) === 'Content';
+  const isContentTag = tag => tag?.type === 'MemberExpression' && tag.object.type === 'MemberExpression' &&
+    tag.object.object.name === summaryName && key(tag.object.property) === summaryExport && key(tag.property) === 'Content';
+  const isContent = node => node.type === 'CallExpression' && isContentTag(node.arguments[0]);
   const directChild = (call, target, resolves) => {
     const child = prop(call.arguments[1], 'children');
     return child?.type === 'ArrayExpression' ? child.elements.some(element => resolves(element, target)) : resolves(child, target);
@@ -159,11 +160,15 @@ test('native task portals and collapsed identity paints remain inside their actu
     prop(node.arguments[1], 'aria-hidden').operator === '!' && prop(node.arguments[1], 'aria-hidden').argument.value === 0 &&
     directChild(node, solid, profileAliases.resolves));
   assert.ok(hiddenWrapper, `${native.drift}: solid plate must remain a direct child of its aria-hidden wrapper`);
-  const stickyOwner = profileNodes.find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'className')).includes('pointer-events-none sticky') &&
+  const stickyOwner = profileNodes.find(node => node.type === 'CallExpression' && profileAliases.matches(prop(node.arguments[1], 'className'), value => {
+    const tokens = text(value).split(/\s+/);
+    return tokens.includes('pointer-events-none') && tokens.includes('sticky');
+  }) &&
     directChild(node, hiddenWrapper, profileAliases.resolves));
   const identity = profileNodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'data-orbit-profile-identity'));
   assert.ok(stickyOwner && identity && directChild(stickyOwner, identity, profileAliases.resolves), `${native.drift}: native profile identity must remain a sibling of decorative paint`);
-  const profileContent = profileNodes.find(node => isContent(node) && text(prop(node.arguments[1], 'variant')) === 'dynamic-isle' &&
+  const profileContent = profileNodes.find(node => node.type === 'CallExpression' && profileAliases.matches(node.arguments[0], isContentTag) &&
+    profileAliases.matches(prop(node.arguments[1], 'variant'), value => text(value) === 'dynamic-isle') &&
     directChild(node, stickyOwner, profileAliases.resolves));
   assert.ok(profileContent, `${native.drift}: collapsed plate must remain inside dynamic-isle Content`);
 });

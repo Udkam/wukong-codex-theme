@@ -53,7 +53,7 @@ const loadNative = () => {
   return cached;
 };
 
-test('current shared footer source retains split thread, Dots and portal consumers without a gradient direction utility', { skip }, () => {
+test('current shared footer source retains Dots and portal consumers without a gradient direction utility', { skip }, () => {
   const native = loadNative();
   for (const part of ['surface', 'fade', undefined]) {
     const result = native.render({ part });
@@ -64,21 +64,10 @@ test('current shared footer source retains split thread, Dots and portal consume
     assert.ok(!result.props.className.includes('bg-gradient-to-t'), 'Native CSS owns the gradient; direction utilities cannot identify its paint leaf');
   }
   const portal = native.consumers.find(item => item.source.includes('workspace-agent-preview-footer'));
-  // Workspace preview has its own measured clearance; it is not the ordinary
-  // thread's sticky reservation even though it references the scroll owner.
-  const threads = native.consumers.filter(item => item !== portal && item.source.includes('thread-scroll-container') && item.source.includes('data-thread-scroll-footer'));
-  assert.ok(threads.length, 'Current ordinary thread consumers are missing');
-  for (const thread of threads) {
-    const parts = thread.calls.map(call => text(prop(call.arguments[1], 'part')));
-    assert.ok(parts.includes('surface') && parts.includes('fade'), `${thread.asset}: native split paints must both be exercised`);
-    assert.ok(nodes(thread.ast).some(node => node.type === 'ObjectExpression' && text(prop(node, 'data-thread-scroll-footer')) === 'true' &&
-      nodes(prop(node, 'children')).some(child => thread.calls.includes(child) && text(prop(child.arguments[1], 'part')) === 'surface')));
-    assert.ok(nodes(thread.ast).some(node => node.type === 'ObjectExpression' && nodes(prop(node, 'className')).some(child => text(child).includes('sticky bottom-0')) &&
-      nodes(prop(node, 'children')).some(child => thread.calls.includes(child) && text(prop(child.arguments[1], 'part')) === 'fade')));
-  }
   const dots = native.consumers.find(item => item.source.includes('composer-disclaimer-above'));
-  assert.ok(dots && dots.calls.some(call => !prop(call.arguments[1], 'part')) && dots.calls.some(call => text(prop(call.arguments[1], 'part')) === 'surface'),
-    'Dots composer and disclaimer must execute combined and surface variants');
+  assert.ok(dots && dots.source.includes('"composer-wrap"') && dots.source.includes('reply-chain-host-open') &&
+    dots.calls.some(call => !prop(call.arguments[1], 'part')) && dots.calls.some(call => text(prop(call.arguments[1], 'part')) === 'surface'),
+    'Dots reply chain and composer disclaimer must retain their shared paint variants');
   assert.ok(portal && portal.source.includes('createPortal') && portal.calls.some(call => text(prop(call.arguments[1], 'part')) === 'surface') &&
     portal.calls.some(call => text(prop(call.arguments[1], 'part')) === 'fade'), 'Workspace preview footer must retain its portal and reserve paints');
   assert.ok(nodes(portal.ast).some(node => node.type === 'ObjectExpression' && prop(node, 'aria-hidden') &&
@@ -105,7 +94,7 @@ const legacyFooterSelectors = current => {
   return sheet.toString();
 };
 
-test('current footer paint clears in thread, Dots and body portals without changing geometry, controls or unrelated leaves', { skip }, async () => {
+test('shared footer leaves clear in Dots and body portals without changing geometry, controls or unrelated leaves', { skip }, async () => {
   const native = loadNative(), oldTheme = legacyFooterSelectors(theme);
   const paint = (id, part, children = '') => `<div id="${id}" aria-hidden="true" class="${escapeAttribute(native.render({ part }).props.className)}">${children}</div>`;
   const browser = await chromium.launch({ headless: true });
@@ -116,18 +105,18 @@ test('current footer paint clears in thread, Dots and body portals without chang
     // no alternative native footer paint, dimensions or special gradient class.
     await page.setContent(`<html data-theme="dark" data-codex-window-type="electron"><head><style>${native.css}</style><style>
       body{margin:0}#root{position:relative;padding:16px}section{position:relative;height:130px;margin:20px 0}
-      #viewport{height:260px;overflow:auto;position:relative}#scroll-content{height:800px;position:relative}
-      #reservation{position:sticky;bottom:0;height:90px}#footer{position:relative;height:90px}
+      #preview-reserve{position:relative;height:90px}
+      #footer{position:relative;height:90px}
       #main,#dots{height:150px}#disclaimer{position:relative;height:45px}#dot-carrier{position:relative;height:60px}
       #workspace-portal,#dots-portal{position:relative;height:95px;margin:12px}#outside-root{position:relative;height:45px}
       #image-preview,#no-module,#with-children,#interactive,#other-owner,#no-hidden,#no-pointer,#no-variant,#hover-family,#substring-family{position:relative;height:40px;width:180px}
       .test-gradient{background-image:linear-gradient(#112233,#667788)}#call{padding:8px;border:2px solid #8ab;border-radius:12px;background:#456;color:#fff}
     </style></head><body><div id="root">
-      <div id="viewport" class="thread-scroll-container"><div id="scroll-content"><p>Scrollable thread</p></div><div id="reservation">${paint('thread-fade', 'fade')}</div></div>
-      <div id="footer" data-thread-scroll-footer="true">${paint('thread-surface', 'surface')}<button id="call">Call</button></div>
-      <section id="dots" class="messaging-root messaging-embedded"><div class="composer-wrap"><div data-codex-composer-root>
+      <div id="footer" data-thread-scroll-footer="true"><button id="call">Call</button></div>
+      <div id="preview-reserve" class="thread-scroll-container">${paint('portal-fade', 'fade')}</div>
+      <section id="dots" class="messaging-root messaging-embedded"><div data-app-shell-main-content-layout><div class="composer-wrap">
         <div id="disclaimer" class="composer-disclaimer-above relative">${paint('dot-disclaimer', 'surface')}<span>Disclaimer</span></div>
-        <div id="dot-carrier">${paint('dot-combined')}<input id="message" aria-label="Message" style="position:relative"></div>
+        <div id="dot-carrier" class="reply-chain-host reply-chain-host-open">${paint('dot-combined')}<input id="message" aria-label="Message" style="position:relative"></div>
       </div></div></section>
       <section id="main" data-app-shell-main-content-layout>${paint('home-combined')}${paint('health-surface', 'surface')}
         <div id="image-preview" aria-hidden="true" class="pointer-events-none test-gradient"><img alt="Preview"></div>
@@ -145,7 +134,7 @@ test('current footer paint clears in thread, Dots and body portals without chang
       <iframe title="External page" srcdoc="<style>body{margin:0;background:rgb(10,20,30)}input{background:rgb(40,50,60);border-radius:11px}</style><input aria-label='External' value='Frame'>"></iframe>
     </body></html>`);
     const style = await page.addStyleTag({ content: oldTheme });
-    const cleared = ['thread-fade', 'thread-surface', 'dot-disclaimer', 'dot-combined', 'home-combined', 'health-surface', 'portal-surface', 'portal-combined'];
+    const cleared = ['portal-fade', 'dot-disclaimer', 'dot-combined', 'home-combined', 'health-surface', 'portal-surface', 'portal-combined'];
     const preserved = ['image-preview', 'no-module', 'with-children', 'interactive', 'other-owner', 'outside-root', 'no-hidden', 'no-pointer', 'no-variant', 'hover-family', 'substring-family', 'call'];
     const capture = () => page.locator('[id]').evaluateAll(elements => Object.fromEntries(elements.map(element => {
       const css = getComputedStyle(element), rect = element.getBoundingClientRect();
@@ -155,21 +144,20 @@ test('current footer paint clears in thread, Dots and body portals without chang
     const external = () => page.frameLocator('iframe').locator('body,input').evaluateAll(elements => elements.map(element => {
       const css = getComputedStyle(element); return [css.backgroundColor, css.borderRadius, element.value];
     }));
-    for (const mode of ['dark', 'light']) for (const width of [720, 1260]) for (const height of [660, 920]) for (const scroll of [0, 180]) {
-      const label = `${mode}/${width}x${height}/scroll${scroll}`;
+    for (const mode of ['dark', 'light']) for (const width of [720, 1260]) for (const height of [660, 920]) {
+      const label = `${mode}/${width}x${height}`;
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ colorScheme: mode });
       await style.evaluate((node, css) => { node.textContent = css; }, oldTheme);
-      await page.evaluate(({ mode, scroll }) => {
+      await page.evaluate(mode => {
         const root = document.documentElement; root.classList.remove('forge-ink-mountain');
         Object.assign(root.dataset, { theme: mode, forgeNativeTheme: mode, forgeBackgroundReady: 'true' });
-        document.getElementById('viewport').scrollTop = scroll;
-      }, { mode, scroll });
+      }, mode);
       const before = await capture(), frameBefore = await external();
       for (const id of cleared) assert.ok(before[id].paint[0] !== 'rgba(0, 0, 0, 0)' || before[id].paint[1] !== 'none', `${label}: ${id} must actually own native paint`);
       await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
       const legacy = await capture();
-      for (const id of ['thread-fade', 'dot-combined', 'dot-disclaimer', 'portal-surface', 'portal-combined']) assert.ok(legacy[id].paint[0] !== 'rgba(0, 0, 0, 0)' || legacy[id].paint[1] !== 'none', `${label}: old CSS must reproduce missed native paint in ${id}`);
+      for (const id of ['portal-fade', 'dot-combined', 'dot-disclaimer', 'portal-surface', 'portal-combined']) assert.ok(legacy[id].paint[0] !== 'rgba(0, 0, 0, 0)' || legacy[id].paint[1] !== 'none', `${label}: old CSS must reproduce missed native paint in ${id}`);
       await style.evaluate((node, css) => { node.textContent = css; }, theme);
       const after = await capture();
       for (const id of Object.keys(before)) assert.deepEqual(after[id].geometry, before[id].geometry, `${label}: ${id} retains native geometry`);
@@ -179,7 +167,6 @@ test('current footer paint clears in thread, Dots and body portals without chang
       }
       for (const id of preserved) assert.deepEqual(after[id], before[id], `${label}: ${id} is outside the decorative owner contract`);
       assert.deepEqual(await external(), frameBefore, `${label}: external frames remain isolated`);
-      assert.equal(await page.locator('#viewport').evaluate(element => element.scrollTop), scroll);
     }
     await page.locator('#message').fill('Still editable');
     assert.equal(await page.locator('#message').inputValue(), 'Still editable');
@@ -188,35 +175,53 @@ test('current footer paint clears in thread, Dots and body portals without chang
   } finally { await browser.close(); }
 });
 
-test('voice focus clears only the native outer footer plate once the wallpaper is ready', { skip }, async () => {
+test('thread footer clears only native backdrop and voice focus paint once the wallpaper is ready', { skip }, async () => {
   const native = loadNative();
   const focusMarker = 'data-thread-focus-mode';
   const focusUtility = `has-[[${focusMarker}]]:bg-surface`;
-  const outerFooters = native.consumers.flatMap(record => nodes(record.ast).flatMap(node => {
+  const records = native.bundle.findModules(['data-thread-composer-backdrop', 'data-thread-scroll-footer']);
+  assert.equal(records.length, 1, 'Current ThreadScrollLayout backdrop owner changed');
+  const outerFooters = nodes(records[0].ast).flatMap(node => {
     if (node.type !== 'CallExpression' || text(node.arguments[0]) !== 'div') return [];
     const props = node.arguments[1];
     const child = prop(props, 'children');
     if (child?.type !== 'CallExpression' || text(prop(child.arguments[1], 'data-thread-scroll-footer')) !== 'true') return [];
+    const carrier = prop(child.arguments[1], 'children')?.elements?.find(item => prop(item?.arguments?.[1], 'data-thread-composer-backdrop'));
+    if (!carrier) return [];
     const classes = nodes(prop(props, 'className')).map(text);
     const utility = classes.find(value => value.split(/\s+/).includes(focusUtility));
     const moduleClass = classes.find(value => /^footer-\S+$/.test(value));
-    return utility && moduleClass ? [`${moduleClass} ${utility} bottom-0`] : [];
-  }));
+    return utility && moduleClass ? [{ moduleClass, outerClass: `${moduleClass} ${utility} bottom-0` }] : [];
+  });
   assert.equal(outerFooters.length, 1, 'Native focus paint must sit on the parent of the semantic thread footer');
   assert.ok(native.bundle.findModules([`"${focusMarker}"`]).some(record => nodes(record.ast)
     .some(node => node.type === 'Property' && key(node.key) === focusMarker)), 'Native voice stage must emit the focus marker');
-  const [outerClass] = outerFooters;
+  const [{ outerClass, moduleClass }] = outerFooters;
+  const pseudoSelector = `.${moduleClass}:has([data-thread-composer-backdrop] [data-composer-body])`;
+  const backdropCss = native.bundle.stylesheetAssets([pseudoSelector])[0];
+  assert.ok(backdropCss, 'Native thread footer backdrop stylesheet is missing');
+  const backdropRules = postcss.parse(native.bundle.read(backdropCss));
+  for (const pseudo of ['before', 'after']) {
+    const paint = [];
+    backdropRules.walkRules(pseudoSelector + ':' + pseudo, rule => {
+      rule.walkDecls('background', declaration => paint.push(declaration.value));
+    });
+    assert.equal(paint.length, 1, `Native footer ${pseudo} paint owner changed`);
+    assert.match(paint[0], pseudo === 'before' ? /linear-gradient\(.*var\(--color-surface\)/ : /^var\(--color-surface\)$/);
+  }
   const sheets = new Set([
     ...native.bundle.baseStylesheets(),
     ...native.bundle.stylesheetAssets([native.classes.background]),
-    ...native.bundle.stylesheetAssets([`has([${focusMarker}])`])
+    ...native.bundle.stylesheetAssets([`has([${focusMarker}])`]),
+    backdropCss
   ]);
   const css = `${native.bundle.layerOrder}\n${[...sheets].map(asset => native.bundle.read(asset)).join('\n')}`;
   const section = (id, classes, content, style = '') => `<section class="host"><div id="${id}" class="${escapeAttribute(classes)}" style="${style}">${content}</div></section>`;
   const footer = (content, id = '') => `<div ${id ? `id="${id}"` : ''} data-thread-scroll-footer="true" class="relative w-full shrink-0 fixture-footer">${content}</div>`;
   const marked = `<div ${focusMarker}="true"></div>`;
-  const body = section('focus-outer', outerClass, footer('<div id="voice-stage"><button id="voice-control" class="pointer-events-auto">Voice action</button></div>', 'focus-inner')) +
-    section('nested-decoy', outerClass, `<div>${footer(marked)}</div>`) +
+  const composer = '<div data-thread-composer-backdrop><div data-composer-body><button id="voice-control" class="pointer-events-auto">Voice action</button></div></div>';
+  const body = section('focus-outer', outerClass, footer('<div id="voice-stage"></div>' + composer, 'focus-inner')) +
+    section('nested-decoy', outerClass, `<div>${footer(marked + '<div data-thread-composer-backdrop><div data-composer-body></div></div>')}</div>`) +
     section('interactive-decoy', outerClass.replace('pointer-events-none ', ''), footer(marked)) +
     section('paint-decoy', outerClass.replace(focusUtility, ''), footer(marked), 'background-color:rgb(40,60,80)');
   const browser = await chromium.launch({ headless: true });
@@ -235,17 +240,33 @@ test('voice focus clears only the native outer footer plate once the wallpaper i
     }, { mode, themed, ready, focused, focusMarker });
     const read = () => page.locator('.host [id]').evaluateAll(elements => Object.fromEntries(elements.map(element => {
       const css = getComputedStyle(element), rect = element.getBoundingClientRect();
+      const readPseudo = pseudo => {
+        const style = getComputedStyle(element, pseudo);
+        return { color: style.backgroundColor, image: style.backgroundImage, top: style.top, bottom: style.bottom,
+          content: style.content, opacity: style.opacity, pointerEvents: style.pointerEvents };
+      };
       return [element.id, { color: css.backgroundColor, image: css.backgroundImage, shadow: css.boxShadow,
         rect: [rect.x, rect.y, rect.width, rect.height], position: css.position, radius: css.borderRadius,
-        pointerEvents: css.pointerEvents, disabled: element.disabled, tabIndex: element.tabIndex }];
+        pointerEvents: css.pointerEvents, disabled: element.disabled, tabIndex: element.tabIndex,
+        before: readPseudo('::before'), after: readPseudo('::after') }];
     })));
-    for (const mode of ['dark', 'light']) {
+    const cleared = (snapshot, color = snapshot['focus-outer'].color) => {
+      const outer = snapshot['focus-outer'];
+      return { ...snapshot, 'focus-outer': { ...outer, color,
+        before: { ...outer.before, color: transparent, image: 'none' },
+        after: { ...outer.after, color: transparent, image: 'none' } } };
+    };
+    for (const mode of ['dark', 'light']) for (const width of [680, 960]) {
+      await page.setViewportSize({ width, height: 640 });
       await page.emulateMedia({ colorScheme: mode });
       await state({ mode, themed: false, ready: true, focused: false });
       const normal = await read();
       assert.equal(normal['focus-outer'].color, transparent, `${mode}: ordinary footer has no outer plate`);
+      assert.match(normal['focus-outer'].before.image, /linear-gradient/);
+      assert.notEqual(normal['focus-outer'].after.color, transparent);
+      assert.match(normal['nested-decoy'].before.image, /linear-gradient/);
       await state({ mode, themed: true, ready: true, focused: false });
-      assert.deepEqual(await read(), normal, `${mode}: ordinary footer stays unchanged`);
+      assert.deepEqual(await read(), cleared(normal), `${mode}: clear normal footer pseudos only`);
       await state({ mode, themed: false, ready: true, focused: true });
       const focused = await read();
       for (const id of ['focus-outer', 'nested-decoy', 'interactive-decoy', 'paint-decoy']) {
@@ -254,12 +275,34 @@ test('voice focus clears only the native outer footer plate once the wallpaper i
       await state({ mode, themed: true, ready: false, focused: true });
       assert.deepEqual(await read(), focused, `${mode}: keep native focus paint until the wallpaper is ready`);
       await state({ mode, themed: true, ready: true, focused: true });
-      assert.deepEqual(await read(), { ...focused, 'focus-outer': { ...focused['focus-outer'], color: transparent } },
-        `${mode}: clear only the outer focus plate and preserve geometry, controls, and unrelated carriers`);
+      assert.deepEqual(await read(), cleared(focused, transparent),
+        `${mode}: clear focus plate and pseudos while preserving geometry, controls, and unrelated carriers`);
       await page.locator('#voice-control').click();
       assert.equal(await page.locator('#voice-control').evaluate(element => element === document.activeElement), true);
       await state({ mode, themed: true, ready: true, focused: false });
-      assert.deepEqual(await read(), normal, `${mode}: leaving focus restores the ordinary footer`);
+      assert.deepEqual(await read(), cleared(normal), `${mode}: leaving focus restores the ordinary footer`);
+    }
+    const previewDirectory = process.env.WUKONG_THREAD_FOOTER_PREVIEW_DIRECTORY;
+    if (previewDirectory) {
+      const wallpaper = fs.readFileSync(new URL('../themes/backgrounds/scenery-01.jpg', import.meta.url)).toString('base64');
+      fs.mkdirSync(previewDirectory, { recursive: true });
+      await page.setViewportSize({ width: 760, height: 640 });
+      await page.addStyleTag({ content: `
+        .host:first-child{height:172px;background:center 75%/cover url("data:image/jpeg;base64,${wallpaper}")}
+        .host:first-child::before{content:"Composer footer · fixture";position:absolute;inset:12px auto auto 16px;color:#fff;font:14px sans-serif}
+        #focus-outer{height:110px}
+        #focus-inner{display:grid;place-items:center}
+        #voice-control{position:relative;z-index:1;border-radius:18px;min-width:280px;min-height:52px;margin:0;
+          background:var(--color-surface-elevated-secondary);color:var(--color-text);text-align:start;padding-inline:16px}
+      ` });
+      await page.locator('#voice-control').evaluate(button => button.textContent = '示例输入框');
+      for (const mode of ['dark', 'light']) {
+        await page.emulateMedia({ colorScheme: mode });
+        await state({ mode, themed: true, ready: true, focused: false });
+        await page.locator('.host').first().screenshot({
+          path: path.join(previewDirectory, `${mode}-thread-footer-fixture-20261115.png`)
+        });
+      }
     }
   } finally { await browser.close(); }
 });

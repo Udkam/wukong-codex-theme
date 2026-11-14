@@ -1,5 +1,9 @@
 # 原生 UI 与主题替换接口
 
+## 普通对话底部绘制（2026-11-15，v126）
+
+Windows Codex 26.1111.2228.0 的 ThreadScrollLayout 通过外壳的 `::before` 和 `::after` 绘制普通对话底部渐变和实色。主题匹配带 `footer-` 类的外壳、直接语义 footer 和 composer backdrop 内的输入框主体，壁纸就绪后只清除两个伪元素的背景。原生锚点、大小、滚动透明度和输入框材质保留。Dots、工作区预览及语音专注状态沿用各自的绘制归属。
+
 ## 侧栏行材质与首页首帧
 
 共享 sidebar-item 行使用原生 active、selected、hover 和菜单状态。主题按 data-app-action-sidebar-project-row／thread-row 区分项目与聊天：项目悬停和菜单用局部 ghost token，selected 聊天用淡冷色底，active 聊天覆盖为更清晰的冷色底及 1 CSS px 内描边。内描边由行自身的 inset box-shadow 绘制，沿用原生圆角，不占用链接的 ::before 热区或键盘焦点轮廓。拖放状态、activity-sidebar-host 和 forced-colors 保持原生绘制；左右书写方向使用同样的完整描边。

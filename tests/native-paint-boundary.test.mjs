@@ -7,7 +7,7 @@ import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import postcss from 'postcss';
 import { PNG } from 'pngjs';
-import { loadNativeBundle, nodes, prop, text, key, nativeFunction, nativeObject, presentationHarness } from './native-bundle-current-helper.mjs';
+import { loadNativeBundle, nodes, ownNodes, prop, text, key, nativeFunction, nativeObject, presentationHarness } from './native-bundle-current-helper.mjs';
 import { makeApplyExpression, makeStyleUpdateExpression } from '../runtime/injection-plan-v13.mjs';
 
 fs.mkdirSync(new URL('../artifacts/test-runs/native-boundary-20260920/',import.meta.url),{recursive:true});
@@ -558,17 +558,38 @@ const loadSidebarRowNative = () => {
   assert.ok(css.includes('.' + hoverClass + '{background-color:var(--color-background-secondary-ghost-hover)'));
   assert.ok(rowFunction.source.includes('bg-text-accent/10 ring-2 ring-inset ring-ring'), 'Native drop target fill and ring changed');
   assert.ok(rowFunction.source.includes('"aria-current":'));
-  const navRecords = bundle.findModules(['data-sidebar-navigation-root', 'sidebarElectron.newThread']);
-  assert.equal(navRecords.length, 1, 'Native New Chat navigation owner changed');
-  const [navRecord] = navRecords;
-  const newChat = nativeFunction(navRecord, 'sidebarElectron.newThread');
+  const navRecords = bundle.findModules(['data-sidebar-navigation-root', 'data-slate-sidebar-content']);
+  const newChatRecords = bundle.findModules(['sidebarElectron.newThread', 'sidebar-new-chat']);
+  assert.equal(navRecords.length, 1, 'Native sidebar navigation owner changed');
+  assert.equal(newChatRecords.length, 1, 'Native New Chat renderer changed');
+  const [navRecord] = navRecords, [newChatRecord] = newChatRecords;
+  const navOwner = nativeFunction(navRecord, '"data-sidebar-navigation-root"');
+  const newChat = nativeFunction(newChatRecord, 'sidebarElectron.newThread');
   const itemCall = newChat.nodes.find(node => node.type === 'CallExpression' &&
     text(prop(node.arguments[1], 'animatedIcon')) === 'sidebar-new-chat');
-  const itemImport = bundle.imports(navRecord)[itemCall?.arguments[0].object.name];
+  const navImports = bundle.imports(navRecord), newChatExports = bundle.exports(newChatRecord);
+  // New Chat lives behind an imported child renderer. Follow the JSX calls
+  // from the sidebar owner through its exported and local child renderers.
+  const pending = navOwner.nodes.filter(node => node.type === 'CallExpression' &&
+    navImports[node.arguments[0]?.object?.name]?.id === newChatRecord.id)
+    .map(node => newChatExports[key(node.arguments[0].property)]?.name).filter(Boolean);
+  const local = new Map(ownNodes(newChatRecord.ast).filter(node => node.type === 'FunctionDeclaration')
+    .map(node => [node.id.name, node]));
+  const reachable = new Set();
+  while (pending.length) {
+    const name = pending.pop();
+    if (reachable.has(name) || !local.has(name)) continue;
+    reachable.add(name);
+    for (const node of ownNodes(local.get(name))) {
+      if (node.type === 'CallExpression' && node.arguments[0]?.type === 'Identifier') pending.push(node.arguments[0].name);
+    }
+  }
+  assert.ok(reachable.has(newChat.ast.id.name), 'The sidebar navigation owner must render New Chat through its exported children');
+  const itemImport = bundle.imports(newChatRecord)[itemCall?.arguments[0].object.name];
   assert.ok(itemImport, 'New Chat must still use the shared navigation item');
   const itemRecord = bundle.module(itemImport.id), itemExport = bundle.exports(itemRecord)[key(itemCall.arguments[0].property)];
   const itemClasses = nodes(itemExport).map(text);
-  const navClass = nodes(navRecord.ast).map(text).find(value => /^Navigation-\S+$/.test(value));
+  const navClass = navOwner.nodes.map(text).find(value => /^Navigation-\S+$/.test(value));
   const navItem = itemClasses.find(value => value.startsWith('sidebar-item relative shrink-0'));
   const navElementHover = itemClasses.find(value => value.startsWith('hover:bg-secondary-ghost-hover '));
   const navPseudoHover = itemClasses.find(value => value.startsWith('hover:before:bg-secondary-ghost-hover '));

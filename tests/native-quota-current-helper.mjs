@@ -60,7 +60,11 @@ let cached;
 export const loadQuotaNative = () => {
   if (cached) return cached;
   const bundle = loadNativeBundle({ archive: quotaArchive });
-  const recovery = bundle.findModules(['aria-live', 'banner-', 'value:"recovery"']).filter(record => record.source.length < 10000);
+  const recovery = bundle.findModules(['aria-live', 'banner-', 'role:"status"']).filter(record =>
+    nodes(record.ast).some(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'role')) === 'status' &&
+      text(prop(node.arguments[1], 'aria-live')) === 'polite') &&
+    nodes(record.ast).some(node => node.type === 'Property' && key(node.key) === 'value' &&
+      nodes(node.value).some(value => text(value) === 'recovery')));
   assert.equal(recovery.length, 1, 'Native recovery presentation module must be unique');
   const bannerRecord = recovery[0], banner = nativeFunction(bannerRecord, 'role:"status"');
   const aside = banner.nodes.find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'role')) === 'status');

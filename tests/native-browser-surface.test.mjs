@@ -64,9 +64,9 @@ const legacyVisibilityExpression = expression
   .replace(visibilityObserver, 'const fullViewStructureChanged = false && records.some(')
   .replace(regularToggleScan, "    ':not(*)',\n");
 
-test('current native browser separates new-tab canvas, transparent toolbar and its real paint carrier', () => {
+test('current native browser separates new-tab paint, transparent toolbar and its navigation slot carrier', () => {
   const native = loadBrowserSurfaceNative();
-  assert.match(native.newTabClass, /(?:^|\s)bg-surface-canvas(?:\s|$)/);
+  assert.match(native.newTabClass, /(?:^|\s)bg-surface(?:\s|$)/);
   assert.ok(!native.toolbarBaseClass.includes('bg-'));
   assert.match(native.frameClass, /(?:^|\s)bg-surface(?:\s|$)/);
   // Semantic JSX/import/export/owner assertions live in the helper, which

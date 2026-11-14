@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1106.6628.0.
+/* Native paint boundary, audited against desktop 26.1111.2228.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -119,6 +119,12 @@
  * semantic owner so cards inside the composer keep their own paint. */
 :root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"],
 :root.forge-ink-mountain[data-forge-background-ready="true"] [data-thread-scroll-footer="true"] > [aria-hidden="true"].pointer-events-none {
+  background: transparent !important;
+}
+/* The ordinary thread footer paints a feather and a solid strip on its
+ * outer shell. Leave native anchoring, opacity and composer paint intact. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] .pointer-events-none:is([class^="footer-"], [class*=" footer-"]):has(> [data-thread-scroll-footer="true"] > [data-thread-composer-backdrop] [data-composer-body])::before,
+:root.forge-ink-mountain[data-forge-background-ready="true"] .pointer-events-none:is([class^="footer-"], [class*=" footer-"]):has(> [data-thread-scroll-footer="true"] > [data-thread-composer-backdrop] [data-composer-body])::after {
   background: transparent !important;
 }
 /* The voice focus stage gives the outer footer shell its own solid fill. */

@@ -22,7 +22,9 @@ test('current native quota recovery has its own status surface and bypasses ordi
   assert.ok(banner.props.className.split(/\s+/).includes(native.classes.banner));
   assert.equal(Object.keys(banner.props).filter(name => name.startsWith('data-')).length, 0,
     'Recovery has no dedicated native data marker; do not invent one in production');
-  const branch = native.notice.nodes.find(node => node.type === 'IfStatement' && node.test.type === 'BinaryExpression' && [node.test.left, node.test.right].some(value => text(value) === 'recovery'));
+  const branch = native.notice.nodes.find(node => node.type === 'IfStatement' && nodes(node.test).some(comparison =>
+    comparison.type === 'BinaryExpression' && comparison.operator === '===' &&
+    [comparison.left, comparison.right].some(value => text(value) === 'recovery')));
   assert.ok(branch && nodes(branch.consequent).some(node => node.type === 'ReturnStatement'),
     'Recovery must return before generic attachedToComposer notice styling');
   assert.ok(nodes(branch.consequent).some(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&

@@ -1,5 +1,7 @@
 # 当前目标与发行状态
 
+2026-11-15 开发版 v126-thread-footer-backdrop 适配 Windows Codex 26.1111.2228.0（包内 26.1111.21308），修复普通对话输入框下方重新出现的底带。见 [下一版变更](RELEASE_NEXT.md) 和 [验证记录](VALIDATION.md)。
+
 更新于 2026-11-13。**[v0.18.11](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.11) 已发布为 GitHub 最新正式版**。运行时为 v125-native-surfaces-and-reduced-motion，适配 Windows Codex 26.1106.6628.0（包内 26.1106.51428）。
 
 新版修正语音专注模式底部、活动侧栏及导航悬停底色。启用减少动态效果时，壁纸在解码完成后直接切换。深浅色对照及范围见 [预览说明](previews/README.md) 和 [发行说明](RELEASE_0.18.11.md)。

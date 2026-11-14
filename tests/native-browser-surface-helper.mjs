@@ -21,11 +21,11 @@ export const loadBrowserSurfaceNative = () => {
   const bundle = loadNativeBundle();
   // Only candidate chunks with these presentation interfaces are parsed. No
   // module factory, hook, navigation command or native transport is executed.
-  const records = bundle.findModules([/data-new-tab-scroll-root|data-browser-sidebar-toolbar|data-browser-sidebar-chrome-expanded|data-app-shell-unified-tab-strip|data-app-shell-active-page|data-app-shell-workspace-layout-toggle|relative min-h-12 w-full border-b border-default bg-surface/]);
+  const frameClass = 'relative flex min-h-12 w-full flex-col gap-2 border-b border-default bg-surface py-2';
+  const records = bundle.findModules([/data-new-tab-scroll-root|data-browser-sidebar-toolbar|data-browser-sidebar-chrome-expanded|data-app-shell-unified-tab-strip|data-app-shell-active-page|data-app-shell-workspace-layout-toggle|relative flex min-h-12 w-full flex-col gap-2 border-b border-default bg-surface py-2/]);
   const newTab = unique(records, record => !!marked(record, 'data-new-tab-scroll-root'), 'new-tab renderer');
   const toolbar = unique(records, record => !!marked(record, 'data-browser-sidebar-toolbar'), 'toolbar renderer');
   const browser = unique(records, record => !!marked(record, 'data-browser-sidebar-chrome-expanded'), 'panel renderer');
-  const frameClass = 'relative min-h-12 w-full border-b border-default bg-surface';
   const frame = unique(records, record => jsxNodes(record).some(node => text(prop(node.arguments[1], 'className')) === frameClass), 'toolbar paint carrier');
   const workspace = unique(records, record => !!marked(record, 'data-app-shell-unified-tab-strip'), 'unified workspace');
   const activePage = unique(records, record => jsxNodes(record).some(node =>
@@ -82,6 +82,9 @@ export const loadBrowserSurfaceNative = () => {
   const toolbarCall = callToExport(bundle, browser, toolbar, toolbarExport);
   const frameCall = callToExport(bundle, browser, frame, frameExport);
   assert.ok(toolbarCall && frameCall, 'Native browser must import the real toolbar and separate paint carrier');
+  const navigationSlot = nodes(browser.ast).find(node => text(prop(node, 'id')) === 'browser-navigation');
+  assert.equal(prop(navigationSlot, 'content'), frameCall, 'The browser navigation slot must use the native paint carrier');
+  assert.equal(text(prop(navigationSlot, 'height')), 'content', 'Native toolbar height must follow its content');
   assert.ok(prop(frameCall.arguments[1], 'children') && prop(frameCall.arguments[1], 'inert'), 'Native toolbar carrier forwarding changed');
   assert.ok(prop(browserNode.arguments[1], 'data-browser-sidebar-primary-focus-target'), 'Native browser root focus boundary changed');
   assert.equal(text(prop(browserNode.arguments[1], 'className')), 'relative h-full min-h-0 w-full min-w-0');
@@ -230,11 +233,10 @@ export const loadBrowserSurfaceNative = () => {
   const stripAssets = bundle.stylesheetAssets([`.${stripClass}`]);
   assert.ok(stripAssets.length, 'Native tab-strip component CSS changed');
   const css = [bundle.layerOrder, ...[...new Set([...bundle.baseStylesheets(), shellAssets[0], stripAssets[0]])].map(asset => bundle.read(asset))].join('\n');
-  assert.ok(css.includes('.bg-surface-canvas{background-color:var(--color-surface-canvas)}'));
   assert.ok(css.includes('.bg-surface{background-color:var(--color-surface)}'));
   const newTabClass = text(prop(newTabNode.arguments[1], 'className'));
   const toolbarBaseClass = toolbarFn.nodes.map(text).find(value => value.startsWith('@container/browser-toolbar '));
-  assert.ok(newTabClass.includes('bg-surface-canvas') && toolbarBaseClass && !toolbarBaseClass.includes('bg-'));
+  assert.ok(newTabClass.split(' ').includes('bg-surface') && toolbarBaseClass && !toolbarBaseClass.includes('bg-'));
   cached = { bundle, records: { newTab, toolbar, browser, frame, workspace, activePage, toggle, strip }, classes, css, shellCss,
     newTabClass, toolbarBaseClass, frameClass, tabsClass, tabsBodyClass, rightPanelClass,
     rightHeaderClass, leftHeaderClass, trackClass, endActionClass, actionGroupClass,
