@@ -7,3 +7,7 @@
 浏览器、侧栏、额度提示和摘要面板的自动回归已更新到本版客户端结构。深浅色预览使用当前客户端的原生底部结构、CSS 和示例输入框，由组件测试生成。[组件预览](previews/README.md) · [验证记录](VALIDATION.md)
 
 解压 Windows 运行包后，完全退出桌面客户端，再双击 `start.cmd`。[使用说明](QUICK_START.txt)
+
+[GitHub 正式发行](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.12) · [Windows ZIP](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.12/Wukong-Codex-Theme-0.18.12-Windows.zip) · [SHA256SUMS.txt](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.12/SHA256SUMS.txt)
+
+发行源码 197 项检查和 Studio 端到端测试均通过。包内 37 个文件与验证源码及解压内容逐项核对，两个发行资产重新下载后的 SHA-256 与本地文件和 GitHub 记录一致。
