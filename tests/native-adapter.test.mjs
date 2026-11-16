@@ -139,7 +139,7 @@ test('new composer rails map through attributes without native spacing or font t
     await page.setContent(`<style>main{height:500px}.context{display:flex;min-height:90px}.composer-surface-chrome{height:130px}[data-composer-rail-item]{height:42px}[data-summary-panel-variant]{height:80px}</style>
       <main data-app-shell-main-surface="default"><h1>What should we build?</h1>
       <div data-codex-composer-root>
-      <div data-above-composer-portal data-above-composer-conversation-id="fixture"><div data-in-progress-fixed-content><div id="progress" class="bg-surface-elevated-secondary">Localized status without a file count</div></div></div><div>
+      <div>
         <div id="context" class="context"><button data-composer-navigation-target="workspace-project">Project</button><button data-composer-navigation-target="branch">Branch</button></div>
         <div id="stack" data-composer-rail data-composer-rail-placement="above">
           <div id="queue" data-composer-rail-item="present" data-composer-rail-framed><div class="vertical-scroll-fade-mask"><div id="item" class="overflow-visible"><button>Queued item</button></div></div></div>
@@ -154,7 +154,6 @@ test('new composer rails map through attributes without native spacing or font t
     assert.ok(state.queue.includes('forge-composer-panel'));
     assert.ok(state.goal.includes('forge-composer-panel'));
     assert.ok(state.summary.includes('forge-right-panel'));
-    assert.equal(await page.locator('#progress').evaluate(e => e.classList.contains('forge-composer-progress-pill')), true);
     await page.evaluate(() => document.querySelector('#goal').setAttribute('data-composer-rail-item','exiting'));
     await page.waitForFunction(() => !document.querySelector('#goal').classList.contains('forge-composer-panel'));
     await page.evaluate(RESTORE_EXPRESSION);

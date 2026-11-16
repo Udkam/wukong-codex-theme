@@ -507,25 +507,19 @@
 /* Goal/queue strips retain their native clipping and corners. Embedded default
  * rail items are transparent: the floating chat's rounded carrier owns paint.
  * Replace material only where an unprefixed native background token exists.
- * Only the outer strip blurs; inner queue leaves never create extra blur layers.
+ * Rail and fixed-progress paint use native owners so opacity and portal
+ * changes cannot expose the original fill before runtime reconciliation.
  */
-:root.forge-ink-mountain :is(
-  .forge-composer-panel,
-  [data-composer-rail-item],
-  .forge-composer-progress-pill
-):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
+:root.forge-ink-mountain [data-composer-rail-item]:is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]),
+:root.forge-ink-mountain [data-in-progress-fixed-content] .overflow-hidden.rounded-3xl > .rounded-3xl.bg-surface-elevated-secondary {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
   border-color: var(--forge-glass-edge) !important;
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
-:root.forge-ink-mountain :is(.forge-composer-panel, [data-composer-utility-rail]):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
+:root.forge-ink-mountain :is([data-composer-rail-item], [data-composer-utility-rail]):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
-}
-:root.forge-ink-mountain .forge-composer-queue-item {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
   :root.forge-ink-mountain {

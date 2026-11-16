@@ -78,7 +78,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v126-thread-footer-backdrop';
+export const RUNTIME_REVISION = 'v127-composer-status-first-paint';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -1061,16 +1061,6 @@ function applyRuntime(payload, createAdapter) {
     }
     if (!composerRoot || !surface) return [];
 
-    const aboveComposerPortal = [...composerRoot.children].find(child => (
-      child.matches?.(
-        '[data-above-composer-portal][data-above-composer-conversation-id]'
-      )
-    )) || null;
-    const composerComponent = [...composerRoot.children].find(child => (
-      child !== aboveComposerPortal &&
-      child.contains(surface)
-    )) || null;
-
     mark(composerRoot, 'forge-composer');
     if (surface && visible(surface)) mark(surface, 'forge-composer-frame');
     const editorShell = editor?.parentElement?.closest('div') || null;
@@ -1119,9 +1109,6 @@ function applyRuntime(payload, createAdapter) {
      * topology so several queued messages become joined inner leaves instead
      * of several unrelated outer cards.
      */
-    const aboveComposerPortals = aboveComposerPortal
-      ? [aboveComposerPortal]
-      : [];
     const panelStacks = nativeUi.all(selectors.composerRail, composerRoot)
       .filter(structurallyMounted);
     panelStacks.forEach(stack => mark(stack, 'forge-composer-panel-stack'));
@@ -1135,23 +1122,13 @@ function applyRuntime(payload, createAdapter) {
       .filter(item => structurallyMounted(item) && item.classList.contains('overflow-visible')));
     queuedItems.forEach(item => mark(item, 'forge-composer-queue-item'));
 
-    const progressHosts = aboveComposerPortals.flatMap(portal => nativeUi.all(selectors.progress, portal))
-      .filter(visible);
-    // The packaged AboveComposerFixedContentSurface owns this native paint
-    // token. Scope it to the published progress portal; text and row dimensions
-    // are intentionally not part of its identity (translations/zoom may vary).
-    const progressPills = progressHosts.flatMap(host => nativeUi.all('.bg-surface-elevated-secondary', host))
-      .filter(visible);
-    progressPills.forEach(pill => mark(pill, 'forge-composer-progress-pill'));
-
     return [
       composerRoot,
       surface,
       editorShell,
       context,
       ...panelStacks,
-      ...panelCandidates,
-      ...progressPills
+      ...panelCandidates
     ];
   };
   const markRightPanelSurfaces = () => {
@@ -1730,7 +1707,6 @@ function applyRuntime(payload, createAdapter) {
     selectors.sidebar,
     selectors.composerRail,
     selectors.composerRailItem,
-    selectors.progress,
     selectors.summary,
     '[class~="group/application-menu-top-bar"]',
     '[class~="group/application-menu-top-bar"] button[aria-haspopup="menu"][aria-expanded]',
@@ -1805,7 +1781,6 @@ function applyRuntime(payload, createAdapter) {
   const composerSignalSelector = [
     selectors.composerRail,
     selectors.composerRailItem,
-    selectors.progress,
     selectors.composer,
     selectors.footer,
     selectors.composerSurface,
@@ -1840,7 +1815,6 @@ function applyRuntime(payload, createAdapter) {
     selectors.sidebar,
     selectors.composerRail,
     selectors.composerRailItem,
-    selectors.progress,
     selectors.summary,
     selectors.composer,
     selectors.composerFind,

@@ -1,6 +1,8 @@
 # 当前目标与发行状态
 
-更新于 2026-11-15。**[v0.18.12](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.12) 已发布为 GitHub 最新正式版**。运行时为 v126-thread-footer-backdrop，适配 Windows Codex 26.1111.2228.0（包内 26.1111.21308）。
+更新于 2026-11-17。**[v0.18.12](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.12) 已发布为 GitHub 最新正式版**。发行运行时为 v126-thread-footer-backdrop，适配 Windows Codex 26.1111.2228.0（包内 26.1111.21308）。
+
+开发版 v127 的文件变更徽标、排队消息和目标条从原生节点首次挂载起应用主题材质。见 [验证记录](VALIDATION.md) 和 [下一版说明](RELEASE_NEXT.md)。
 
 新版清除普通对话输入框外壳的原生底部渐变与实色。深浅色效果及回归范围见 [预览说明](previews/README.md) 和 [发行说明](RELEASE_0.18.12.md)。
 

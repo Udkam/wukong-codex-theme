@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import { nativeFunction, nativeObject, ownNodes } from './native-bundle-current-helper.mjs';
 import postcss from 'postcss';
 import { chromium } from '@playwright/test';
@@ -30,9 +31,12 @@ const loadGoalNative = () => {
   const registry = harness.load(record.id).l;
   const context = harness.createdContexts.find(value => value.defaultValue === null);
   assert.ok(context, 'Native rail context boundary changed');
-  const renderItem = (options, embedded = true) => {
-    harness.contexts.set(context, { embedded, expandedTopTray: false, placement: 'above', shouldUseReducedMotion: true });
-    try { return registry.Item(options); } finally { harness.contexts.delete(context); }
+  const renderItem = (options, embedded = true, { expandedTopTray = false, present = true } = {}) => {
+    const presence = harness.modules.iodE;
+    const previous = presence.tF;
+    presence.tF = () => present;
+    harness.contexts.set(context, { embedded, expandedTopTray, placement: 'above', shouldUseReducedMotion: true });
+    try { return registry.Item(options); } finally { harness.contexts.delete(context); presence.tF = previous; }
   };
   const railClasses = Object.fromEntries(['rail', 'embedded', 'item', 'attached'].map(name => [name,
     nodes(record.ast).map(text).find(value => value.startsWith(`${name}-`) && !value.includes(' '))]));
@@ -89,10 +93,10 @@ const legacyRailPaint = current => {
   const sheet = postcss.parse(current);
   let restored = 0;
   sheet.walkRules(rule => {
-    if (rule.selector.includes('[data-composer-rail-item]') && rule.selector.includes('.forge-composer-progress-pill')) {
-      rule.selector = ':root.forge-ink-mountain :is(.forge-composer-panel[class*="bg-"], [data-composer-rail-item], .forge-composer-progress-pill[class*="bg-"])';
+    if (rule.selector.includes('[data-composer-rail-item]') && rule.nodes.some(node => node.prop === 'background-color')) {
+      rule.selector = ':root.forge-ink-mountain :is(.forge-composer-panel[class*="bg-"], [data-composer-rail-item])';
       restored++;
-    } else if (rule.selector.includes('.forge-composer-panel') && rule.selector.includes('[data-composer-utility-rail]') &&
+    } else if (rule.selector.includes('[data-composer-rail-item]') && rule.selector.includes('[data-composer-utility-rail]') &&
         rule.nodes.some(node => node.prop === 'backdrop-filter')) {
       rule.selector = ':root.forge-ink-mountain .forge-composer-panel[class*="bg-"]';
       restored++;
@@ -179,6 +183,122 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
         await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
         const restored = await capture();
         for (const id of ['goal', 'floating-paint', 'independent', 'warning']) assert.deepEqual(restored[id].paint, baseline[id].paint, `${id} restores native material`);
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('newly mounted and exiting native goals and queues keep the same themed paint owner', { skip: quotaNativeSkip }, async () => {
+  const native = loadGoalNative(), { bundle } = native;
+  const rail = native.item.record;
+  const [goal] = bundle.findModules(['composer.threadGoal.clearTooltip', `"${rail.id}"`]);
+  const [queue] = bundle.findModules(['composer.queuedMessage.resumeInterruptedQueue', 'vertical-scroll-fade-mask', `"${rail.id}"`]);
+  assert.ok(goal && queue, 'Native goal and queue must both use the installed rail');
+  const itemCall = (record, anchor) => {
+    const root = nativeFunction(record, anchor).ast;
+    const imports = bundle.imports(record);
+    const call = ownNodes(root).find(node => node.type === 'CallExpression' && key(node.arguments[0]?.property) === 'Item' &&
+      imports[node.arguments[0].object.object?.name]?.id === rail.id);
+    assert.ok(call, 'The actual shared Rail.Item must own this presentation');
+    return { call, root };
+  };
+  const goalItem = itemCall(goal, 'composer.threadGoal.clearTooltip');
+  assert.equal(prop(goalItem.call.arguments[1], 'variant'), undefined, 'Goal inherits the default rail item variant');
+  const queueItem = itemCall(queue, 'composer.queuedMessage.resumeInterruptedQueue');
+  const variant = prop(queueItem.call.arguments[1], 'variant');
+  const variantDefinition = ownNodes(queueItem.root).find(node => node.type === 'VariableDeclarator' && node.id.name === variant?.name)?.init;
+  assert.equal(variantDefinition?.type, 'ConditionalExpression');
+  assert.deepEqual([text(variantDefinition.consequent), text(variantDefinition.alternate)], ['inline', 'default']);
+  assert.match(queue.source.slice(variantDefinition.test.start, variantDefinition.test.end), /isCompact/,
+    'Only the noncompact floating queue switches to an inline item');
+  const listClass = ownNodes(queueItem.root).map(text).find(value => value.startsWith('vertical-scroll-fade-mask '));
+  const leafClass = nodes(queue.ast).find(node => node.type === 'ObjectExpression' &&
+    text(prop(node, 'className')) === 'overflow-visible' && prop(node, 'initial') && prop(node, 'exit'));
+  assert.ok(listClass && leafClass, 'Native queue preserves one scrolling list with unpainted motion leaves');
+  const oldPaint = postcss.parse(theme);
+  let count = 0;
+  oldPaint.walkRules(rule => {
+    if (rule.selector.includes('[data-composer-utility-rail]') && rule.nodes.some(node => node.prop === 'backdrop-filter')) {
+      rule.selector = rule.selector.replace('[data-composer-rail-item]', '.forge-composer-panel');
+      count++;
+    }
+  });
+  assert.equal(count, 1, 'Restore only the former runtime-mark dependency in the rail filter');
+  const previewDirectory = process.env.WUKONG_COMPOSER_RAIL_PREVIEW_DIRECTORY;
+  const previewBackdrop = previewDirectory
+    ? fs.readFileSync(new URL('../themes/backgrounds/scenery-08.jpg', import.meta.url)).toString('base64') : '';
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) {
+      const page = await browser.newPage({ colorScheme: mode, viewport: { width: 640, height: 520 } });
+      try {
+        const row = (title, action) => native.renderRail.Row({ title, actions: action ?
+          native.renderRail.Action({ children: action }) : undefined });
+        const queueChildren = element('div', { className: listClass, children: [1, 2].map(index =>
+          element('div', { id: `queue-leaf-${index}`, className: text(prop(leafClass, 'className')), children:
+            row(index === 1 ? '检查变更后的界面' : '运行完整验证', '发送') })) });
+        const parts = present => [
+          native.renderItem({ id: 'goal-default', children: row('示例目标：修复输入区显示', '暂停目标') }, false, { present }),
+          native.renderItem({ id: 'queue-default', children: queueChildren }, false, { present }),
+          native.renderItem({ id: 'warning', variant: 'warning', children: 'Connection warning' }, false, { present }),
+          native.renderItem({ id: 'goal-embedded', children: 'Embedded goal' }, true, { present }),
+          native.renderItem({ id: 'goal-expanded', children: 'Expanded goal' }, false, { expandedTopTray: true, present }),
+          native.renderItem({ id: 'queue-inline', variant: 'inline', children: 'Floating queue' }, true, { present })
+        ].map(quotaHtml).join('');
+        const backdrop = previewBackdrop ? `body{background:center 55% / cover no-repeat url(data:image/jpeg;base64,${previewBackdrop})}` : '';
+        await page.setContent(`<html class="forge-ink-mountain" data-theme="${mode}" data-forge-native-theme="${mode}" style="color-scheme:${mode}">
+          <style>${native.css}</style><style>body{margin:0;padding:12px 20px}${backdrop}</style><style id="theme">${oldPaint.toString()}</style><body><div id="root"><div data-composer-rail>${parts(true)}</div></div><div id="portal"></div></body></html>`);
+        const rows = page.locator('[data-composer-rail-item],#queue-leaf-1,#queue-leaf-2');
+        const read = () => rows.evaluateAll(elements => Object.fromEntries(elements.map(node => {
+          const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+          return [node.id, { fill: style.backgroundColor, image: style.backgroundImage, filter: style.backdropFilter,
+            rect: [rect.x, rect.y, rect.width, rect.height], radius: style.borderRadius, opacity: style.opacity,
+            state: node.getAttribute('data-composer-rail-item'), inert: node.inert }];
+        })));
+        const previously = await read();
+        for (const id of ['goal-default', 'queue-default', 'warning']) assert.equal(previously[id].filter, 'none');
+        await page.locator('#theme').evaluate((style, next) => { style.textContent = next; }, theme);
+        const mounted = await read();
+        for (const [id, row] of Object.entries(mounted)) {
+          assert.deepEqual(row.rect, previously[id].rect);
+          assert.equal(row.radius, previously[id].radius);
+          assert.equal(row.opacity, previously[id].opacity);
+        }
+        const verifyPaint = values => {
+          for (const id of ['goal-default', 'queue-default', 'warning']) {
+            assert.notEqual(values[id].fill, 'rgba(0, 0, 0, 0)');
+            assert.match(values[id].image, /linear-gradient/);
+            assert.match(values[id].filter, /blur\(/);
+          }
+          for (const id of ['goal-embedded', 'goal-expanded', 'queue-inline', 'queue-leaf-1', 'queue-leaf-2']) {
+            assert.equal(values[id].fill, 'rgba(0, 0, 0, 0)');
+            assert.equal(values[id].image, 'none');
+            assert.equal(values[id].filter, 'none');
+          }
+        };
+        verifyPaint(mounted);
+        assert.equal(await page.locator('[data-forge-mark],.forge-composer-panel').count(), 0);
+        if (previewDirectory) {
+          fs.mkdirSync(previewDirectory, { recursive: true });
+          const queueBox = await page.locator('#queue-default').boundingBox();
+          assert.ok(queueBox);
+          await page.screenshot({ path: path.join(previewDirectory, `${mode}-goal-queue-fixture-20261117.png`),
+            clip: { x: 0, y: 0, width: 640, height: Math.ceil(queueBox.y + queueBox.height) } });
+        }
+        await page.locator('[data-composer-rail]').evaluate((rail, html) => { rail.innerHTML = html; }, parts(false));
+        const exiting = await read();
+        verifyPaint(exiting);
+        for (const id of ['goal-default', 'queue-default', 'warning']) {
+          assert.equal(exiting[id].state, 'exiting');
+          assert.equal(exiting[id].inert, true);
+          assert.equal(exiting[id].filter, mounted[id].filter);
+        }
+        await page.locator('#portal').evaluate((portal, html) => {
+          document.querySelector('#root [data-composer-rail]').remove();
+          portal.innerHTML = `<div data-composer-rail>${html}</div>`;
+        }, parts(true));
+        verifyPaint(await read());
+        assert.equal(await page.locator('#portal [data-composer-rail-item="present"]').count(), 6);
       } finally { await page.close(); }
     }
   } finally { await browser.close(); }

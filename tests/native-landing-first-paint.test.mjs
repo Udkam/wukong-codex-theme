@@ -14,6 +14,7 @@ const scene = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www
 const brand = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168"><path fill="#f7d589" d="M18 68h132v32H18z"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${scene}");--forge-ui-landing-mark:url("${brand}");}`;
 const oldSheet = postcss.parse(theme);
+const railOwners = '[data-composer-rail-item], [data-composer-utility-rail]';
 let oldIcon = 0, oldTitle = 0, oldRail = 0;
 oldSheet.walkRules(rule => {
   if (rule.selector.includes('[data-testid="home-icon"]')) {
@@ -22,11 +23,15 @@ oldSheet.walkRules(rule => {
   if (rule.selector.includes('[data-feature="game-source"]')) {
     rule.selector = rule.selector.replaceAll('[data-feature="game-source"]', '[data-forge-title-copy]'); oldTitle++;
   }
-  if (rule.selector.includes('[data-composer-utility-rail]')) {
-    rule.selector = rule.selector.replaceAll('[data-composer-utility-rail]', ':not(*)'); oldRail++;
+  if (rule.selector.includes(railOwners) && rule.nodes.some(node => node.prop === 'backdrop-filter')) {
+    rule.selector = rule.selector.replace(
+      railOwners,
+      '[data-composer-rail-item]:not([data-composer-utility-rail]), .forge-composer-panel[data-composer-utility-rail]'
+    );
+    oldRail++;
   }
 });
-assert.ok(oldIcon && oldTitle && oldRail, 'First-paint negative control must retain marker paint while removing all three native interfaces');
+assert.ok(oldIcon && oldTitle && oldRail === 1, 'First-paint negative control must retain marker paint while removing all three native interfaces');
 const oldTheme = oldSheet.toString();
 const element = (tag, props) => ({ tag, props });
 const jsx = record => nodes(record.ast).filter(n => n.type === 'CallExpression' && n.arguments[1]?.type === 'ObjectExpression');

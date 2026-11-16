@@ -33,7 +33,6 @@ export const NATIVE_UI_SELECTORS = Object.freeze({
   utilityTargets: '[data-composer-navigation-target="workspace-project"], [data-composer-navigation-target="environment"], [data-composer-navigation-target="run-location"], [data-composer-navigation-target="branch"], [data-composer-navigation-target="starting-state"]',
   composerRail: '[data-composer-rail]',
   composerRailItem: '[data-composer-rail-item]',
-  progress: '[data-in-progress-fixed-content]',
   footer: '[data-thread-scroll-footer="true"]',
   summary: '[data-summary-panel-variant]',
   summaryRows: '[data-slot="thread-summary-panel-item"], [data-slot="thread-summary-panel-item-button"], [data-slot="thread-summary-panel-item-link"]',

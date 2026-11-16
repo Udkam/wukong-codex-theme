@@ -50,7 +50,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 
 原生 rail Item 的背景选择为 `(variant !== "default" || !embedded && !expandedTopTray) && backgroundMap[variant]`。默认 embedded／expandedTopTray 行没有背景类，controls 和 inline 也透明；独立 default 使用 bg-surface-elevated-secondary，warning 使用原生 color-mix 背景类。data-composer-rail-contained 只表示存在 rail 上下文，本身不能证明有底色。
 
-共享条目材料现要求未加状态或伪元素前缀的 bg-* token，排除 bg-transparent；与运行时标记的 panel／progress 入口使用同一判定。原生透明 goal 行不会重复绘制方形玻璃，独立 default／warning 条仍保留材料替换。宽高、圆角、边距、溢出和控件行为均不改写。
+共享条目材料要求 rail item 本身具有未加状态或伪元素前缀的 bg-* token，并排除 bg-transparent。独立 default／warning 条从首次挂载至退出保持同一材质，原生透明 goal 行由浮动外壳绘制。宽高、圆角、边距、溢出和控件行为沿用原生。
 
 回归实际执行当前原生 rail、composer 与 floating frame／surface 展示函数，保护 body portal 归属、真实背景子节点、透明 goal 和其他变体；旧共享选择器的内存负控制能捕获方形覆盖。实机只复现并对照当前深色状态，渲染器隐藏及其他检查边界见 [验证记录](VALIDATION.md)。
 
@@ -101,8 +101,8 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | 对话、dots | conversation 属性、embedded messaging | 风景队列与深色阅读色；原生消息气泡和操作语义保留 |
 | 输入框 | composer-surface-variant、composer-body | 使用原生绘制变量，首页 body 和对话 root 各自拥有表面 |
 | 项目、分支信息条 | utility-bar-scroll-area、具体 navigation target | 按控件归属识别，不依赖固定行高或工具类顺序 |
-| 目标、排队消息 | data-composer-rail / rail-item | 外层玻璃，排队叶节点不额外模糊；列表回退限定在 rail 内 |
-| 进度区 | data-in-progress-fixed-content 内绘制叶 | 不再依赖 h-8、字号或进度文案 |
+| 目标、排队消息 | 带原生底色的 data-composer-rail-item | 外层从首次挂载至退出保持玻璃材质，队列子项沿用原生绘制 |
+| 文件变更等进度区 | data-in-progress-fixed-content 内的原生圆角进度表面 | 首次挂载即替换底色；无独立背景的紧凑 portal 保留继承绘制 |
 | 摘要、环境、变更面板 | data-summary-panel-variant、summary item slot | 卡片及 sticky 标题共用不透明底，遮挡滚动文字 |
 | dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
 | 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
