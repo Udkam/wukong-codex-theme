@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
-import { loadNativeBundle, nodes, text, prop, nativeObject } from './native-bundle-current-helper.mjs';
+import { loadNativeBundle, nodes, ownNodes, text, prop, key, nativeFunction, nativeObject, presentationHarness } from './native-bundle-current-helper.mjs';
 
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 
 const native = (() => {
   const bundle = loadNativeBundle();
-  const records = bundle.findModules([/browser-use-site-permissions-column-|data-mention-list-scroll-area|voicePickerSurface|chatgptConfirmationSurface|ComposerTopMenuPanel|suggestionMenu|floatingSurface|popover-width/]);
+  const records = bundle.findModules([/browser-use-site-permissions-column-|data-mention-list-scroll-area|voicePickerSurface|chatgptConfirmationSurface|suggestionMenu|floatingSurface|popover-width/]);
   const family = prefix => {
     const values = [...new Set(records.flatMap(record => nodes(record.ast)
       .map(node => text(node)).filter(value => value.startsWith(`${prefix}-`) && /^[\w-]+$/.test(value))))];
@@ -29,7 +29,7 @@ const native = (() => {
     assert.equal(gate.type, 'BinaryExpression');
     assert.equal(gate.operator, '==');
     assert.equal(gate.left.type, 'Literal');
-    assert.equal(typeof gate.left.value, 'number');
+    assert.match(String(gate.left.value), /^\d+$/, 'Native CSS gate must identify an entry chunk');
     assert.equal(gate.right.type, 'MemberExpression');
     assert.equal(gate.right.object.name, record.ast.params[2].name);
     assert.equal(gate.right.property.name, 'j');
@@ -63,9 +63,38 @@ const native = (() => {
   assert.ok(records.some(record => nodes(record.ast).some(node => node.type === 'Property' &&
     (node.key.name ?? node.key.value) === 'data-mention-list-scroll-area')),
   'Native suggestion list scroll boundary changed');
+  const homePanels = bundle.findModules(['composer-home-top-menu', 'padded:!1']).flatMap(record => nodes(record.ast)
+    .filter(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'className')) === 'composer-home-top-menu' &&
+      node.arguments[0]?.type === 'MemberExpression').map(call => ({ record, call })));
+  assert.equal(homePanels.length, 1, 'Native home suggestion panel owner changed');
+  const homePanel = homePanels[0], imported = bundle.imports(homePanel.record)[homePanel.call.arguments[0].object.name];
+  const panelRecord = bundle.module(imported.id), panelExport = key(homePanel.call.arguments[0].property);
+  const panelExpression = bundle.exports(panelRecord)[panelExport];
+  assert.ok(panelExpression && nodes(panelExpression).some(node => text(node) === 'flex flex-col overflow-hidden'),
+    'Native home suggestion panel presentation export changed');
+  const harness = presentationHarness(bundle, [panelRecord.id]);
+  // Audit and execute only the pure width lookup used by this panel variant.
+  // The same module's state hooks and account actions are not executed.
+  const widthCall = nodes(panelExpression).find(node => node.type === 'CallExpression' &&
+    node.callee.type === 'SequenceExpression' && key(node.callee.expressions.at(-1)?.property) === 'xk');
+  assert.ok(widthCall, 'Native suggestion panel width lookup changed');
+  const widthMember = widthCall.callee.expressions.at(-1), widthImport = bundle.imports(panelRecord)[widthMember.object.name];
+  const widthRecord = bundle.module(widthImport.id), widthExport = bundle.exports(widthRecord)[key(widthMember.property)];
+  assert.ok(widthExport && !nodes(widthExport).some(node => node.type === 'CallExpression'), 'Native menu width must remain a pure lookup');
+  const widthMapMember = nodes(widthExport).find(node => node.type === 'MemberExpression' && node.computed);
+  const widthMap = ownNodes(widthRecord.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === widthMapMember?.object.name);
+  assert.ok(widthMap, 'Native menu width map changed');
+  harness.modules[widthImport.id] = { [key(widthMember.property)]: harness.compile(nativeFunction(widthRecord, widthExport.start), {
+    [widthMap.id.name]: nativeObject(widthRecord, widthMap.init)
+  }) };
+  const topTrayClass = harness.load(panelRecord.id)[panelExport]({ padded: false, className: 'composer-home-top-menu' }).props.className;
+  assert.ok(topTrayClass.split(/\s+/).includes('bg-surface-elevated-secondary'), 'Native home panel must own its default surface');
+  const payloadClass = nodes(nativeFunction(homePanel.record, homePanel.call.start).ast).map(text)
+    .find(value => value.startsWith('rounded-none! border-0! bg-transparent!'));
+  assert.ok(payloadClass, 'The current template payload must defer its background to the home panel');
   const presentation = {
     popoverClass: family('Popover'), confirmationClass: family('chatgptConfirmationSurface'),
-    voicePickerClass: family('voicePickerSurface'), topTrayClass: family('ComposerTopMenuPanel'),
+    voicePickerClass: family('voicePickerSurface'), topTrayClass, homePayloadClass: payloadClass,
     floatingClass: staticClass('floatingSurface'), suggestionClass: staticClass('suggestionMenu'),
     permissionsClass: text(prop(table.arguments[1], 'className')),
     permissionsViewportClass: text(prop(viewport.arguments[1], 'className')),
@@ -80,7 +109,7 @@ const native = (() => {
   // Preserve the actual index layer order and Tailwind base; a numbered chunk
   // alone silently loses native padding, radii, disabled opacity and utilities.
   const cssAssets = new Set([...bundle.baseStylesheets(),
-    ...['popoverClass', 'confirmationClass', 'voicePickerClass', 'topTrayClass', 'floatingClass', 'suggestionClass']
+    ...['popoverClass', 'confirmationClass', 'voicePickerClass', 'floatingClass', 'suggestionClass']
       .map(name => stylesheet(presentation[name])),
     bundle.stylesheetAssets(['[cmdk-root],[data-cmdk-root]'])[0]]);
   assert.ok(!cssAssets.has(undefined), 'Native command-menu CSS missing');
@@ -257,7 +286,7 @@ test('command surfaces paint their content once and retain native input, list an
         <div id="image-dialog" role="dialog" class="bg-surface-elevated-secondary"><img class="object-contain" alt="Preview"></div>
         <div id="standalone" cmdk-root><input cmdk-input aria-label="Standalone command"><div cmdk-list><div cmdk-item>Independent command menu</div></div></div>
         <div id="alias" data-cmdk-root><input cmdk-input aria-label="Alias command"><div data-cmdk-list>Alternate attribute</div></div>
-        <div id="tray" class="${native.topTrayClass}" data-composer-expanded-top-tray><div id="tray-command" cmdk-root><div cmdk-list>Add menu</div></div></div>
+        <div id="tray" class="${native.topTrayClass}"><section id="tray-content" class="${native.homePayloadClass}">Template carousel</section></div>
       </body></html>`);
       const measure = () => page.locator('body *').evaluateAll(nodes => nodes.map(node => {
         const s = getComputedStyle(node), r = node.getBoundingClientRect();
@@ -283,7 +312,7 @@ test('command surfaces paint their content once and retain native input, list an
       }, mode);
       assert.deepEqual(await measure(), before, `${mode}: native geometry and attributes`);
       assert.deepEqual(await states(), nativeStates, `${mode}: selected, disabled and loading row paint`);
-      for (const id of ['#search', '#transparent-menu', '#transparent-dialog', '#transparent-alert', '#query', '#results', '#tray-command']) {
+      for (const id of ['#search', '#transparent-menu', '#transparent-dialog', '#transparent-alert', '#query', '#results', '#tray-content']) {
         assert.deepEqual(await material(id), {
           background: 'rgba(0, 0, 0, 0)', image: 'none', blur: 'none', shadow: 'none'
         }, `${mode}: ${id} must not create a second material layer`);

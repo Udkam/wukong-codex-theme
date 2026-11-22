@@ -69,7 +69,11 @@ const loadLandingNative = () => {
   const utilityModules = bundle.findModules(['data-composer-utility-rail', 'data-composer-utility-bar-scroll-area']);
   assert.equal(utilityModules.length, 1);
   const utility = utilityModules[0], railCall = jsx(utility).find(n => prop(n.arguments[1], 'data-composer-utility-rail'));
-  assert.equal(text(prop(railCall.arguments[1], 'variant')), 'controls');
+  const variant = prop(railCall.arguments[1], 'variant');
+  const variantDefinition = nativeFunction(utility, railCall.start).nodes.find(node =>
+    node.type === 'VariableDeclarator' && node.id.name === variant?.name)?.init;
+  assert.equal(variantDefinition?.type, 'ConditionalExpression', 'Inline and default home bars retain separate rail variants');
+  assert.deepEqual([text(variantDefinition.consequent), text(variantDefinition.alternate)], ['inline', 'controls']);
   assert.ok(nodes(utility.ast).some(n => text(n) === 'bg-background-composer-action-bar'), 'Utility material remains on the native rail item');
   const railImport = bundle.imports(utility)[railCall.arguments[0].object.object.name];
   assert.ok(railImport);
@@ -116,7 +120,7 @@ const geometry = page => page.locator('#home-icon,#home-title,#hero-project,#uti
 }));
 const paint = page => page.evaluate(() => {
   const read = (id, pseudo) => { const s = getComputedStyle(document.getElementById(id), pseudo); return { content: s.content, image: s.backgroundImage, color: s.color, fill: s.webkitTextFillColor, opacity: s.opacity, display: s.display, blur: s.backdropFilter, background: s.backgroundColor, shadow: s.boxShadow, border: s.borderColor }; };
-  return { title: read('home-title', '::after'), project: read('hero-project'), icon: read('home-icon', '::before'), logo: read('native-logo'), rail: read('utility-rail') };
+  return { title: read('home-title', '::after'), project: read('hero-project'), host: read('home-icon'), icon: read('home-icon', '::before'), logo: read('native-logo'), rail: read('utility-rail') };
 });
 const prepare = async (page, native, mode, sheet = theme, vars = variables) => {
   await page.setContent(fixture(native, mode));
@@ -144,13 +148,16 @@ test('current native home exposes the heading, static logo, rich project trigger
 test('late native home paints its replacement before markers while preserving controls, toggles and restoration', async () => {
   const native = loadLandingNative(), markup = mountMarkup(native), browser = await chromium.launch({ headless: true });
   try {
-    for (const mode of ['dark', 'light']) for (const width of [900, 1280]) {
+    for (const mode of ['dark', 'light']) for (const width of [900, 1800]) {
       const page = await browser.newPage({ viewport: { width, height: 760 }, colorScheme: mode });
       try {
         await prepare(page, native, mode); await insert(page, markup);
         assert.equal(await page.locator('#late [data-forge-mark],#late [data-forge-title-copy]').count(), 0, 'Capture first paint with runtime marking withheld');
         const before = await geometry(page), first = await paint(page);
         assert.equal(first.logo.opacity, '0'); assert.match(first.icon.image, /^url\(/); assert.match(first.title.content, /此去，欲破何局/);
+        const size = await page.locator('#home-icon').evaluate(element => Number.parseFloat(getComputedStyle(element, '::before').width));
+        assert.equal(size, 168, 'The existing wordmark size stays unchanged across viewport widths');
+        assert.equal(first.host.opacity, native.classes.icon.includes('opacity-30') ? '0.3' : '1', 'The existing native host opacity stays unchanged');
         assert.equal(first.project.fill, 'rgba(0, 0, 0, 0)'); assert.notEqual(first.rail.blur, 'none');
         await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refresh());
         assert.deepEqual(await paint(page), first, `${mode}/${width}: marker arrival must not change hero or utility paint`);
@@ -189,7 +196,7 @@ test('late native home paints its replacement before markers while preserving co
           await preview.setContent(fixture(native, mode)); await insert(preview, markup);
           await preview.evaluate(makeApplyExpression({ styleSheet: theme, variables: payloadFromThemeFile('themes/active.json').variables }));
           await preview.waitForFunction(() => document.documentElement.dataset.forgeBackgroundReady === 'true' && !window.__wukongCodexThemeRuntimeV13.transitionInFlight);
-          fs.writeFileSync(path.join(process.env.WUKONG_HOME_PREVIEW_DIRECTORY, `${mode}-landing-first-paint-fixture-20261109.png`), await preview.locator('#mount').screenshot());
+          fs.writeFileSync(path.join(process.env.WUKONG_HOME_PREVIEW_DIRECTORY, `${mode}-landing-first-paint-fixture-20261122.png`), await preview.locator('#mount').screenshot());
         } finally { await preview.close(); }
       }
     }

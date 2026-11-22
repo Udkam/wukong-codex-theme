@@ -4,24 +4,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import postcss from 'postcss';
+import { PNG } from 'pngjs';
 import { chromium } from '@playwright/test';
-import { makeApplyExpression, ACTIVE_PROBE_EXPRESSION } from '../runtime/injection-plan-v13.mjs';
+import { makeApplyExpression, ACTIVE_PROBE_EXPRESSION, RESTORE_EXPRESSION } from '../runtime/injection-plan-v13.mjs';
 import { createRuntimeProvider } from '../runtime/host.mjs';
 import { loadNativeBundle, nodes, prop, text } from './native-bundle-current-helper.mjs';
+import { loadNativeShell, shellHtml } from './native-shell-current-helper.mjs';
 
 const lock = JSON.parse(fs.readFileSync('docs/native-asar-provenance.json', 'utf8'));
 const archive = process.env.CODEX_LOCAL_ASAR || path.join(process.env.ProgramFiles || '', 'WindowsApps', lock.packageDirectoryName, lock.asarRelativePath);
 const theme = fs.readFileSync('runtime/wukong-codex-theme-background-v13.css', 'utf8');
 const asset = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="#708090"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${asset}");}`;
+const elementTree = (tag, props) => ({ tag, props });
 
-const nativeClassMap = (bundle, names) => {
-  const candidates = bundle.findModules(names.map(name => new RegExp(`\\b${name}:`)));
-  const maps = candidates.flatMap(record => nodes(record.ast).filter(node => node.type === 'ObjectExpression' &&
-    names.every(name => prop(node, name)?.type === 'Literal' && text(prop(node, name)).startsWith(`${name}-`))));
-  assert.equal(maps.length, 1, `Native CSS module ${names.join('/')} must be re-audited`);
-  return Object.fromEntries(names.map(name => [name, text(prop(maps[0], name))]));
-};
 const nativeStyles = (bundle, needles) => {
   const assets = bundle.stylesheetAssets(needles);
   assert.ok(assets.length, `Native styles for ${needles.join('/')} must be re-audited`);
@@ -68,25 +64,39 @@ test('native dots floating header paint follows its inert anchor contract across
   skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
 }, async () => {
   const bundle = loadNativeBundle({ archive });
-  // Discover the two actual native paint hosts; keep the fixture independent of
-  // the theme selector so a native rename/removal fails the contract audit.
-  const { background: legacyClass, floatingHeader: floatingClass } = nativeClassMap(bundle, ['background', 'floatingHeader']);
-  const css = nativeStyles(bundle, [`.${legacyClass}`, `.${floatingClass}`]);
+  // Discover the actual anchored native leaf. The current client replaced the
+  // CSS-module material classes with a utility whose gradient has a native var
+  // fallback. Keep rename controls, but bind their paint to this real rule.
+  const headers = bundle.findModules(['--orbit-messaging-header-']);
+  assert.equal(headers.length, 1, 'Native dots header owner must be re-audited');
+  const headerNodes = nodes(headers[0].ast);
+  const anchors = new Set(headerNodes.filter(node => node.type === 'VariableDeclarator' &&
+    text(node.init).startsWith('--orbit-messaging-header-')).map(node => node.id.name));
+  const leaves = headerNodes.filter(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'div')
+    .map(node => node.arguments[1]).filter(props => anchors.has(prop(prop(props, 'style'), 'positionAnchor')?.name) &&
+      !prop(props, 'children') && prop(props, 'aria-hidden'));
+  assert.equal(leaves.length, 1, 'Native dots inert anchored paint leaf must be re-audited');
+  const paintClasses = text(prop(leaves[0], 'className')).split(/\s+/);
+  const paintTokens = paintClasses.filter(name => name.startsWith('bg-[image:var(--app-shell-content-fade,'));
+  assert.equal(paintTokens.length, 1, 'Native dots content-fade utility must be re-audited');
+  const floatingClass = paintTokens[0], legacyClass = 'previous-header-material';
+  const css = bundle.css(['--app-shell-content-fade']);
+  const nativeSelector = '.' + floatingClass.replace(/[^\w-]/g, character => `\\${character}`);
   const gradients = [];
   postcss.parse(css).walkRules(rule => {
-    const selectors = rule.selector.split(',').map(selector => selector.trim());
-    if (selectors.length === 2 && selectors.includes(`.${legacyClass}`) && selectors.includes(`.${floatingClass}`) &&
-        rule.nodes.some(node => node.type === 'decl' && node.prop === 'background-image' && node.value.startsWith('linear-gradient('))) gradients.push(rule);
+    if (rule.selector === nativeSelector && rule.nodes.some(node => node.type === 'decl' &&
+      node.prop === 'background-image' && node.value.includes('linear-gradient('))) gradients.push(rule);
   });
   assert.equal(gradients.length, 1, 'Native dots floating header paint must be re-audited');
   const renamedClass = 'future-header-material';
   // Preserve the native nested titlebar-context gradient as well as its base
   // declaration when testing an otherwise unrelated future module rename.
   const renamedPaint = gradients[0].clone({ selector: `.${renamedClass}` }).toString();
+  const previousPaint = gradients[0].clone({ selector: `.${legacyClass}` }).toString();
   const browser = await chromium.launch({headless:true});
   try {
     const page = await browser.newPage({viewport:{width:1280,height:760}});
-    await page.setContent(`<html data-theme="dark"><style>${css}</style><style>${renamedPaint}
+    await page.setContent(`<html data-theme="dark"><style>${css}</style><style>${renamedPaint}${previousPaint}
       :root{--spacing:4px;--color-surface:rgb(24,24,24)}
       :root[data-theme="light"]{--color-surface:rgb(250,250,250)}
       body{margin:0}#root{position:relative;margin:24px;height:540px}
@@ -196,7 +206,11 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
   skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
 }, async () => {
   const bundle = loadNativeBundle({ archive });
-  const { PageSurface: surface } = nativeClassMap(bundle, ['PageSurface', 'LeftPanel', 'FullHeightPageSurface']);
+  const shell = loadNativeShell({ bundle });
+  const backing = shell.backing.render({ sidebarOpen: true, leftInset: 308 });
+  backing.props.id = 'paint';
+  const frame = shell.frame.render(); frame.props.id = 'layout';
+  const frameOpen = shellHtml(frame).slice(0, -'</div>'.length);
   // Bind both classes to the renderer that supplies the sticky semantics and
   // titlebar inset. Generic shell/content names exist in unrelated components.
   const stickyRecords = bundle.findModules(['--app-shell-titlebar-left-inset', 'data-scroll-collapse', 'data-sticky']);
@@ -213,20 +227,22 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
     return values[0];
   };
   const sticky = stickyClass('shell'), stickyContent = stickyClass('content');
-  const css = nativeStyles(bundle, [`.${surface}`, `.${sticky}[data-sticky]:before`, `.${stickyContent}`]);
+  const css = shell.css + '\n' + nativeStyles(bundle, [`.${sticky}[data-sticky]:before`, `.${stickyContent}`]);
   const browser = await chromium.launch({headless:true});
   try {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
     await page.setContent(`<html data-theme="dark" data-codex-window-type="electron"><style>${css}</style><style>
       body{margin:0}:root{--app-shell-titlebar-height:44px;--app-shell-navigation-rail-width:52px;--app-shell-main-surface-top-start-radius:12px;--app-shell-main-surface-top-end-radius:12px}
-      #layout{position:relative;height:100vh}aside{position:absolute;top:44px;bottom:4px;display:flex;width:308px}nav.rail{width:52px}.sidebar-navigation{flex:1;border-radius:12px 0 0 12px}
-      main{position:absolute;top:44px;bottom:4px;left:308px;right:4px;overflow:auto;border-radius:0 12px 4px 0}.rows{height:1400px}
-    </style><div id="root"><div id="layout" data-app-shell-page-surface><div id="paint" class="${surface}"></div><aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><nav class="rail group/sidebar-rail"></nav><div id="sidebar" class="sidebar-navigation"><div class="sidebar-navigation">Navigation</div></div></aside><main data-app-shell-main-surface="default"><div id="header" class="${sticky}" data-sticky style="--app-shell-titlebar-left-inset:0px"><div class="${stickyContent}"><input id="plugins-store-page-search"></div></div><div class="rows"><div data-thread-find-target="conversation"><div data-message-id="fixture"><div data-markdown-text-style="assistant-message"><p id="stream">Streaming</p></div></div></div></div></main></div><div role="tooltip" class="bg-tooltip" style="background:#111;color:white">Tooltip</div></div></html>`);
+      #layout{position:relative;height:100vh}#workspace{position:absolute;top:44px;bottom:4px;inset-inline:0}
+      aside{position:absolute;top:0;bottom:0;display:flex;width:308px}nav.rail{width:52px}.sidebar-navigation{flex:1;border-radius:12px 0 0 12px}
+      main{position:absolute;top:0;bottom:0;left:308px;right:4px;overflow:auto;border-radius:0 12px 4px 0}.rows{height:1400px}
+    </style><div id="root">${frameOpen}<div id="workspace" data-app-shell-workspace="true">${shellHtml(backing)}<aside class="app-shell-left-panel" data-app-shell-left-panel-appearance="default"><nav class="rail group/sidebar-rail"></nav><div id="sidebar" class="sidebar-navigation"><div class="sidebar-navigation">Navigation</div></div></aside><main data-app-shell-main-surface="default"><div id="header" class="${sticky}" data-sticky style="--app-shell-titlebar-left-inset:0px"><div class="${stickyContent}"><input id="plugins-store-page-search"></div></div><div class="rows"><div data-thread-find-target="conversation"><div data-message-id="fixture"><div data-markdown-text-style="assistant-message"><p id="stream">Streaming</p></div></div></div></div></main></div></div><div role="tooltip" class="bg-tooltip" style="background:#111;color:white">Tooltip</div></div></html>`);
     const geometry = () => page.evaluate(() => ['paint','sidebar','header'].map(id => {
       const e=document.getElementById(id), r=e.getBoundingClientRect(),s=getComputedStyle(e),p=getComputedStyle(e,'::before');
       return [id,r.x,r.y,r.width,r.height,s.borderRadius,s.position,p.inset,p.borderRadius,p.position];
     }));
     for (const mode of ['light','dark']) for (const width of [720,1280]) {
+      await page.evaluate(RESTORE_EXPRESSION);
       await page.setViewportSize({width,height:800});
       await page.evaluate(mode=>{document.documentElement.dataset.theme=mode;document.documentElement.classList.remove('forge-ink-mountain');},mode);
       const before=await geometry();
@@ -234,26 +250,30 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
       await page.waitForFunction(ACTIVE_PROBE_EXPRESSION);
       assert.deepEqual(await geometry(),before);
       const paint=await page.evaluate(()=>({
-        host:document.getElementById('wukong-codex-theme-background').parentElement.id,
+        host:document.getElementById('wukong-codex-theme-background').parentElement.tagName,
+        backing:getComputedStyle(document.getElementById('paint')).backgroundColor,
         tooltip:getComputedStyle(document.querySelector('[role=tooltip]')).color,
         tooltipBg:getComputedStyle(document.querySelector('[role=tooltip]')).backgroundColor,
         header:getComputedStyle(document.getElementById('header'),'::before').backdropFilter,
         inner:getComputedStyle(document.querySelector('#sidebar > div')).backgroundColor,
         main:getComputedStyle(document.querySelector('[data-app-shell-main-surface]')).backgroundColor
       }));
-      assert.equal(paint.host,'paint');assert.equal(paint.tooltip,'rgb(255, 255, 255)');assert.equal(paint.tooltipBg,'rgb(17, 17, 17)');
+      assert.equal(paint.host,'BODY');assert.equal(paint.backing,'rgba(0, 0, 0, 0)');
+      assert.equal(paint.tooltip,'rgb(255, 255, 255)');assert.equal(paint.tooltipBg,'rgb(17, 17, 17)');
       assert.equal(paint.header,'blur(12px)');assert.equal(paint.inner,'rgba(0, 0, 0, 0)');
       assert.equal(paint.main,mode==='light'?'rgba(247, 249, 251, 0.9)':'rgba(20, 24, 28, 0.86)');
       await page.evaluate(()=>document.querySelector('main').scrollTop=90);
-      await page.evaluate(()=>document.documentElement.classList.remove('forge-ink-mountain'));
+      await page.evaluate(RESTORE_EXPRESSION);
       const scrolled=await geometry();
-      await page.evaluate(()=>document.documentElement.classList.add('forge-ink-mountain'));
+      await page.evaluate(makeApplyExpression({styleSheet:theme,variables}));
+      await page.waitForFunction(ACTIVE_PROBE_EXPRESSION);
       assert.deepEqual(await geometry(),scrolled);
       await page.evaluate(()=>document.querySelector('main').scrollTop=0);
     }
     await page.evaluate(()=>{
       window.savedOverlay=document.getElementById('wukong-codex-theme-background');
       window.savedImage=savedOverlay.querySelector('[data-forge-active="true"] img');
+      window.nativeDecode=HTMLImageElement.prototype.decode;
       window.calls=0;HTMLImageElement.prototype.decode=function(){window.calls++;return Promise.resolve()};
     });
     for(let i=0;i<6;i++) {
@@ -269,6 +289,31 @@ test('new native paint hosts keep geometry, sticky corners, tooltip ink and deco
     for(let i=0;i<12;i++)await page.evaluate(()=>{const s=document.createElement('span');s.textContent='追加';document.getElementById('stream').append(s);});
     await page.waitForTimeout(700);
     assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.refreshCount),await page.evaluate(()=>beforeRefresh),'inline streaming must not rescan the page');
+    if (process.env.WUKONG_SHELL_PREVIEW_DIRECTORY) {
+      await page.evaluate(() => { HTMLImageElement.prototype.decode = window.nativeDecode; delete window.nativeDecode; });
+      const wallpaper = fs.readFileSync(new URL('../themes/backgrounds/scenery-01.jpg', import.meta.url)).toString('base64');
+      const previewVariables = variables.replace(asset, `data:image/jpeg;base64,${wallpaper}`);
+      await page.evaluate(() => {
+        document.getElementById('header').removeAttribute('data-sticky');
+        document.getElementById('header').firstElementChild.innerHTML = '<span style="padding:12px 20px;display:block">主区域背景 · 原生组件夹具</span>';
+        document.getElementById('sidebar').innerHTML = '<div style="padding:24px 18px"><strong>工作区</strong><p style="margin-top:28px">新建聊天</p><p>示例项目</p><p>最近聊天</p><p style="margin-top:40px;font-size:12px;opacity:.7">合成内容 · 不含聊天记录</p></div>';
+        document.querySelector('.rows').innerHTML = '<div data-thread-find-target="conversation" style="padding:28px 36px"><div data-message-id="fixture"><h2 style="font-size:22px">新的工作，从这里开始</h2><p style="margin-top:16px;line-height:1.8">新版主区域使用原生背景节点和布局。<br>主题只替换绘制，保留侧栏缩进、圆角与控件。</p><div style="margin-top:32px;padding:20px;border:1px solid var(--forge-glass-edge);background:var(--forge-glass-fill);border-radius:12px;backdrop-filter:var(--forge-glass-filter)">当前客户端源码 + 示例内容<br><small style="opacity:.75">组件夹具预览，不代表实机页面验收</small></div></div></div>';
+        document.querySelector('main').scrollTop = 0;
+      });
+      fs.mkdirSync(process.env.WUKONG_SHELL_PREVIEW_DIRECTORY, { recursive: true });
+      for (const mode of ['dark','light']) {
+        await page.evaluate(RESTORE_EXPRESSION);
+        await page.evaluate(mode => document.documentElement.dataset.theme = mode, mode);
+        await page.evaluate(makeApplyExpression({styleSheet:theme,variables:previewVariables}));
+        await page.waitForFunction(ACTIVE_PROBE_EXPRESSION);
+        await page.waitForFunction(() => {
+          const image = document.querySelector('[data-forge-background-layer][data-forge-active="true"] img');
+          return image?.complete && image.naturalWidth > 0 && !window.__wukongCodexThemeRuntimeV13.transitionInFlight;
+        });
+        assert.equal(await page.locator('main').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'Preview must expose the decoded wallpaper');
+        await page.screenshot({ path: path.join(process.env.WUKONG_SHELL_PREVIEW_DIRECTORY, `${mode}-native-shell-fixture-20261122.png`) });
+      }
+    }
   } finally {await browser.close();}
 });
 
@@ -297,4 +342,251 @@ test('mapping-only hot updates move the wallpaper owner and carry a new renderer
     assert.equal(await page.locator('#wukong-codex-theme-background').evaluate(e=>e.parentElement.id),'new-paint');
     assert.equal(await page.evaluate(()=>window.__wukongCodexThemeRuntimeV13.sourceFingerprint),second.SOURCE_FINGERPRINT);
   } finally {await browser.close();fs.rmSync(dir,{recursive:true});}
+});
+
+test('current shell backing and alternate main pseudo clear only decoded wallpaper paint', {
+  skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
+}, async () => {
+  const shell = loadNativeShell({ archive });
+  const nativeBacking = shell.backing.render({ sidebarOpen: true, leftInset: 308, trailingSidebar: true });
+  nativeBacking.props.id = 'backing';
+  const frame = shell.frame.render(); frame.props.id = 'frame';
+  const frameOpen = shellHtml(frame).slice(0, -'</div>'.length);
+  const wrapper = shell.workspace.renderWrapper({ hasPageSurface: false, unifiedTabs: true,
+    children: { tag: 'button', props: { id: 'control', type: 'button', className: 'bg-surface', children: 'Native control' } } });
+  wrapper.props.id = 'alternate';
+  const decoy = shell.workspace.renderWrapper({ hasPageSurface: false, unifiedTabs: true });
+  decoy.props.id = 'nested-decoy';
+  decoy.props.children = { tag: 'section', props: { children: decoy.props.children } };
+  const outside = shell.backing.render(); outside.props.id = 'outside-backing';
+  const oldStyle = postcss.parse(theme);
+  let removed = 0;
+  oldStyle.walkRules(rule => {
+    if (rule.selector.includes('data-app-shell-surface-backing') || rule.selector.includes('electron:before:bg-surface')) {
+      rule.remove(); removed++;
+    }
+  });
+  assert.ok(removed, 'The old-owner negative control must remove the current shell paint adaptation');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.setContent(`<html data-theme="dark" data-codex-window-type="electron"><style>${shell.css}</style><style>
+      :root{--color-surface:rgb(24,25,26);--height-toolbar:44px;--radius-xl-base:16px}
+      :root[data-theme="light"]{--color-surface:rgb(248,249,250)}
+      body{margin:0}#frame{position:relative;height:360px}#workspace{position:relative;height:100%}
+      #alternate,#nested-decoy{height:180px;flex:none}#control{margin:12px;padding:8px;border:2px solid #789;border-radius:9px}
+      #outside-owner{position:relative;height:60px}
+    </style><div id="root">${frameOpen}<div id="workspace" data-app-shell-workspace="true">${shellHtml(nativeBacking)}<main data-app-shell-main-surface="default"></main></div></div>${shellHtml(wrapper)}${shellHtml(decoy)}<div id="outside-owner" data-app-shell-workspace="true">${shellHtml(outside)}</div></div></html>`);
+    const capture = () => page.evaluate(() => Object.fromEntries(['backing','alternate','nested-decoy','outside-backing','control'].map(id => {
+      const element = document.getElementById(id), rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element), before = getComputedStyle(element, '::before');
+      return [id, {
+        geometry: [rect.x,rect.y,rect.width,rect.height,style.position,style.inset,style.borderRadius,style.padding,style.borderWidth,
+          style.font,style.pointerEvents,style.zIndex,before.position,before.inset,before.zIndex,before.pointerEvents,before.content],
+        color: style.backgroundColor, image: style.backgroundImage, ink: style.color,
+        before: before.backgroundColor
+      }];
+    })));
+    const old = await page.addStyleTag({ content: oldStyle.toString() });
+    for (const mode of ['dark','light']) for (const width of [720,1280]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.evaluate(mode => {
+        document.documentElement.classList.add('forge-ink-mountain');
+        Object.assign(document.documentElement.dataset, { theme: mode, forgeNativeTheme: mode, forgeBackgroundReady: 'true' });
+      }, mode);
+      const oldPaint = await capture();
+      assert.notEqual(oldPaint.backing.color, 'rgba(0, 0, 0, 0)', 'Previous shell selectors leave the current solid backing opaque');
+      assert.notEqual(oldPaint.alternate.before, 'rgba(0, 0, 0, 0)', 'Previous shell selectors leave the actual alternate pseudo opaque');
+    }
+    await old.evaluate(element => element.remove());
+    await page.addStyleTag({ content: theme });
+    for (const mode of ['dark','light']) for (const width of [720,1280]) for (const sidebarOpen of [true,false]) {
+      await page.setViewportSize({ width, height: 800 });
+      const nativeInset = shell.backing.render({ sidebarOpen, leftInset: width < 1000 ? 240 : 308 }).props.style.insetInlineStart;
+      await page.evaluate(({ mode, nativeInset }) => {
+        const root = document.documentElement;
+        root.classList.remove('forge-ink-mountain');
+        Object.assign(root.dataset, { theme: mode, forgeNativeTheme: mode, forgeBackgroundReady: 'true' });
+        document.getElementById('backing').style.insetInlineStart = nativeInset;
+      }, { mode, nativeInset });
+      const native = await capture();
+      await page.evaluate(() => {
+        document.documentElement.dataset.forgeBackgroundReady = 'false';
+        document.documentElement.classList.add('forge-ink-mountain');
+      });
+      const waiting = await capture();
+      assert.equal(waiting.backing.color, native.backing.color, 'Undecoded wallpaper retains native backing');
+      assert.equal(waiting.alternate.before, native.alternate.before, 'Undecoded wallpaper retains native pseudo');
+      await page.evaluate(() => document.documentElement.dataset.forgeBackgroundReady = 'true');
+      const themed = await capture();
+      for (const id of Object.keys(native)) assert.deepEqual(themed[id].geometry, native[id].geometry, `${mode}/${width}/${sidebarOpen}: ${id} geometry remains native`);
+      assert.equal(themed.backing.color, 'rgba(0, 0, 0, 0)');
+      assert.equal(themed.alternate.before, 'rgba(0, 0, 0, 0)');
+      for (const id of ['nested-decoy','outside-backing','control']) assert.deepEqual(themed[id], native[id], `${id} is not the current shell paint owner`);
+      await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
+      assert.deepEqual(await capture(), native, 'Theme removal restores native backing and pseudo paint');
+    }
+  } finally { await browser.close(); }
+});
+
+test('current main and viewer header fades retain native visibility, geometry and controls', {
+  skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
+}, async () => {
+  const shell = loadNativeShell({ archive });
+  const mainFade = shell.fades.main.render(); mainFade.props.id = 'main-fade';
+  const viewerFade = shell.fades.viewer.render(); viewerFade.props.id = 'viewer-fade';
+  const outside = shell.fades.main.render(); outside.props.id = 'outside-fade';
+  const ordinary = shell.fades.viewer.render(); ordinary.props.id = 'ordinary-header-fade';
+  const interactive = shell.fades.main.render();
+  Object.assign(interactive.props, { id: 'interactive', 'aria-hidden': 'false', children: 'Native action' });
+  const nonempty = shell.fades.main.render();
+  Object.assign(nonempty.props, { id: 'nonempty', children: { tag: 'button', props: { type: 'button', children: 'Native action' } } });
+  const nativeStyle = postcss.parse(theme); let removed = 0;
+  nativeStyle.walkRules(rule => {
+    if (rule.selector.includes('--app-shell-content-fade') || rule.selector.includes('data-viewer-content-fade')) { rule.remove(); removed++; }
+  });
+  assert.ok(removed, 'The old-header negative control must remove the current fade adaptation');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    await page.setContent(`<html data-theme="dark" data-codex-window-type="electron"><style>${shell.css}</style><style>
+      :root{--color-surface:rgb(24,25,26)}:root[data-theme="light"]{--color-surface:rgb(248,249,250)}
+      body{margin:0}.fixture-area{position:relative;height:140px;width:100%;isolation:isolate}
+      #interactive,#nonempty{top:70px}button{padding:8px;border:2px solid #789;border-radius:9px;background:#456;color:#fff}
+    </style><div id="root"><main class="fixture-area" data-app-shell-main-surface="default">${shellHtml(mainFade)}${shellHtml(interactive)}${shellHtml(nonempty)}</main>
+      <header class="fixture-area" data-testid="viewer-header" data-viewer-content-fade="true">${shellHtml(viewerFade)}<button id="viewer-control">Native toolbar action</button></header>
+      <header class="fixture-area">${shellHtml(ordinary)}</header><div class="fixture-area">${shellHtml(outside)}</div></div></html>`);
+    const capture = () => page.evaluate(() => Object.fromEntries(['main-fade','viewer-fade','outside-fade','ordinary-header-fade','interactive','nonempty','viewer-control'].map(id => {
+      const e = document.getElementById(id), r = e.getBoundingClientRect(), s = getComputedStyle(e);
+      return [id, { geometry: [r.x,r.y,r.width,r.height,s.position,s.inset,s.borderRadius,s.borderWidth,s.padding,s.font,
+        s.opacity,s.visibility,s.display,s.pointerEvents,s.zIndex,s.transitionProperty,s.transitionDuration],
+        image:s.backgroundImage,paint:[s.backgroundColor,s.color,s.boxShadow,s.backdropFilter] }];
+    })));
+    const old = await page.addStyleTag({ content: nativeStyle.toString() });
+    await page.evaluate(() => {
+      document.documentElement.classList.add('forge-ink-mountain');
+      Object.assign(document.documentElement.dataset, { forgeBackgroundReady: 'true', forgeNativeTheme: 'dark' });
+    });
+    const previous = await capture();
+    assert.match(previous['main-fade'].image, /linear-gradient\(/, 'Previous selectors leave the source main top fade opaque');
+    assert.match(previous['viewer-fade'].image, /linear-gradient\(/, 'Previous selectors leave the source viewer header fade opaque');
+    await old.evaluate(element => element.remove());
+    await page.addStyleTag({ content: theme });
+    for (const mode of ['dark','light']) for (const width of [720,1280]) for (const visible of [true,false]) for (const hidden of [true,false]) {
+      await page.setViewportSize({ width, height: 800 });
+      const render = shell.fades.main.render({ visible, hidden });
+      await page.evaluate(({ mode, render }) => {
+        document.documentElement.classList.remove('forge-ink-mountain');
+        Object.assign(document.documentElement.dataset, { theme: mode, forgeNativeTheme: mode, forgeBackgroundReady: 'true' });
+        const fade = document.getElementById('main-fade'); fade.className = render.props.className; fade.hidden = render.props.hidden;
+      }, { mode, render });
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const native = await capture();
+      await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
+      const themed = await capture();
+      for (const id of Object.keys(native)) {
+        assert.deepEqual(themed[id].geometry, native[id].geometry, `${mode}/${width}/${visible}/${hidden}: ${id} keeps native layout and visibility`);
+        assert.deepEqual(themed[id].paint, native[id].paint, `${id} changes no native ink, fill or filter`);
+      }
+      for (const id of ['main-fade','viewer-fade']) assert.equal(themed[id].image, 'none', `${id} clears only its decorative fade`);
+      for (const id of ['outside-fade','ordinary-header-fade','interactive','nonempty','viewer-control']) assert.equal(themed[id].image, native[id].image, `${id} retains native paint`);
+      await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
+      assert.deepEqual(await capture(), native, 'Theme removal restores native header fades');
+    }
+  } finally { await browser.close(); }
+});
+
+test('actual native window frames shed layered tint only when wallpaper is ready', {
+  skip: !fs.existsSync(archive) && 'Requires the audited installed ASAR'
+}, async () => {
+  const shell = loadNativeShell({ archive });
+  const frame = (id, hasPageSurface, children) => {
+    const result = shell.frame.render({ hasPageSurface, children }); result.props.id = id; return result;
+  };
+  const backing = shell.backing.render({ leftInset: 64 }); backing.props.id = 'frame-backing';
+  const backed = frame('backed-frame', true, elementTree('div', { 'data-app-shell-workspace': true, className: 'fixture-workspace', children: [backing,
+    elementTree('button', { id: 'frame-control', type: 'button', className: 'bg-surface', children: 'Native control' })] }));
+  const plain = frame('plain-frame', false, elementTree('main', { 'data-app-shell-main-surface': 'default' }));
+  const retained = frame('retained-frame', true, null);
+  const previousStyle = postcss.parse(theme); let removed = 0;
+  previousStyle.walkRules(rule => {
+    if (rule.selector.includes('data-forge-background-ready') && rule.selector.includes('[data-app-shell-frame]') &&
+      rule.nodes.some(node => node.type === 'decl' && node.prop === 'background-image' && node.value === 'none')) {
+      rule.remove(); removed++;
+    }
+  });
+  assert.equal(removed, 1, 'Negative control removes only the current window-frame paint replacement');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 720, height: 800 } });
+    await page.setContent(`<html data-theme="dark" data-appearance-preset="codex" data-codex-os="win32" data-codex-window-type="electron"><style>${shell.css}</style><style>
+      body{margin:0}#known-image{position:fixed;inset:0;z-index:0;background:rgb(64,96,128)}#root{position:relative;z-index:1}
+      #backed-frame,#plain-frame{height:180px;flex:none}.fixture-workspace{position:relative;height:100%}
+      #frame-control{position:absolute;top:16px;left:12px;padding:8px;border-radius:8px;border:2px solid #789}
+      #frame-decoy{width:80px;height:40px;background:rgba(10,20,30,.7)}
+    </style><div id="known-image"></div><div id="root">${[backed,plain].map(shellHtml).join('')}<div id="retained-page" data-app-shell-active-page="false" hidden>${shellHtml(retained)}</div><div id="frame-decoy"></div></div></html>`);
+    const capture = () => page.evaluate(() => Object.fromEntries(['backed-frame','plain-frame','retained-frame','frame-backing','frame-control','frame-decoy'].map(id => {
+      const e = document.getElementById(id), r = e.getBoundingClientRect(), s = getComputedStyle(e), a = getComputedStyle(e, '::after');
+      return [id, { rect:[r.x,r.y,r.width,r.height], geometry:[s.position,s.inset,s.borderRadius,s.padding,s.borderWidth,s.font,s.opacity,s.display,s.visibility,s.pointerEvents],
+        fill:s.backgroundColor,image:s.backgroundImage,ink:s.color,filter:[s.filter,s.backdropFilter],
+        after:[a.content,a.position,a.inset,a.borderRadius,a.boxShadow,a.zIndex,a.pointerEvents] }];
+    })));
+    const alpha = color => page.evaluate(color => {
+      const canvas = document.createElement('canvas'); canvas.width = canvas.height = 1;
+      const context = canvas.getContext('2d'); context.fillStyle = color; context.fillRect(0,0,1,1); return context.getImageData(0,0,1,1).data[3]/255;
+    }, color);
+    const pixel = async () => {
+      const png = PNG.sync.read(await page.screenshot()); return [...png.data.subarray((80*png.width+png.width-32)*4,(80*png.width+png.width-32)*4+3)];
+    };
+    const style = await page.addStyleTag({ content: previousStyle.toString() });
+    for (const mode of ['dark','light']) {
+      await page.emulateMedia({ colorScheme: mode });
+      await page.evaluate(mode => {
+        document.documentElement.style.colorScheme = mode;
+        document.documentElement.classList.add('forge-ink-mountain');
+        Object.assign(document.documentElement.dataset, { theme:mode,forgeNativeTheme:mode,forgeBackgroundReady:'true' });
+      }, mode);
+      const old = await capture();
+      assert.match(old['backed-frame'].image,/linear-gradient\(/, 'Old selectors leave the native docked gradient above the wallpaper');
+      assert.ok(Math.abs(await alpha(old['backed-frame'].fill)-(mode==='dark'?.8:.85)) <= 1/255,
+        'Old selectors leave the native 80%/85% window fill');
+      const gradientColor = await page.locator('#backed-frame').evaluate(frame => {
+        const probe = document.createElement('span'); probe.style.backgroundColor='var(--app-shell-sidebar-docked-background)';
+        frame.append(probe); const color=getComputedStyle(probe).backgroundColor; probe.remove(); return color;
+      });
+      assert.ok(Math.abs(await alpha(gradientColor)-.65)<=1/255,'The native gradient adds its independent 65% docked tint');
+      assert.notDeepEqual(await pixel(),[64,96,128], 'Clearing the child backing alone still changes wallpaper contrast');
+    }
+    await style.evaluate((element, content) => element.textContent = content, theme);
+    for (const mode of ['dark','light']) for (const width of [720,1280]) {
+      await page.setViewportSize({ width, height:800 }); await page.emulateMedia({ colorScheme:mode });
+      await page.evaluate(mode => {
+        document.documentElement.classList.remove('forge-ink-mountain'); document.documentElement.style.colorScheme=mode;
+        Object.assign(document.documentElement.dataset,{ theme:mode,forgeNativeTheme:mode,forgeBackgroundReady:'true' });
+      }, mode);
+      const native = await capture();
+      assert.equal(native['backed-frame'].after[4],'none'); // The separate backing owns the hairline.
+      assert.notEqual(native['frame-backing'].after[4],'none','The genuine frame enables its native backing hairline');
+      await page.evaluate(() => {
+        document.documentElement.classList.add('forge-ink-mountain'); document.documentElement.dataset.forgeBackgroundReady='false';
+      });
+      const waiting = await capture();
+      for (const id of ['backed-frame','plain-frame','retained-frame']) {
+        assert.equal(waiting[id].fill,native[id].fill); assert.equal(waiting[id].image,native[id].image);
+      }
+      await page.evaluate(() => document.documentElement.dataset.forgeBackgroundReady='true');
+      const themed = await capture();
+      for (const id of Object.keys(native)) {
+        for (const field of ['rect','geometry','after','ink','filter']) assert.deepEqual(themed[id][field],native[id][field],`${mode}/${width}: ${id} ${field} stays native`);
+      }
+      for (const id of ['backed-frame','retained-frame']) {
+        assert.equal(themed[id].fill,'rgba(0, 0, 0, 0)'); assert.equal(themed[id].image,'none');
+      }
+      for (const id of ['plain-frame','frame-control','frame-decoy']) assert.deepEqual(themed[id],native[id],`${id} retains native material`);
+      assert.deepEqual(themed['retained-frame'].rect,[0,0,0,0],'Retained hidden pages remain hidden');
+      assert.deepEqual(await pixel(),[64,96,128],'The ready frame adds no tint above the known wallpaper');
+      await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
+      assert.deepEqual(await capture(),native,'Removing the theme restores the complete native frame material');
+    }
+  } finally { await browser.close(); }
 });

@@ -102,7 +102,7 @@ export const presentationHarness = (bundle, auditedPresentationModules = []) => 
   const modules = {
     ABep: jsx, QosV: { c: length => Array(length).fill(Symbol.for('react.memo_cache_sentinel')) },
     on57: { A: (...values) => values.flat(Infinity).filter(value => typeof value === 'string' && value).join(' ') },
-    zd8w: react, LIss: { P: { div: motion('div'), aside: motion('aside'), section: motion('section') } },
+    zd8w: react, K4Cx: { P: { div: motion('div'), aside: motion('aside'), section: motion('section') } },
     El6m: { CW: chromeContext, zN: surfaceContext }, DNYL: { m: Object.assign(pass, { DefaultsProvider: pass }) },
     a6Zv: { Y: () => true }, eFJR: { Y: noop }, K45w: { d: () => '28px' }, HgLj: { P: noop },
     T1PX: { I: () => true }, iodE: { tF: () => true, N: pass, q: pass }, V8uZ: { Wu: [0, 0, 1, 1] },

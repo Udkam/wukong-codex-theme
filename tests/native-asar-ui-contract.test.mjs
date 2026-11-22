@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import postcss from 'postcss';
 import { loadNativeBundle, key, text, prop, nodes, nativeObject } from './native-bundle-current-helper.mjs';
+import { loadNativeShell } from './native-shell-current-helper.mjs';
 const provenance = JSON.parse(fs.readFileSync(
   new URL('../docs/native-asar-provenance.json', import.meta.url),
   'utf8'
@@ -67,10 +68,19 @@ test('local ChatGPT.exe ASAR remains the authoritative native geometry contract'
     '--sidebar-row-label-inset:', '--radius-token-composer-single-line:',
     '--composer-layout-surface-background', '--composer-layout-surface-backdrop-filter',
     'data-composer-surface-variant', '.ComposerLayoutRoot-', '.ComposerLayoutBody-',
-    '.PageSurface-', '--app-shell-navigation-rail-width',
-    '[data-sticky]:before', '.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']) {
+    '--app-shell-navigation-rail-width',
+    '[data-sticky]:before', '.sidebar-navigation{']) {
     assert.ok(css.includes(token), 'native CSS contract drift: '+token);
   }
+  // The new frame replaced PageSurface's CSS-module leaf with an explicit
+  // decorative workspace sibling and a utility-based alternate ::before.
+  // Bind their renderer relationships rather than accepting a renamed hash.
+  const shell = loadNativeShell({ bundle });
+  assert.equal(shell.backing.render({ sidebarOpen: true, leftInset: 308 }).props.style.insetInlineStart, '308px');
+  assert.equal(shell.backing.render({ sidebarOpen: false }).props.style.insetInlineStart, '0px');
+  assert.ok(shell.workspace.renderWrapper({ hasPageSurface: false, unifiedTabs: true }).props.className.includes('electron:before:bg-surface'));
+  assert.ok(!shell.workspace.renderWrapper({ hasPageSurface: true, unifiedTabs: true }).props.className.includes('electron:before:bg-surface'));
+  assert.ok(!shell.workspace.renderWrapper({ hasPageSurface: false, unifiedTabs: false }).props.className.includes('electron:before:bg-surface'));
   assert.ok(bundle.findModules(['data-user-message-bubble']).some(record => nodes(record.ast)
     .some(node => node.type === 'Property' && key(node.key) === 'data-user-message-bubble')),
   'native user-message paint owner must remain explicit');
@@ -112,7 +122,7 @@ test('native Dots header exposes an empty decorative anchor surface separate fro
   const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for (const props of decorative) {
     const className = prop(props, 'className');
-    const nativeClasses = (className.expressions || []).filter(node => node.type === 'MemberExpression')
+    const nativeClasses = [...text(className).split(/\s+/).filter(Boolean), ...(className.expressions || []).filter(node => node.type === 'MemberExpression')
       .map(member => {
         assert.equal(member.object.type, 'MemberExpression', `${drift}: CSS module binding`);
         const imported = bundle.imports(header)[member.object.object.name];
@@ -125,14 +135,17 @@ test('native Dots header exposes an empty decorative anchor surface separate fro
           expression = expression.consequent;
         }
         return nativeObject(record, expression)[key(member.property)];
-      });
+      })];
     const css = nativeClasses.flatMap(name => bundle.stylesheetAssets([name]))
       .map(asset => bundle.read(asset)).join('\n');
     const gradientClasses = new Set();
     postcss.parse(css).walkRules(rule => {
       if (!rule.nodes.some(node => node.type === 'decl' && node.prop === 'background-image' &&
-        node.value.startsWith('linear-gradient('))) return;
-      for (const name of nativeClasses) if (new RegExp(`\\.${escape(name)}(?![\\w-])`).test(rule.selector)) gradientClasses.add(name);
+        node.value.includes('linear-gradient('))) return;
+      for (const name of nativeClasses) {
+        const escapedClass = name.replace(/[^\w-]/g, character => `\\${character}`);
+        if (new RegExp(`\\.${escape(escapedClass)}(?![\\w-])`).test(rule.selector)) gradientClasses.add(name);
+      }
     });
     assert.ok(nativeClasses.some(name => gradientClasses.has(name)),
     `${drift}: empty anchor surface no longer owns the native gradient`);

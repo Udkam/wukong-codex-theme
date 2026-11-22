@@ -1,4 +1,4 @@
-/* Native paint boundary, audited against desktop 26.1111.9664.0.
+/* Native paint boundary, audited against desktop 26.1117.4957.0.
  * Native fonts and layout are retained. The standalone Recovery banner in the
  * default multiline composer follows its native composer contour tokens.
  * Navigation uses a translucent reading surface matched to the native theme.
@@ -65,8 +65,9 @@
  * retain a row fallback for non-portalled tabs. Native geometry stays intact.
  */
 :root.forge-ink-mountain #root :is(
-  [data-app-shell-focus-area="right-panel"][data-app-shell-titlebar-slot="content"],
-  [data-app-shell-titlebar] [data-app-shell-header-slot="end"][data-app-shell-header-obstacle="true"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .h-full.w-max.justify-self-end,
+  [data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"],
+  [data-app-shell-titlebar] [data-app-shell-header-slot="end"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .col-span-full.row-start-1.h-full.min-w-max,
+  [data-app-shell-titlebar] [data-app-shell-header-slot="end"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .pointer-events-none.relative.col-start-1.row-start-1.h-full.w-full.min-w-0,
   [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])
 ) {
   background-color: var(--color-surface, Canvas) !important;
@@ -177,14 +178,26 @@
  * On ChatGPT home the BODY owns the capsule/rounded rectangle; the ROOT is
  * layout only. On a thread the ROOT owns the surface. Do not paint both.
  */
-:root.forge-ink-mountain [data-composer-surface-variant]:not([data-composer-surface-variant="inline"]) {
+:root.forge-ink-mountain :is(
+  [data-composer-surface-variant="default"],
+  [data-composer-surface-variant="opaque"],
+  [data-composer-surface-variant="secondary"]
+):not([data-composer-drag-active]) {
   --composer-layout-surface-background: var(--forge-glass-fill) !important;
   --composer-layout-surface-backdrop-filter: var(--forge-glass-filter) !important;
   --composer-layout-surface-shadow: var(--forge-glass-shadow) !important;
 }
 :root.forge-ink-mountain :is(
-  [data-composer-surface-variant]:not([data-composer-utility-bar-variant="home"]):not([data-composer-surface-variant="inline"]),
-  [data-composer-utility-bar-variant="home"] > [data-composer-body]
+  :is(
+    [data-composer-surface-variant="default"],
+    [data-composer-surface-variant="opaque"],
+    [data-composer-surface-variant="secondary"]
+  ):not([data-composer-drag-active]):not([data-composer-utility-bar-variant="home"]),
+  :is(
+    [data-composer-surface-variant="default"],
+    [data-composer-surface-variant="opaque"],
+    [data-composer-surface-variant="secondary"]
+  )[data-composer-utility-bar-variant="home"]:not([data-composer-drag-active]) > [data-composer-body]
 ) {
   background-image: var(--forge-glass-highlight) !important;
 }
@@ -259,6 +272,7 @@
     [role="alertdialog"][class*="bg-"]:not([class~="bg-transparent"])
   ):not([data-slot="popover-content"]):not([class~="bg-coachmark"]),
   [cmdk-root], [data-cmdk-root],
+  [data-content-search-bar="true"] > div[class~="bg-surface-secondary"],
   [data-slot="popover-content"]:is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
   [data-slot="popover-content"]:not(:is([class^="bg-surface"], [class*=" bg-surface"])) > :is(div, section, form, aside, nav):is([class^="bg-surface"], [class*=" bg-surface"]):not([class~="bg-transparent"]),
   [data-slot="popover-content"][data-checkout-presentation="inline"],
@@ -266,10 +280,10 @@
   .codex-dialog:is(:is([class^="chatgptConfirmationSurface-"], [class*=" chatgptConfirmationSurface-"]), :is([class^="voicePickerSurface-"], [class*=" voicePickerSurface-"])),
   :is([class^="floatingSurface-"], [class*=" floatingSurface-"]):is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]),
   [data-summary-panel-variant],
+  .settings-dialog,
   [data-thread-user-message-navigation-tooltip-preview],
   aside[data-testid="app-shell-floating-left-panel"],
   [data-testid="app-shell-floating-left-panel"] > aside,
-  [class*="ComposerTopMenuPanel"],
   .composer-home-top-menu,
   :has(> [data-mention-list-scroll-area])
 ) {
@@ -288,7 +302,7 @@
 /* Command menus paint their semantic root, not the transparent dialog. This
  * also covers standalone project/branch/action pickers using the same root.
  * Keep a dense reading tint over wallpaper; preserve native sizes and states. */
-:root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]):not([class*="ComposerTopMenuPanel"] *) {
+:root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]) {
   --color-text: var(--forge-nav-ink) !important;
   --color-text-secondary: var(--forge-nav-muted) !important;
   --color-text-tertiary: var(--forge-nav-muted) !important;
@@ -332,6 +346,15 @@
   background-image: none !important;
   backdrop-filter: var(--forge-navigation-filter) !important;
   -webkit-backdrop-filter: var(--forge-navigation-filter) !important;
+}
+/* Peek navigation now paints on its own nested wrapper. Map only the native
+ * popover background carrier; the shared parent already supplies its blur. */
+:root.forge-ink-mountain [data-slate-sidebar-content].sidebar-navigation[class~="bg-(--app-shell-sidebar-popover-background)"]:not(
+  [data-activity-sidebar-host],
+  :has(section.font-openai-sans[aria-label])
+) {
+  background-color: var(--forge-navigation-fill) !important;
+  background-image: none !important;
 }
 :root.forge-ink-mountain .sidebar-navigation:is([class^="ConversationSidebar-"], [class*=" ConversationSidebar-"]) nav:is([class^="Navigation-"], [class*=" Navigation-"]) {
   --color-text: var(--forge-nav-ink) !important;
@@ -381,22 +404,37 @@
   backdrop-filter: var(--forge-shell-filter) !important;
   -webkit-backdrop-filter: var(--forge-shell-filter) !important;
 }
-:root.forge-ink-mountain [class~="electron:bg-surface"]:has([class~="group/settings"]) {
+:root.forge-ink-mountain :is(
+  [class~="electron:bg-surface"]:has([class~="group/settings"]),
+  [data-settings-panel] [class~="electron:bg-surface"],
+  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll])
+) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
   box-shadow: none !important;
   backdrop-filter: var(--forge-shell-filter) !important;
   -webkit-backdrop-filter: var(--forge-shell-filter) !important;
 }
-/* Settings exposes the wallpaper in both themes; cards retain their material. */
+/* Settings and the standalone profile expose the wallpaper in both themes;
+ * the profile has its own shell and no settings-panel ancestor. */
 @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-:root.forge-ink-mountain[data-forge-native-theme] [class~="electron:bg-surface"]:has([class~="group/settings"]) {
+:root.forge-ink-mountain[data-forge-native-theme] :is(
+  [class~="electron:bg-surface"]:has([class~="group/settings"]),
+  [data-settings-panel] [class~="electron:bg-surface"],
+  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll])
+) {
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+}
+/* SettingsDialog owns one backdrop for the window. Its separate navigation
+ * keeps a reading tint without adding another blur layer or changing width. */
+:root.forge-ink-mountain .settings-dialog-sidebar {
+  background-color: var(--forge-navigation-fill) !important;
+  background-image: none !important;
 }
 /* SettingsLayout's direct sticky controls own the unwanted surface band and
  * fade, shared by usage tabs, archived chat search and keyboard shortcuts.
@@ -414,11 +452,14 @@
  * Paint the real cards without recolouring swatches or the code preview.
  * Cards use tint and highlights without adding GPU blur layers.
  */
-:root.forge-ink-mountain [class~="group/settings"] :is(
+:root.forge-ink-mountain :is([class~="group/settings"], [data-settings-panel]) :is(
   [style*="background"][style*="--color-background-panel"],
   [class~="bg-surface-secondary/92"],
   [class~="dark:bg-surface-secondary/92"]
-):not([data-testid="theme-preview"], [data-testid="theme-preview"] *) {
+):not(
+  [data-testid="theme-preview"], [data-testid="theme-preview"] *,
+  [data-settings-panel] [class~="[[data-settings-panel]_&]:[--settings-surface-background:transparent]"]
+) {
   background-color: var(--forge-glass-fill) !important;
   background-image: var(--forge-glass-highlight) !important;
   border-color: var(--forge-glass-edge) !important;
@@ -464,15 +505,6 @@
 }
 :root.forge-ink-mountain [data-summary-panel-variant] [aria-hidden="true"] > .pointer-events-none.sticky[class~="bg-surface-elevated-secondary"] {
   background-color: var(--forge-summary-fill) !important;
-}
-:root.forge-ink-mountain [class*="ComposerTopMenuPanel"] {
-  --composer-top-tray-background: transparent !important;
-}
-:root.forge-ink-mountain [class*="ComposerTopMenuPanel"] :is([cmdk-root], [data-cmdk-root]) {
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 /* The first-party plugin recommendation has a separate guest document.
@@ -557,6 +589,27 @@
 :root.forge-ink-mountain[data-forge-background-ready="true"] body,
 :root.forge-ink-mountain[data-forge-background-ready="true"] #root {
   background-color: transparent !important;
+}
+
+/* The current workspace shares a native backing between retained pages.
+ * Its motion inset and corners remain authoritative while the viewport scene
+ * continues behind the sidebar, titlebar and active content. The alternate
+ * tab layout paints the same surface on a main-content wrapper's ::before. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] [data-app-shell-frame][data-app-shell-page-surface="true"] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+:root.forge-ink-mountain[data-forge-background-ready="true"] [data-app-shell-page-surface] [data-app-shell-workspace="true"] > [data-app-shell-surface-backing="true"][aria-hidden="true"],
+:root.forge-ink-mountain[data-forge-background-ready="true"] [class~="electron:before:bg-surface"]:has(> [data-app-shell-main-content-layout])::before {
+  background-color: transparent !important;
+}
+
+/* Current content/header fades read the opaque native surface even after the
+ * workspace backing is transparent. Clear only their empty decorative leaves. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] [data-app-shell-main-surface] [aria-hidden="true"].pointer-events-none:empty[class*="bg-[image:var(--app-shell-content-fade,"],
+:root.forge-ink-mountain[data-forge-background-ready="true"] header[data-viewer-content-fade] > [aria-hidden="true"].pointer-events-none:empty[class*="bg-[image:var(--app-shell-content-fade,"] {
+  background-image: none !important;
 }
 
 :root.forge-ink-mountain body {

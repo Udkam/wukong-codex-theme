@@ -1,5 +1,21 @@
 # 当前预览
 
+## v129 工作区背景与侧栏（2026-11-22）
+
+使用 Windows Codex 26.1117.4957.0（包内 26.1117.41037）的原生背景节点、布局与 CSS，配合示例侧栏和正文展示当前开发版工作区。运行时为 v129-native-workspace-surface。图片来自组件夹具，不含聊天记录；实际检查和用户验收范围见 [验证记录](../VALIDATION.md)。
+
+| 深色 | 浅色 |
+| --- | --- |
+| ![深色工作区组件夹具](dark-native-shell-fixture-20261122.png) | ![浅色工作区组件夹具](light-native-shell-fixture-20261122.png) |
+
+## v129 新聊天首帧（2026-11-22）
+
+使用同一当前客户端的真实首页展示组件、原生 CSS 和示例项目内容生成。字标资源、文案、168px 尺寸与宿主透明度沿用原有设置，首页不叠加额外遮罩；首次挂载和加标记后的绘制一致性由动态回归检查。图片来自组件夹具，不能等同于实机截图或用户视觉验收。
+
+| 深色 | 浅色 |
+| --- | --- |
+| ![深色首页首帧夹具](dark-landing-first-paint-fixture-20261122.png) | ![浅色首页首帧夹具](light-landing-first-paint-fixture-20261122.png) |
+
 ## v128 插件推荐卡片（2026-11-22）
 
 使用当前 Windows Codex 26.1111.9664.0 中内置插件推荐页的 CSS 和示例内容展示卡片底色、图标底板与按钮配色。图片来自组件夹具。
@@ -49,31 +65,16 @@
 | --- | --- |
 | ![深色侧栏行夹具](dark-sidebar-selection-fixture-20261113.png) | ![浅色侧栏行夹具](light-sidebar-selection-fixture-20261113.png) |
 
-## v122 新聊天首帧（2026-11-09）
+## v129 标签页标题与完整视图（2026-11-22）
 
-首页夹具展示替换后的稳定外观，首帧与加标记后的一致性由独立动态回归验证。
+使用 Windows Codex 26.1117.4957.0 的原生 CSS、workspace backing、标题 portal、HeaderAction 注册与实际 end-slot 结构。上排为右端独立按钮载体使用原生背景的局部，下排为完整视图暂停主题后的原生内容区域。图片使用示例内容，属于组件夹具，不是实机截图或用户视觉验收。
+
+回归覆盖测量与非测量两种 live 槽位、隐藏的尺寸副本、分栏／完整视图切换和图片复用，并保留原生边缘细线。
 
 | 深色 | 浅色 |
 | --- | --- |
-| ![深色首页首帧夹具](dark-landing-first-paint-fixture-20261109.png) | ![浅色首页首帧夹具](light-landing-first-paint-fixture-20261109.png) |
-
-## v120／v121 标签页右端背景组件夹具（2026-11-09）
-
-dark-tab-header-endcap-fixture-20261109.png、light-tab-header-endcap-fixture-20261109.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、标题 portal、HeaderAction 注册与 end-slot 渲染关系构成的动态展示夹具。v121 保留同一绘制方案，并随本轮回归重新生成核对。覆盖被原生裁切隔开的独立注册按钮层；只展示测试标签和控件，不含聊天、账户或本机路径。**图片来自自动夹具，不是实际客户端截图，也不是用户视觉验收。**
-
-| 深色标签页顶部夹具 | 浅色标签页顶部夹具 |
-| --- | --- |
-| ![深色标签页右端原生背景夹具](dark-tab-header-endcap-fixture-20261109.png) | ![浅色标签页右端原生背景夹具](light-tab-header-endcap-fixture-20261109.png) |
-
-## v119 完整视图原生外观组件夹具（2026-11-08）
-
-dark-native-full-view-fixture-20261108.png、light-native-full-view-fixture-20261108.png：当前 Windows Codex 26.1103.4239.0 的原生 CSS、实际 JSX 根属性及 import／export 关系构成的独立展示夹具，使用确定的外部布局槽位与测试文字，没有执行业务模块。图片是自动回归中暂停主题后的原生内容区域裁图；**不是实际客户端完整视图的截图，也不是用户视觉验收**。地址和卡片均为测试内容，不含聊天、账户或本机路径。
-
-回归按相同状态的未注入原生基线比较背景、文字、滤镜、伪元素、控件矩形和点击，另测退出后恢复同一主题图片。Ego Lite 曾对同源夹具的显式 full 路径做 DOM／输入／切换检查；实际按钮覆盖 split 的分支由最终自动回归验证。Ego 窗口最小化导致截图不可用，不能将这些图片标成 Ego 或实机截图。
-
-| 深色原生组件夹具 | 浅色原生组件夹具 |
-| --- | --- |
-| ![深色完整视图原生组件夹具](dark-native-full-view-fixture-20261108.png) | ![浅色完整视图原生组件夹具](light-native-full-view-fixture-20261108.png) |
+| ![深色标签页右端夹具](dark-tab-header-endcap-fixture-20261122.png) | ![浅色标签页右端夹具](light-tab-header-endcap-fixture-20261122.png) |
+| ![深色完整视图夹具](dark-native-full-view-fixture-20261122.png) | ![浅色完整视图夹具](light-native-full-view-fixture-20261122.png) |
 
 ## v0.18.9／v118 底部背景（2026-11-05）
 

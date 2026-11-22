@@ -45,17 +45,17 @@ test('native independent toolbar, avatar material and asChild checkout preserve 
     direct(aboutPopover, toolbarCall, owner(native.aboutAst, aboutPopover)), 'Native Memory summary toolbar must remain a direct child of an unstyled Popover');
   const toolbarRoot = native.toolbar.nodes.find(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'div' && text(prop(node.arguments[1], 'role')) === 'presentation');
   assert.ok(toolbarRoot, 'Native toolbar material must remain its actual block root');
-  const reactionUses = nodes(native.avatarAst).filter(node => node.type === 'CallExpression' && node.arguments[0]?.name === native.avatarReaction.ast.id.name);
-  assert.ok(reactionUses.length, 'Native reaction picker consumer changed');
-  assert.ok(native.avatarPopovers.some(avatarPopover => {
-    const avatarFn = owner(native.avatarAst, avatarPopover), avatarAliases = aliases(avatarFn);
-    const reactionBranch = nodes(avatarFn).find(node => node.type === 'ConditionalExpression' && reactionUses.includes(node.consequent));
-    return reactionBranch && avatarAliases(prop(avatarPopover.arguments[1], 'children'), reactionBranch);
-  }), 'Native reaction material must remain directly in the transparent Popover branch');
-  const avatar = native.renderAvatarReaction({ children: 'Reaction choices' });
+  const avatarUses = nodes(native.avatarAst).filter(node => node.type === 'CallExpression' && node.arguments[0]?.name === native.avatarDismiss.ast.id.name);
+  assert.ok(avatarUses.length, 'Native avatar dismiss consumer changed');
+  assert.equal(prop(native.avatarMaterialCall.arguments[1], 'children'), native.avatarButton,
+    'The actual avatar material must directly contain its native control');
+  for (const [name, value] of [['color', 'ghostActive'], ['radius', 'full'], ['size', 'iconCircleSm']]) {
+    assert.equal(text(prop(native.avatarButton.arguments[1], name)), value, `Native avatar Button ${name} changed`);
+  }
+  const avatar = native.renderAvatarDismiss({ children: 'Dismiss control' });
   assert.equal(avatar.props['data-avatar-overlay-material'], 'css');
-  assert.equal(avatar.props['data-avatar-overlay-material-variant'], 'reaction-picker');
-  assert.match(avatar.props.style.backdropFilter, /^url\(#/);
+  assert.equal(avatar.props['data-avatar-overlay-material-variant'], 'activity-dismiss');
+  assert.ok(avatar.props.className.split(/\s+/).includes('rounded-full'));
   const { checkoutCall, checkoutPopover } = native;
   assert.ok(checkoutCall && checkoutPopover && prop(checkoutPopover.arguments[1], 'unstyled') &&
     direct(checkoutPopover, checkoutCall, owner(native.checkoutDialogAst, checkoutPopover)), 'Native inline checkout must remain the merged asChild surface');
@@ -91,8 +91,9 @@ test('Popover shells stay transparent while actual native carriers paint once an
     const inner = native.renderFloating({ id: 'design-paint', className: native.editorClasses, children: controlTree() });
     const design = native.renderPopover({ id: 'design-shell', unstyled: true, className: text(prop(native.editorPopover.arguments[1], 'className')), children: inner });
     const pop = (id, options = {}, children) => native.renderPopover({ id, ...options, children });
-    const reaction = native.renderAvatarReaction({ children: { tag: 'button', props: { id: 'avatar-action', className: 'bg-primary-soft rounded-md px-2', children: 'Reaction' } } });
-    reaction.props.id = 'avatar-paint';
+    const avatarDismiss = native.renderAvatarDismiss({ id: 'avatar-paint', children: {
+      tag: 'button', props: { id: 'avatar-action', className: 'bg-primary-soft rounded-full px-2', children: 'Dismiss' }
+    } });
     const checkoutControls = () => ({ tag: 'div', props: { children: [
       { tag: 'input', props: { 'data-checkout-control': 'input', 'aria-label': 'Credit amount', className: native.inputClass, value: '20' } },
       { tag: 'button', props: { 'data-checkout-control': 'button', className: native.checkoutSecondary, disabled: true, children: 'Continue' } }
@@ -109,8 +110,8 @@ test('Popover shells stay transparent while actual native carriers paint once an
       pop('button-shell', { unstyled: true }, { tag: 'button', props: { id: 'button-carrier', className: native.toolbarClasses, children: 'Interactive button' } }),
       ...['hover:bg-surface-elevated-secondary', 'after:bg-surface-elevated-secondary', 'bg-transparent', 'bg-transparent hover:bg-surface-elevated-secondary'].map((className, index) => pop(`negative-${index}`, { unstyled: true, className }, 'Transparent native shell')),
       pop('coachmark', { unstyled: true, className: 'bg-coachmark' }, 'Intentional native coachmark'),
-      pop('avatar-shell', { unstyled: true }, reaction),
-      native.renderAvatarMaterial({ id: 'avatar-native', variant: 'reaction-picker', children: 'Independent native material', style: { backdropFilter: 'url(#native-reaction-filter)' } }),
+      { tag: 'div', props: { id: 'avatar-shell', children: avatarDismiss } },
+      native.renderAvatarMaterial({ id: 'avatar-native', variant: 'activity', children: 'Independent native material', style: { backdropFilter: 'url(#native-material-filter)' } }),
       checkout(false, true), native.renderCheckout({ id: 'checkout-native', expanded: false, isDarkMode: true, children: checkoutControls() })
     ];
     await page.setContent(`<html data-theme="dark"><head><style>${native.css}</style><style>body{margin:0;padding:12px}#fixtures{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start}#design-shell{height:var(--test-panel-height,240px);width:var(--test-panel-width,368px)}iframe{width:180px;height:65px}#as-child-form{display:block}</style></head><body><div id="fixtures">${cases.map(html).join('')}</div><iframe title="External control" srcdoc="<style>body{background:rgb(15,25,35);color:rgb(230,240,250);margin:0}input{background:rgb(40,50,60);border-radius:9px;color:white}</style><input aria-label='External' value='Frame'></input>"></iframe></body></html>`);
@@ -137,10 +138,9 @@ test('Popover shells stay transparent while actual native carriers paint once an
       for (const id of Object.keys(before)) assert.deepEqual(after[id].geometry, before[id].geometry, `${label}: ${id} retains native geometry and rounded corners`);
       for (const id of transparent) assert.deepEqual(after[id].paint.slice(0, 4), ['rgba(0, 0, 0, 0)', 'none', 'none', 'none'], `${label}: ${id} must remain a transparent positioning shell`);
       for (const id of painted) { assert.notEqual(after[id].paint[0], 'rgba(0, 0, 0, 0)', `${label}: ${id} keeps readable fill`); assert.match(after[id].paint[3], /blur\(/, `${label}: ${id} owns the only glass layer`); }
-      for (const id of Object.keys(before).filter(id => id.startsWith('control-') || ['native-toggle', 'avatar-action', 'avatar-native', 'checkout-native', 'coachmark', 'button-carrier'].includes(id) || id.startsWith('styled-child-') || id.startsWith('heading-'))) assert.deepEqual(after[id], before[id], `${label}: ${id} remains native`);
-      assert.notEqual(after['avatar-paint'].paint[0], before['avatar-paint'].paint[0], `${label}: reaction material adopts the theme fill`);
-      assert.deepEqual(after['avatar-paint'].paint.slice(1), before['avatar-paint'].paint.slice(1), `${label}: avatar keeps native SVG backdrop, border elevation and foreground`);
-      assert.match(after['avatar-paint'].paint[3], /^url\(/);
+      for (const id of Object.keys(before).filter(id => id.startsWith('control-') || ['native-toggle', 'avatar-paint', 'avatar-action', 'avatar-native', 'checkout-native', 'coachmark', 'button-carrier'].includes(id) || id.startsWith('styled-child-') || id.startsWith('heading-'))) assert.deepEqual(after[id], before[id], `${label}: ${id} remains native`);
+      assert.equal(after['avatar-paint'].paint[3], 'none', `${label}: native activity dismiss retains its solid material`);
+      assert.match(after['avatar-native'].paint[3], /^url\(/, `${label}: unrelated native material keeps its supplied SVG filter`);
       assert.deepEqual(after['checkout-inline'].checkoutTokens, before['checkout-inline'].checkoutTokens, `${label}: checkout controls keep their native color tokens`);
       assert.equal(await page.locator('#design-shell').evaluate(element => [...element.querySelectorAll('*')].filter(child => getComputedStyle(child).backdropFilter !== 'none').length), 1, `${label}: design controls paints one glass surface`);
       assert.deepEqual(await page.frameLocator('iframe').locator('body,input').evaluateAll(elements => elements.map(element => { const style = getComputedStyle(element); return [style.backgroundColor, style.color, style.borderRadius, element.value]; })), frameBefore, `${label}: external frame is isolated`);

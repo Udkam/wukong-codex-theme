@@ -6,7 +6,7 @@
 export const NATIVE_UI_SELECTORS = Object.freeze({
   pageShell: '[data-app-shell-page-surface]:not([data-app-shell-page-surface="false"])',
   pagePaint: '[class^="PageSurface-"], [class*=" PageSurface-"]',
-  fullViewWorkspace: '[data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"][data-app-shell-header-placement="titlebar"][data-app-shell-page-surface="true"]',
+  fullViewWorkspace: '[data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"]',
   fullViewToggle: '[data-app-shell-workspace-layout-toggle="right-panel"]',
   main: '[data-app-shell-main-surface]',
   mainContent: '[data-app-shell-main-content-layout]',
@@ -14,7 +14,7 @@ export const NATIVE_UI_SELECTORS = Object.freeze({
   floatingSidebar: 'aside[data-testid="app-shell-floating-left-panel"], [data-testid="app-shell-floating-left-panel"] > aside',
   navigation: '.sidebar-navigation',
   activityNavigation: ':is([data-sidebar-navigation-root], [data-slate-sidebar-content]).sidebar-navigation:has(section.font-openai-sans[aria-label])',
-  settings: '[data-settings-mobile-header], [class~="group/settings"]',
+  settings: '[data-settings-panel], .settings-dialog',
   catalogHeader: '[data-sticky][style*="--app-shell-titlebar-left-inset"]',
   conversation: '[data-thread-find-target="conversation"]',
   conversationHost: '[data-vscode-context*="supportsNewChatMenu"]',
@@ -91,8 +91,7 @@ export function createNativeUiAdapter(document, selectors) {
     }
     return null;
   };
-  const settingsActive = () => all(selectors.settings)
-    .some(element => visible(element) && !element.closest(selectors.overlay));
+  const settingsActive = () => all(selectors.settings).some(visible);
   const sidebar = () => first(selectors.floatingSidebar) || first(selectors.sidebar);
   const conversationSidebar = () => {
     const owner = sidebar();

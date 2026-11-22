@@ -191,6 +191,8 @@ test('native in-app browser remains a body portal outside the app root', { skip:
     text(call.arguments[0]) === 'webviewrole' && text(call.arguments[1]) === 'tab'), `${drift}: native webview tab role`);
   assert.ok(calls(constructor, container, 'append').some(call => call.arguments.some(argument => argument.name === webview)),
     `${drift}: native webview must remain inside its portal container`);
+  assert.equal(text(assignments(constructor, `${container}.style.position`)[0]?.right), 'fixed',
+    `${drift}: native browser container fixed positioning`);
 
   const mount = nodes(webviewModule.ast).find(node => node.type === 'MethodDefinition' && key(node.key) === 'attachToDom');
   assert.ok(mount, `${drift}: browser container portal mount`);
@@ -209,7 +211,7 @@ test('native in-app browser remains a body portal outside the app root', { skip:
     memberPath(call.arguments[1]) === `${mountParameter.left.name}.firstChild`), `${drift}: connected browser container portal move`);
   assert.ok(nodes(webviewModule.ast).some(node => node.type === 'CallExpression' && memberPath(node.callee) === 'Object.assign' &&
     memberPath(node.arguments[0]).endsWith('.style') &&
-    text(prop(node.arguments[1], 'position')) === 'fixed' && text(prop(node.arguments[1], 'visibility')) === 'visible' &&
+    text(prop(node.arguments[1], 'visibility')) === 'visible' &&
     prop(node.arguments[1], 'zIndex')?.type === 'Literal' && prop(node.arguments[1], 'zIndex').value === ''),
     `${drift}: visible native browser container stacking`);
 

@@ -75,7 +75,6 @@ export const loadQuotaNative = () => {
   assert.equal(noticeRecord.length, 1, 'Native generic notice module changed');
   const notice = nativeFunction(noticeRecord[0], 'attachedToComposer');
   const button = recoveryButtonBinding(bundle, noticeRecord[0]);
-  const harness = presentationHarness(bundle, [button.id]);
   const placementCall = banner.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'children') === aside && node.arguments[0]?.type === 'MemberExpression');
   const placementImport = placementCall && bundle.imports(bannerRecord)[placementCall.arguments[0].object.name];
   assert.ok(placementImport, 'Native quota placement boundary changed');
@@ -85,6 +84,29 @@ export const loadQuotaNative = () => {
   assert.equal(composerRecord.length, 1, 'Native composer primitives module changed');
   const composerRoot = nativeFunction(composerRecord[0], '"data-composer-surface-variant"');
   const composerBody = nativeFunction(composerRecord[0], '"data-composer-body"');
+  const visibleSurface = nodes(composerRecord[0].ast).find(node => node.type === 'Property' && key(node.key) === 'VisibleSurface')?.value;
+  const visibilityCall = nodes(visibleSurface).find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'value') &&
+    prop(node.arguments[1], 'children') && jsxImport(node, bundle.imports(composerRecord[0])));
+  const visibilityImport = visibilityCall && jsxImport(visibilityCall, bundle.imports(composerRecord[0]));
+  assert.ok(visibilityImport, 'Native visible-surface context boundary changed');
+  const visibilityRecord = bundle.module(visibilityImport.id), visibilityImports = bundle.imports(visibilityRecord);
+  const visibilityExports = bundle.exports(visibilityRecord);
+  const contextFactories = ownNodes(visibilityRecord.ast).filter(node => node.type === 'VariableDeclarator' &&
+    node.init?.type === 'CallExpression' && key(node.init.callee.expressions?.at(-1)?.property) === 'createContext');
+  assert.ok(visibilityExports[visibilityImport.exportName] && contextFactories.length === Object.keys(visibilityExports).length &&
+    Object.values(visibilityImports).every(imported => imported.id === 'zd8w') &&
+    Object.values(visibilityExports).every(value => contextFactories.some(factory => factory.id.name === value.name)),
+  'Visible-surface dependency must remain a React-context-only presentation module');
+  const requireName = visibilityRecord.ast.params[2].name;
+  assert.ok(ownNodes(visibilityRecord.ast).filter(node => node.type === 'CallExpression').every(call =>
+    call.callee.name === requireName && text(call.arguments[0]) === 'zd8w' ||
+    call.callee.object?.name === requireName && key(call.callee.property) === 'd' ||
+    call.callee.type === 'SequenceExpression' && key(call.callee.expressions.at(-1)?.property) === 'createContext' &&
+      visibilityImports[call.callee.expressions.at(-1).object.name]?.id === 'zd8w' && call.arguments.length === 1 &&
+      (call.arguments[0].type === 'Literal' || call.arguments[0].type === 'UnaryExpression' && call.arguments[0].operator === '!' &&
+        call.arguments[0].argument.type === 'Literal')),
+  'The visible-surface context module must not execute transport or business calls');
+  const harness = presentationHarness(bundle, [button.id, visibilityRecord.id]);
   const defaults = composerRoot.nodes.find(node => node.type === 'MemberExpression' && key(node.property) === 'DefaultsProvider');
   assert.equal(defaults?.object.type, 'MemberExpression', 'Native composer tooltip-defaults boundary changed');
   const defaultsImport = bundle.imports(composerRecord[0])[defaults.object.object.name];
@@ -100,6 +122,26 @@ export const loadQuotaNative = () => {
   const registryExport = Object.entries(bundle.exports(composerRecord[0])).find(([, expression]) => expression.name === registry?.id.name)?.[0];
   assert.ok(registryExport && prop(registry.init.arguments[1], 'Body') === composerBody.ast,
     'Native composer root/body registry export association changed');
+  const adaptiveFooter = prop(registry.init.arguments[1], 'AdaptiveFooter');
+  const layoutGroupCalls = nodes(adaptiveFooter).filter(node => node.type === 'CallExpression' &&
+    prop(node.arguments[1], 'inherit') && prop(node.arguments[1], 'children') && jsxImport(node, bundle.imports(composerRecord[0])));
+  const layoutGroups = layoutGroupCalls.map(call => jsxImport(call, bundle.imports(composerRecord[0])));
+  assert.ok(layoutGroups.length && layoutGroups.every(value => value.id === layoutGroups[0].id && value.exportName === layoutGroups[0].exportName),
+    'Native adaptive footer must share one transparent layout-group boundary');
+  const layoutGroup = layoutGroups[0], groupRecord = bundle.module(layoutGroup.id);
+  const groupExport = bundle.exports(groupRecord)[layoutGroup.exportName];
+  const groupExpression = groupExport?.type === 'Identifier'
+    ? ownNodes(groupRecord.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === groupExport.name)?.init : groupExport;
+  const groupChildren = groupExpression?.params[0]?.properties?.find(node => key(node.key) === 'children')?.value;
+  const groupJsx = nodes(groupExpression).filter(node => node.type === 'CallExpression' && node.arguments[1]?.type === 'ObjectExpression' &&
+    prop(node.arguments[1], 'children'));
+  assert.ok(groupExpression && groupChildren?.type === 'Identifier' && groupJsx.length === 1 &&
+    key(groupJsx[0].arguments[0]?.property) === 'Provider' && prop(groupJsx[0].arguments[1], 'children')?.name === groupChildren.name &&
+    !groupJsx.some(call => call.arguments[0]?.type === 'Literal'),
+  'Native layout-group must wrap its unchanged children in a context provider without DOM paint');
+  // The real motion layout-group only contributes a Provider. Its observer
+  // subscriptions are not needed for this static fixture and never execute.
+  harness.modules[layoutGroup.id] = { [layoutGroup.exportName]: pass };
   const cssMapImport = Object.values(bundle.imports(composerRecord[0])).find(imported => {
     const exported = bundle.exports(bundle.module(imported.id));
     return exported.A?.type === 'ObjectExpression' && prop(exported.A, 'ComposerLayoutRoot');

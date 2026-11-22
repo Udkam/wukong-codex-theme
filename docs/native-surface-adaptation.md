@@ -1,5 +1,19 @@
 # 原生 UI 与主题替换接口
 
+## 当前工作区与资料页（2026-11-22，v129）
+
+当前核对 Windows Codex 26.1117.4957.0，包内 26.1117.41037。工作区在 retained pages 之外共用 `data-app-shell-surface-backing` 空装饰叶，原生侧栏动画控制其 inset 和圆角。壁纸继续覆盖视口，准备就绪后清除 frame 自己的窗口底色、docked 渐变及 backing 的底色；另一种 unified-tabs 布局在 main-content 直接包装的 `::before` 绘制同样底色，按相同就绪状态清除。布局、原生边缘细线和非主题状态不变。
+
+普通内容及 viewer header 的顶部渐变现在读取 `--app-shell-content-fade`。仅清除对应主内容或 header 内空、aria-hidden、pointer-events-none 的背景图；保留高度、定位、原生透明度和控件。Dots 继续按动态锚点清除自己的空装饰叶。
+
+新版设置用 `.settings-dialog` 统一绘制窗口材质，`.settings-dialog-sidebar` 提供阅读底色。`data-settings-panel` 内默认卡片已变为透明平铺行，主题让出其原生背景变量，显式 boxed 卡片继续使用玻璃底色。独立个人资料页没有 settings-panel 祖先，按 `data-settings-search-root` 及其直接 `data-profile-scroll` 子节点识别自己的背景壳；不依赖设置窗口容器。侧栏 peek 的嵌套 popover 绘制节点单独映射底色，不增加重复模糊。
+
+首页字标的资源、168px 尺寸、文案及宿主透明度保持原样；首页壁纸不叠加灰雾或额外边缘遮罩。当前深浅色组件夹具与验证边界见 [预览说明](previews/README.md) 和 [验证记录](VALIDATION.md)。
+
+新版输入框只在有独立材质的默认、opaque 与 secondary 状态应用主题；document／inline 的透明编辑画布以及拖放反馈沿用原生绘制。document 的子工具栏仍由原生自己绘制，不能把其尺寸随内容变化的根节点涂成玻璃。当前独立头像 activity-dismiss 使用自己的材质及原生按钮，不套用已经退出当前调用链的 reaction-picker 夹具；设计控件、独立工具栏与内联结账继续按真实 Popover owner 回归。
+
+聊天查找条的 `data-content-search-overlay[role=search]` 是透明定位外层，`data-content-search-bar=true` 是 contents 包装。只给其直接 `div.bg-surface-secondary` 应用共享玻璃材质；`data-codex-find-input` 保持原生透明，尺寸、圆角和查找事件由客户端控制。
+
 ## 内置插件推荐（2026-11-22，v128）
 
 Windows Codex 26.1111.9664.0 的 MCP App 宿主使用 `data-mcp-app-frame=true`，工具推荐内容位于独立 webview 的同源 iframe 中。内置 `suggest_plugins` 工具由固定的标题和 connector 来源共同识别。
@@ -24,13 +38,13 @@ v125 将普通导航入口的 secondary ghost 变量映射到通用悬停底色�
 
 home UtilityBarSlot仅承担透明motion定位；data-composer-utility-rail实际Item上的原生bg token决定是否拥有材料。只在该表面补齐首帧backdrop-filter，bg-transparent及无背景token的变体仍透明，内部scroll-area和上下定位不参与重复绘制。
 
-## 标签页标题与完整视图（2026-11-09，v121 沿用 v120 绘制归属）
+## 标签页标题与完整视图（2026-11-22，v129）
 
-当前核对 Windows Codex 26.1103.4239.0，包内 26.1103.32239。右侧标签条发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"；标题通过 portal 移到共享 titlebar。右侧 content 槽位同时发布 data-app-shell-focus-area="right-panel" 与 data-app-shell-titlebar-slot="content"，可包含内联 end action，但不是所有注册动作的绘制 owner。
+当前右侧标签条发布 data-app-shell-tab-row，其内滚动条发布 data-app-shell-tab-strip-controller="right"；标题通过 portal 移到共享 titlebar。content 槽位使用 data-app-shell-focus-area="right-panel"，新版不再发布 titlebar-slot="content"。它可包含内联 end action，但不是所有注册动作的绘制 owner。
 
-实机另有被 content overlay 裁切避让的全局注册动作：HeaderAction 的 unified-workspace-controls 以 align=end、slotPosition=right 注册到 titlebar；其 focus-area 可为 main。end-slot 使用 data-app-shell-header-slot="end" 与 data-app-shell-header-obstacle="true"，包含 h-full／w-max／justify-self-end 的 live measured 直接子节点，再包 h-full padding 载体及 data-app-shell-header-slot-content。注册 grid 宽度可能覆盖整个右侧标题段且绘制在标签内容之后，不能直接给整个 grid 涂不透明背景。
+全局 HeaderAction 的 unified-workspace-controls 仍以 align=end、slotPosition=right 注册到 titlebar，focus-area 可为 main。end-slot 使用 data-app-shell-header-slot="end"；测量分支的实际载体为 col-span-full／row-start-1／h-full／min-w-max，非测量分支为 pointer-events-none／relative／col-start-1／row-start-1／h-full／w-full／min-w-0。只绘制对应 live 载体，不绘制同级不可见尺寸副本，也不把整个注册 grid 涂成实色。
 
-主题在上述 end-slot 含原生 right-panel toggle 时只给实际整高 measured 子节点使用原生 surface 并清除背景图；右侧 content 槽位与非 portal row 保留对应覆盖。选择器不依赖模块 hash、按钮中文文案或固定像素，不改裁切、尺寸与定位，不匹配左侧标题或外部网页。源码合同保护 measured 子节点的实际类与注册／渲染关系。
+主题在 end-slot 含原生 right-panel toggle 时给上述实际整高载体使用原生 surface 并清除背景图；右侧 content 槽位与非 portal row 保留对应覆盖。选择器不依赖模块 hash、按钮中文文案或固定像素，不改裁切、尺寸与定位，不匹配左侧标题或外部网页。源码合同保护两种载体和注册／渲染关系；原生工作区 backing 的边缘细线保留，并与原生像素基线比较。
 
 完整视图不延伸主题壁纸。原生 right-panel 切换按钮的 aria-pressed 组合显式 full 布局与独立完整视图覆盖状态；后者允许 workspace-layout 仍为 split。当前使用可见原生按钮作为优先依据，按钮缺失时才检查活动 workspace 的显式 full 状态。
 
@@ -56,7 +70,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 
 核对 Windows Codex 26.1016.8622.0。浮动输入框经 body portal 挂载在 #root 外；带 data-quick-chat-drag-handle 的 section 是透明定位／拖动外壳，保留 overflow-visible。它的直接 FloatingSurface 背景子节点负责整个组件的 22px 圆角、底色和滤镜；data-floating-chat-surface 内使用 compact／inline composer。不得通过给外壳加裁切或给 goal 行硬加圆角来修复材料归属。
 
-原生 rail Item 的背景选择为 `(variant !== "default" || !embedded && !expandedTopTray) && backgroundMap[variant]`。默认 embedded／expandedTopTray 行没有背景类，controls 和 inline 也透明；独立 default 使用 bg-surface-elevated-secondary，warning 使用原生 color-mix 背景类。data-composer-rail-contained 只表示存在 rail 上下文，本身不能证明有底色。
+当前 26.1117.4957.0 的原生 rail Item 背景选择为 `(variant !== "default" || !embedded) && backgroundMap[variant]`。默认 embedded 行没有背景类，controls 和 inline 在嵌入与独立状态下都透明；独立 default 使用 bg-surface-elevated-secondary，warning 在两种状态下均使用原生 color-mix 背景类。data-composer-rail-contained 只表示存在 rail 上下文，本身不能证明有底色。
 
 共享条目材料要求 rail item 本身具有未加状态或伪元素前缀的 bg-* token，并排除 bg-transparent。独立 default／warning 条从首次挂载至退出保持同一材质，原生透明 goal 行由浮动外壳绘制。宽高、圆角、边距、溢出和控件行为沿用原生。
 
@@ -104,7 +118,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | 壁纸 | data-app-shell-page-surface 内 PageSurface 叶节点 | 继承边界和圆角，最多两层；叶节点无独立 data 属性，保留限定范围组件回退 |
 | 主内容与页框 | main-surface、main-content-layout 属性 | 布局层透明，目录正文增加阅读衬底 |
 | 图标轨道、应用顶栏 | sidebar rail、ApplicationMenuTopBar | 按实际图片裁切采样填色，不拼接固定宽高遮罩 |
-| 宽侧栏 | aside 的 appearance 属性、外层 sidebar-navigation | 单层磨砂，内层导航不重复叠色；浮动侧栏按原生 testid |
+| 宽侧栏 | aside 的 appearance 属性、外层 sidebar-navigation；data-slate-sidebar-content 的原生 popover 底色 | 外层提供磨砂；拥有独立底色的 peek 包装映射导航色，Activity 保留原生；浮动侧栏按原生 testid |
 | 导航文字 | ConversationSidebar / Navigation 范围 | 局部颜色变量随材质变化，不覆盖全局原生文字 |
 | 对话、dots | conversation 属性、embedded messaging | 风景队列与深色阅读色；原生消息气泡和操作语义保留 |
 | 输入框 | composer-surface-variant、composer-body | 使用原生绘制变量，首页 body 和对话 root 各自拥有表面 |
@@ -115,7 +129,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
 | 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
 | dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
-| 设置 | group/settings、settings mobile header | 设置壳透明，真实卡片玻璃，色卡与代码预览保留 |
+| 设置 | data-settings-panel、settings-dialog；资料页的 data-settings-search-root 与 electron:bg-surface | 设置窗口整体及导航应用材质，正文壳透明；原生默认平铺设置行保留透明，显式盒装卡片使用玻璃，色卡与代码预览保留 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
 | 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、Popover slot 的实际原生底色及直接内容面、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 与无底色定位壳不绘制；命令根与添加列表使用浓阅读底色；内层表面与嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |

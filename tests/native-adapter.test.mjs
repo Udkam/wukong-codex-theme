@@ -27,7 +27,7 @@ test('native ownership survives utility churn and retained hidden main/shell nod
       <div class="PageSurface-transparent3" aria-hidden="true" style="opacity:1"></div>
       <main data-app-shell-main-surface="default" style="opacity:1">
         <aside data-app-shell-left-panel-appearance="default"><div class="sidebar-navigation">Retained navigation</div></aside>
-        <div data-settings-mobile-header="false" style="height:100px">Retained settings</div>
+        <div data-settings-panel style="height:100px">Retained settings</div>
       </main>
     </section>
     <div style="visibility:hidden"><section data-app-shell-page-surface="true">
@@ -54,11 +54,17 @@ test('native ownership survives utility churn and retained hidden main/shell nod
 test('settings state follows mounted settings and excludes schedule dialogs', async () => {
   const page = await browser.newPage();
   try {
-    await page.setContent('<div role="dialog"><form class="group/settings" style="height:100px">Schedule</form></div><div hidden id="settings" data-settings-mobile-header="false" style="height:200px">Settings</div><div style="opacity:0"><div id="faded-settings" class="group/settings" style="height:100px;opacity:1">Retained settings</div></div>');
+    await page.setContent('<div role="dialog"><form class="group/settings" style="height:100px">Schedule</form></div><div hidden id="settings" data-settings-panel style="height:200px">Settings</div><div style="opacity:0"><div id="faded-settings" data-settings-panel style="height:100px;opacity:1">Retained settings</div></div><div role="dialog" hidden id="settings-dialog" class="settings-dialog" style="height:200px">Settings</div>');
     await page.evaluate(adapterExpression);
     assert.equal(await page.evaluate(() => adapter.settingsActive()), false);
     await page.locator('#settings').evaluate(e => e.hidden=false);
     assert.equal(await page.evaluate(() => adapter.settingsActive()), true);
+    await page.locator('#settings').evaluate(e => e.hidden=true);
+    assert.equal(await page.evaluate(() => adapter.settingsActive()), false);
+    await page.locator('#settings-dialog').evaluate(e => e.hidden=false);
+    assert.equal(await page.evaluate(() => adapter.settingsActive()), true);
+    await page.locator('#settings-dialog').evaluate(e => e.setAttribute('inert',''));
+    assert.equal(await page.evaluate(() => adapter.settingsActive()), false);
   } finally { await page.close(); }
 });
 
@@ -88,7 +94,10 @@ test('activity sidebar keeps its native paint and cannot become the conversation
   assert.ok(activityBind, 'The shared sidebar must render the lazy ActivitySidebar export');
   const activity = bundle.module(text(activityBind.arguments[1]));
   const navigationClass = nodes(prop(navigation.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden sidebar-navigation'));
-  const slateClass = text(prop(slate.arguments[1], 'className'));
+  const slateOwner = nativeFunction(shell, slate.start);
+  const slateClass = slateOwner.nodes.map(text).find(value => value.endsWith('overflow-hidden sidebar-navigation'));
+  const slatePopover = slateOwner.nodes.map(text).find(value => value.includes('bg-(--app-shell-sidebar-popover-background)'));
+  assert.ok(slatePopover, 'Native peek wrapper owns its separate popover background');
   const floatingClass = nodes(prop(floatingShell.arguments[1], 'className')).map(text).find(value => value.endsWith('overflow-hidden bg-surface'));
   const activitySection = nodes(activity.ast).find(node => jsx(node) && text(node.arguments[0]) === 'section' && prop(node.arguments[1], 'aria-label'));
   const activityOwner = nativeFunction(activity, activitySection.start);
@@ -96,7 +105,7 @@ test('activity sidebar keeps its native paint and cannot become the conversation
   const activityClass = ownNodes(activityOwner.ast).find(node => node.type === 'AssignmentExpression' &&
     node.left.name === prop(activitySection.arguments[1], 'className').name && node.right.type === 'Literal')?.right.value;
   assert.ok(navigationClass && slateClass.includes('sidebar-navigation') && floatingClass && activityClass?.split(' ').includes('font-openai-sans'));
-  const nativeCss = bundle.css(['.sidebar-navigation:not(.sidebar-navigation .sidebar-navigation)']);
+  const nativeCss = bundle.css();
   const activityViews = [
     '<header><button>Filter</button></header><button data-activity-id="fixture">Entry</button>',
     '<header><button>Filter</button></header><div role="status">Empty</div>',
@@ -105,9 +114,9 @@ test('activity sidebar keeps its native paint and cannot become the conversation
   for (const mode of ['dark', 'light']) {
     const page = await browser.newPage({ colorScheme: mode });
     try {
-      for (const [floating, wrap] of [[false, false], [false, true], [true, true]]) for (const view of activityViews) {
+      for (const [floating, wrap, peeking] of [[false, false, false], [false, true, false], [false, true, true], [true, true, false]]) for (const view of activityViews) {
         const section = `<section id="activity" class="${activityClass}" aria-label="Fixture activity">${view}</section>`;
-        const children = wrap ? `<div id="slate" data-slate-sidebar-content="true" class="${slateClass}"><div>${section}</div></div>` : section;
+        const children = wrap ? `<div id="slate" data-slate-sidebar-content="true" class="${slateClass} ${peeking ? slatePopover : ''}"><div>${section}</div></div>` : section;
         const shellAttributes = floating ? `class="${floatingClass}" data-testid="app-shell-floating-left-panel"` : 'class="app-shell-left-panel"';
         await page.setContent(`<html class="electron-${mode}" data-theme="${mode}" style="color-scheme:${mode}"><style>${nativeCss}</style>
           <style>aside{display:flex;height:320px;width:300px}</style><aside ${shellAttributes} data-app-shell-left-panel-appearance="default">
@@ -128,6 +137,8 @@ test('activity sidebar keeps its native paint and cannot become the conversation
         await page.locator('#activity').evaluate(element => element.replaceWith(document.createElement('nav')));
         assert.equal(await page.evaluate(() => adapter.conversationSidebar()?.id), 'shared');
         if (!floating) assert.match((await read())[0].paint[2], /^blur\(/, 'The docked wrapper resumes conversation material on return');
+        if (peeking) assert.equal(await page.locator('#slate').evaluate(element => getComputedStyle(element).backgroundColor),
+          mode === 'dark' ? 'rgba(20, 24, 28, 0.64)' : 'rgba(247, 249, 251, 0.6)', 'The native peek carrier receives the same navigation tint');
       }
     } finally { await page.close(); }
   }

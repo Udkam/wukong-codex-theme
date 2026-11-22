@@ -145,14 +145,26 @@ export const loadPopoverNative = archive => {
   const avatarMaterialRecord = one(['data-avatar-overlay-material-variant', 'QuickChatMaterial', 'data-avatar-overlay-native-surface-id']);
   const avatarMaterial = nativeFunction(avatarMaterialRecord, 'data-avatar-overlay-material-variant');
   const renderAvatarMaterial = compileSelected(avatarMaterial);
-  const avatarRecord = one(['floodColor', 'data-avatar-overlay-material-variant', 'reaction-picker']);
-  const avatarReaction = nativeFunction(avatarRecord, 'floodColor');
-  const reactionCall = avatarReaction.nodes.find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'variant')) === 'reaction-picker');
-  assert.ok(reactionCall && importedCall(avatarRecord, reactionCall, avatarMaterialRecord.id, exported(avatarMaterialRecord, avatarMaterial)), 'Native reaction picker material call changed');
-  const renderAvatarReaction = compileSelected(avatarReaction, {
-    [reactionCall.arguments[0].object.name]: { [key(reactionCall.arguments[0].property)]: renderAvatarMaterial }
+  // The former reaction-picker SVG wrapper is retired. The current overlay's
+  // independent activity-dismiss material directly owns its native Button.
+  // Audit that real caller without evaluating its activity/business module.
+  const avatarRecord = one(['data-avatar-overlay-hit-region', '"activity-dismiss"', `"${avatarMaterialRecord.id}"`]);
+  const avatarMaterialCall = nodes(avatarRecord.ast).find(node => node.type === 'CallExpression' &&
+    importedCall(avatarRecord, node, avatarMaterialRecord.id, exported(avatarMaterialRecord, avatarMaterial)) &&
+    text(prop(node.arguments[1], 'variant')) === 'activity-dismiss' &&
+    text(prop(node.arguments[1], 'className')).startsWith('w-fit rounded-full transition-transform'));
+  assert.ok(avatarMaterialCall, 'Native independent avatar dismiss material changed');
+  const avatarDismiss = nativeFunction(avatarRecord, avatarMaterialCall.start);
+  const avatarButton = prop(avatarMaterialCall.arguments[1], 'children');
+  assert.ok(avatarButton?.type === 'CallExpression' &&
+    bundle.imports(avatarRecord)[avatarButton.arguments[0]?.object?.name]?.id === 'Sm6l' &&
+    key(avatarButton.arguments[0]?.property) === '$', 'Native avatar material must directly own the shared Button');
+  assert.ok(!avatarDismiss.nodes.some(node => importedCall(avatarRecord, node, popoverRecord.id, popAlias)),
+    'The native avatar dismiss control must remain independent of Popover');
+  const renderAvatarDismiss = options => renderAvatarMaterial({
+    className: text(prop(avatarMaterialCall.arguments[1], 'className')),
+    variant: text(prop(avatarMaterialCall.arguments[1], 'variant')), ...options
   });
-  const avatarPopovers = nodes(avatarRecord.ast).filter(node => node.type === 'CallExpression' && importedCall(avatarRecord, node, popoverRecord.id, popAlias) && prop(node.arguments[1], 'unstyled'));
 
   const checkoutRecord = one(['chatgpt.inline_credit_checkout.payment.title', 'defaultMessage:']);
   const checkout = nativeFunction(checkoutRecord, 'chatgpt.inline_credit_checkout.payment.title');
@@ -189,7 +201,7 @@ export const loadPopoverNative = archive => {
   return { css, renderPopover, renderFloating, renderSwitch, editorPopover, editorFunction: editor.ast, innerFloating, reaches,
     editorClasses, floatingClass: floatingClasses.floatingSurface, toolbarClasses: `${toolbarBase} ${toolbarPaint}`, inputClass, selectClass,
     aboutAst: aboutRecord.ast, aboutPopover, toolbarCall, toolbar,
-    avatarAst: avatarRecord.ast, avatarReaction, avatarPopovers, renderAvatarReaction, renderAvatarMaterial,
+    avatarAst: avatarRecord.ast, avatarDismiss, avatarMaterialCall, avatarButton, renderAvatarDismiss, renderAvatarMaterial,
     checkoutDialogAst: checkoutDialogRecord.ast, checkoutCall, checkoutPopover, renderCheckout,
     checkoutSecondary: checkoutClasses.secondary,
     editorHeader: editor.nodes.map(text).find(value => value.startsWith('flex h-toolbar shrink-0 cursor-grab')),

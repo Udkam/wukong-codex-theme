@@ -23,7 +23,33 @@ const loadNative = () => {
   const family = name => { const match = css.match(new RegExp('\\.(' + name + '-[A-Za-z0-9_-]+)[\\[{,]')); assert.ok(match, 'Native CSS family missing: ' + name); return match[1]; };
   const code = bundle.findModules(['data-code-block-source', 'data-markdown-copy']).find(record => record.source.includes('CodeSurface-'));
   assert.ok(code, 'Native code block owner changed');
-  return { archive:bundle.archive, css, rootClass:family('ComposerLayoutRoot'), bodyClass:family('ComposerLayoutBody'), topMenu:family('ComposerTopMenuPanel'), effortClass:family('ModelPickerTriggerEffortText'), codeSurfaceClass:family('CodeSurface'), stickyCodeBarClass:family('StickyActionBar'), codeBlockSource:code.source, codeBlockAST:code.ast };
+  const homePanels = bundle.findModules(['composer-home-top-menu', 'padded:!1']).flatMap(record => nodes(record.ast)
+    .filter(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'className')) === 'composer-home-top-menu' &&
+      node.arguments[0]?.type === 'MemberExpression').map(call => ({ record, call })));
+  assert.equal(homePanels.length, 1, 'Native home suggestion panel owner changed');
+  const homePanel = homePanels[0], imported = bundle.imports(homePanel.record)[homePanel.call.arguments[0].object.name];
+  const panelRecord = bundle.module(imported.id), panelExport = key(homePanel.call.arguments[0].property);
+  const panelExpression = bundle.exports(panelRecord)[panelExport];
+  assert.ok(panelExpression && nodes(panelExpression).some(node => text(node) === 'flex flex-col overflow-hidden'),
+    'Native suggestion panel presentation export changed');
+  const harness = presentationHarness(bundle, [panelRecord.id]);
+  // Only the panel's pure width lookup is needed for the default variant. The
+  // module also exports state hooks, which must not execute in this fixture.
+  const widthCall = nodes(panelExpression).find(node => node.type === 'CallExpression' &&
+    node.callee.type === 'SequenceExpression' && key(node.callee.expressions.at(-1)?.property) === 'xk');
+  assert.ok(widthCall, 'Native suggestion panel width lookup changed');
+  const widthMember = widthCall.callee.expressions.at(-1), widthImport = bundle.imports(panelRecord)[widthMember.object.name];
+  const widthRecord = bundle.module(widthImport.id), widthExport = bundle.exports(widthRecord)[key(widthMember.property)];
+  assert.ok(widthExport && !nodes(widthExport).some(node => node.type === 'CallExpression'), 'Native menu width must remain a pure lookup');
+  const widthMapMember = nodes(widthExport).find(node => node.type === 'MemberExpression' && node.computed);
+  const widthMap = ownNodes(widthRecord.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === widthMapMember?.object.name);
+  assert.ok(widthMap, 'Native menu width map changed');
+  harness.modules[widthImport.id] = { [key(widthMember.property)]: harness.compile(nativeFunction(widthRecord, widthExport.start), {
+    [widthMap.id.name]: nativeObject(widthRecord, widthMap.init)
+  }) };
+  const topMenu = harness.load(panelRecord.id)[panelExport]({ padded: false, className: 'composer-home-top-menu' }).props.className;
+  assert.ok(topMenu.split(/\s+/).includes('bg-surface-elevated-secondary'), 'Native home suggestion panel paint owner changed');
+  return { archive:bundle.archive, css, rootClass:family('ComposerLayoutRoot'), bodyClass:family('ComposerLayoutBody'), topMenu, effortClass:family('ModelPickerTriggerEffortText'), codeSurfaceClass:family('CodeSurface'), stickyCodeBarClass:family('StickyActionBar'), codeBlockSource:code.source, codeBlockAST:code.ast };
 };
 const native = loadNative();
 
@@ -280,7 +306,7 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
         ['color','text-shadow','--color-text','--color-text-secondary','--color-text-secondary-solid','--color-text-tertiary','--color-background-primary-ghost-hover'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain :has(> [data-mention-list-scroll-area])' &&
         ['color','--color-text','--color-codex-description','--color-text-tertiary'].includes(d.prop)) return;
-    if (s === ':root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root]):not([class*="ComposerTopMenuPanel"] *)' &&
+    if (s === ':root.forge-ink-mountain :is([cmdk-root], [data-cmdk-root])' &&
         ['color','--color-text','--color-text-secondary','--color-text-tertiary','--color-codex-description'].includes(d.prop)) return;
     if (s === ':root.forge-ink-mountain [data-mention-list-scroll-area]' && d.prop === '--color-surface-elevated-secondary') return;
     // The shared summary header resolves its gradient through this token.
@@ -310,7 +336,7 @@ test('current client CSS: native geometry/semantic colours, home paint boundarie
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   try {
     const composer = (id, mode, utility) => `<div id="${id}" class="${native.rootClass}" data-composer-layout="${mode}" data-composer-radius-variant="default" data-composer-surface-variant="default" data-composer-utility-bar-variant="${utility}"><div class="${native.bodyClass}" data-composer-body data-composer-layout="${mode}"><div class="p-3"><span class="text-warning">完全访问</span><span data-codex-intelligence-trigger="true"><span id="${id}-ultra" class="${native.effortClass}" data-reasoning-effort="ultra" data-max-effort="true">Ultra</span></span><button class="rounded-full bg-composer-primary text-composer-primary p-2">发送</button><button class="rounded-full text-default p-2">取消</button><div contenteditable="true" role="textbox" class="text-default">测试输入</div></div></div></div>`;
-    await page.setContent(`<html data-theme="dark" data-codex-os="win32" data-codex-window-type="electron"><head><style>${native.css}</style><style>#fixtures{padding:24px;width:900px;display:grid;gap:20px}.native-preview{width:320px}#scheduler{padding:10px}#scheduler input{height:32px}#scheduler::after{content:'';position:absolute;top:100%;height:32px;background:linear-gradient(#333,transparent)}</style></head><body><div id="fixtures">${composer('thread','multiline','default')}${composer('chat','single-line','home')}${composer('work','multiline','home')}<div id="scheduler" class="sticky z-30 bg-surface"><div class="rounded-full bg-surface-elevated border border-default"><input id="scheduled-page-search" class="text-default"></div></div><div id="preview" class="native-preview w-80 rounded-xl bg-surface-elevated-secondary/95 p-2 text-sm text-default shadow-xl-spread">侧边预览，正文中的 Ultra 不能染色</div><div id="goal" data-composer-rail-item="present" class="rounded-t-2xl bg-surface-elevated-secondary text-default p-2">目标已停滞</div><div id="queue" data-composer-rail-item="present" class="rounded-t-2xl bg-surface-elevated-secondary text-default p-2">排队消息</div><div id="menu" role="menu" class="rounded-xl bg-surface-elevated-secondary p-2 text-default">重命名 <span class="text-warning">警告</span></div><div id="add" class="${native.topMenu} rounded-xl bg-surface-elevated-secondary" data-composer-expanded-top-tray><div cmdk-root class="bg-surface"><span class="text-default">添加插件</span></div></div><p class="text-default">正文 Ultra，已处理、正在重新连接</p><p class="text-secondary">运行了命令</p></div></body></html>`);
+    await page.setContent(`<html data-theme="dark" data-codex-os="win32" data-codex-window-type="electron"><head><style>${native.css}</style><style>#fixtures{padding:24px;width:900px;display:grid;gap:20px}.native-preview{width:320px}#scheduler{padding:10px}#scheduler input{height:32px}#scheduler::after{content:'';position:absolute;top:100%;height:32px;background:linear-gradient(#333,transparent)}</style></head><body><div id="fixtures">${composer('thread','multiline','default')}${composer('chat','single-line','home')}${composer('work','multiline','home')}<div id="scheduler" class="sticky z-30 bg-surface"><div class="rounded-full bg-surface-elevated border border-default"><input id="scheduled-page-search" class="text-default"></div></div><div id="preview" class="native-preview w-80 rounded-xl bg-surface-elevated-secondary/95 p-2 text-sm text-default shadow-xl-spread">侧边预览，正文中的 Ultra 不能染色</div><div id="goal" data-composer-rail-item="present" class="rounded-t-2xl bg-surface-elevated-secondary text-default p-2">目标已停滞</div><div id="queue" data-composer-rail-item="present" class="rounded-t-2xl bg-surface-elevated-secondary text-default p-2">排队消息</div><div id="menu" role="menu" class="rounded-xl bg-surface-elevated-secondary p-2 text-default">重命名 <span class="text-warning">警告</span></div><div id="add" class="${native.topMenu}"><span class="text-default">添加插件</span></div><p class="text-default">正文 Ultra，已处理、正在重新连接</p><p class="text-secondary">运行了命令</p></div></body></html>`);
     const read = () => page.evaluate(() => [...document.querySelectorAll('#fixtures,#fixtures *')].map(e => {
       const s = getComputedStyle(e), r = e.getBoundingClientRect();
       const pseudo = type => { const p=getComputedStyle(e,type);return [p.content,p.backgroundColor,p.backgroundImage,p.borderRadius,p.boxShadow]; };
@@ -344,7 +370,7 @@ test('current client CSS: native geometry/semantic colours, home paint boundarie
     const first = after.find(x => x.id === 'menu');
     await page.locator('#menu').evaluate(e => e.classList.add('forge-menu','forge-paper-containing-block'));
     assert.deepEqual((await read()).find(x => x.id === 'menu'), first);
-    assert.equal(await page.locator('#add [cmdk-root]').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+    assert.equal(await page.locator('#add > span').evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
     await page.locator('#work [role=textbox]').fill('仍可正常输入');
     assert.equal(await page.locator('#work [role=textbox]').textContent(), '仍可正常输入');
     // Current SettingsLayout container, with native colour swatches inside it.
@@ -521,7 +547,7 @@ const loadSidebarRowNative = () => {
     'data-app-action-sidebar-thread-pinned': 'false', 'data-app-action-sidebar-thread-row': '',
     'data-app-action-sidebar-thread-selected': 'false'
   });
-  const rowRecords = bundle.findModules(['sidebar-item focus-visible:outline', 'isHighlighted']);
+  const rowRecords = bundle.findModules(['data-sidebar-cycle-item', 'hasNavigationButton', 'isHighlighted', 'sidebar-item']);
   assert.equal(rowRecords.length, 1, 'Shared native sidebar interaction renderer changed');
   const rowRecord = rowRecords[0], exports = bundle.exports(rowRecord);
   const rowExport = Object.values(exports).find(node => /FunctionExpression/.test(node.type));

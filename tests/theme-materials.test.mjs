@@ -12,7 +12,7 @@ test('exported material choices replace paint in both modes while native dimensi
   const browser=await chromium.launch({headless:true});
   try{
     const page=await browser.newPage();
-    await page.setContent('<html class="forge-ink-mountain"><style>[data-composer-surface-variant]{width:73%;height:95px;border-radius:19px;background:var(--composer-layout-surface-background);backdrop-filter:var(--composer-layout-surface-backdrop-filter)}</style><div data-composer-surface-variant="thread"></div></html>');
+    await page.setContent('<html class="forge-ink-mountain"><style>[data-composer-surface-variant]{width:73%;height:95px;border-radius:19px;background:var(--composer-layout-surface-background);backdrop-filter:var(--composer-layout-surface-backdrop-filter)}</style><div data-composer-surface-variant="default"></div></html>');
     const measure=()=>page.locator('[data-composer-surface-variant]').evaluate(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {rect:[r.x,r.y,r.width,r.height],radius:s.borderRadius,bg:s.backgroundColor,blur:s.backdropFilter};});
     const native=await measure();
     await page.addStyleTag({content:fs.readFileSync('runtime/wukong-codex-theme-background-v13.css','utf8')+cssFor(exported)});

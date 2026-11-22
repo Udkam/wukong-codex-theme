@@ -3038,9 +3038,9 @@ test('settings theme switch and return retain the visible background layer', asy
   const before=await currentBackground(page);
   await page.evaluate(()=>{
     window.proofLayer=document.querySelector('[data-forge-background-layer][data-forge-active="true"]');
-    // SettingsPage owns group/settings in the audited native UI. Its former
-    // scrollbar/padding utility chain is no longer a page identity contract.
-    const settings=document.createElement('div');settings.id='settings-proof';settings.className='group/settings';settings.style.cssText='width:400px;height:400px';document.body.append(settings);
+    // Routed settings use the semantic panel shared with the settings window.
+    // An inner group/settings can also be an unrelated scheduling form.
+    const settings=document.createElement('div');settings.id='settings-proof';settings.setAttribute('data-settings-panel','');settings.style.cssText='width:400px;height:400px';document.body.append(settings);
     history.pushState({},'','/settings');
   });
   await page.waitForTimeout(650);

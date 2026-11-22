@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1111.9664.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1111.9664.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1111.71704",
+  "installationDirectoryVersion": "26.1117.4957.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1117.4957.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1117.41037",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 783725118,
-  "asarSha256": "a538c8bfa0bf6a43b06c4c62aad93616a78c4cad306602cc05f528844a551598",
+  "sizeBytes": 443800006,
+  "asarSha256": "8a437aad94098770c1bf5fd5385c204e162b62c6d7917f688741d74e05babe90",
   "capturedAt": "2026-11-22",
-  "captureMode": "installed browser portal source contract and full/split presentation fixtures",
+  "captureMode": "running browser body-portal source contract and current utility-shell full/split presentation fixtures",
   "assets": {
     "javascript": {
-      "member": "webview/assets/async/956370.aff5cce818.js",
-      "bytes": 1919102,
-      "sha256": "84c3881d294dc4ac2892d9a58f7f60bed97cb061bde375a4fe2f1a768ea22379"
+      "member": "webview/assets/async/364313.d749d31da5.js",
+      "bytes": 2215997,
+      "sha256": "657d4caa67c85d4cc4458b661646c8ef55b68efd65be5219a5cd039670e27ded"
     },
     "stylesheet": {
-      "member": "webview/assets/async/2bc0f6e687cf.css",
-      "bytes": 1408813,
-      "sha256": "b1df75994fdc5a5056c9ec0b74869a54f10687284e35785f56b9754fa8993fbb"
+      "member": "webview/assets/async/4d21324f5cf6.css",
+      "bytes": 1487999,
+      "sha256": "422bb649149b2b78623d723b12a3bb871e88fa681514e6fca5deba75304bf021"
     },
     "entrypoint": {
       "member": "webview/index.html",
-      "bytes": 9697,
-      "sha256": "8bba1ee1abdb5810274a1ed51d650feabaea587fcbd0f2397bc783ba9091d590"
+      "bytes": 12741,
+      "sha256": "79f496c5b96ed8a5c93df8c222bf8a30e47832f419194ce3a962806a8ca75a59"
     },
     "runtime": {
-      "member": "webview/assets/348410.16a4406b14.js",
-      "bytes": 301912,
-      "sha256": "4d0d82af09c4413c58b1446e1a88658fd506f71222555747ac0f7e68f7e9c7de"
+      "member": "webview/assets/348410.35ea11b6a0.js",
+      "bytes": 283386,
+      "sha256": "6ed551093131b3e72a07956981d27253333ffffb1944867d2635eabe98945159"
     }
   }
 }

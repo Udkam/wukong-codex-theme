@@ -26,7 +26,7 @@ const legacyTheme = legacySheet.toString();
 const rowOnlySheet = postcss.parse(theme);
 let restoredRowOnlyRules = 0;
 rowOnlySheet.walkRules(rule => {
-  if (rule.selector.includes('[data-app-shell-titlebar-slot="content"]') &&
+  if (rule.selector.includes('[data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"]') &&
     rule.selector.includes('[data-app-shell-tab-row]') && rule.selector.includes('[data-app-shell-tab-strip-controller="right"]')) {
     rule.selector = ':root.forge-ink-mountain #root [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])';
     restoredRowOnlyRules++;
@@ -38,14 +38,14 @@ const missingEndSheet = postcss.parse(theme), wholeEndGridSheet = postcss.parse(
 let missingEndRules = 0, wholeEndGridRules = 0;
 missingEndSheet.walkRules(rule => {
   if (!rule.selector.includes('[data-app-shell-header-slot="end"]') || !rule.selector.includes('[data-app-shell-workspace-layout-toggle="right-panel"]')) return;
-  assert.ok(rule.selector.includes('[data-app-shell-titlebar-slot="content"]') && rule.selector.includes('[data-app-shell-tab-row]'));
-  rule.selector = ':root.forge-ink-mountain #root :is([data-app-shell-focus-area="right-panel"][data-app-shell-titlebar-slot="content"], [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]))';
+  assert.ok(rule.selector.includes('[data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"]') && rule.selector.includes('[data-app-shell-tab-row]'));
+  rule.selector = ':root.forge-ink-mountain #root :is([data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"], [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]))';
   missingEndRules++;
 });
 wholeEndGridSheet.walkRules(rule => {
   if (!rule.selector.includes('[data-app-shell-header-slot="end"]')) return;
-  assert.equal(rule.selector.split(' > .h-full.w-max.justify-self-end').length, 2);
-  rule.selector = rule.selector.replace(' > .h-full.w-max.justify-self-end', ''); wholeEndGridRules++;
+  assert.equal(rule.selector.split(' > .col-span-full.row-start-1.h-full.min-w-max').length, 2);
+  rule.selector = rule.selector.replace(' > .col-span-full.row-start-1.h-full.min-w-max', ''); wholeEndGridRules++;
 });
 assert.equal(missingEndRules, 1, 'The live endcap control must remove only the registered end owner');
 assert.equal(wholeEndGridRules, 1, 'The overpaint control must widen exactly the measured carrier to its entire grid');
@@ -94,7 +94,7 @@ const pixel = (buffer, x, y) => {
 };
 const active = page => page.waitForFunction(() => {
   const overlay = document.getElementById('wukong-codex-theme-background'), image = overlay?.querySelector('[data-forge-active="true"] img');
-  return overlay?.parentElement?.id === 'paint' && !overlay.hidden && document.documentElement.dataset.forgeBackgroundReady === 'true' && image?.naturalWidth > 0;
+  return overlay?.parentElement === document.body && document.documentElement.dataset.forgeBackgroundPlacement === 'viewport' && !overlay.hidden && document.documentElement.dataset.forgeBackgroundReady === 'true' && image?.naturalWidth > 0;
 });
 const suspended = page => page.waitForFunction(() => {
   const style = document.getElementById('wukong-codex-theme-style'), overlay = document.getElementById('wukong-codex-theme-background');
@@ -138,7 +138,7 @@ test('full workspace restores native paint while split reuses the same decoded t
           const main = await page.locator('#main').boundingBox();
           const preview = await page.screenshot({ clip: { x: main.x, y: main.y, width: main.width, height: Math.min(550, main.height) } });
           fs.writeFileSync(path.join(process.env.WUKONG_BROWSER_PREVIEW_DIRECTORY,
-            `${mode}-native-full-view-fixture-20261108.png`), preview);
+            `${mode}-native-full-view-fixture-20261122.png`), preview);
         }
         for (const [x,y] of [[16,80],[100,80],[16,300],[100,300]]) assert.deepEqual(pixel(actualFull,x,y),pixel(nativeFull,x,y),'Full view has native paint across the former rail edge and tab strip');
         assert.deepEqual(pixel(actualFull,width-20,740),[15,180,117],'The separate guest document keeps its native paint');
@@ -505,6 +505,12 @@ test('registered end-slot paints its complete 81px carrier beyond the content cl
         await page.setContent(browserSurfaceFixture(native, { mode, layout, registeredEndSlot: true }));
         const before = await geometry(page), left = (await nativePaint(page)).filter(item => item.id.startsWith('left-'));
         const baseline = await page.screenshot(), carrier = await page.locator('#registered-end-measure').boundingBox();
+        const frameEdge = await page.locator('#paint').evaluate(element => ({
+          right: element.getBoundingClientRect().right,
+          width: Math.ceil(parseFloat(getComputedStyle(element).getPropertyValue('--border-width-hairline'))),
+          shadow: getComputedStyle(element, '::after').boxShadow
+        }));
+        assert.ok(frameEdge.width > 0 && frameEdge.shadow !== 'none', 'Native backing keeps its source-owned hairline above the end carrier');
         const grid = await page.locator('#registered-end-slot').boundingBox();
         assert.equal(carrier.width, 81, 'Live capture input: full-height padding carrier is 81 CSS px, including both controls and trailing padding');
         assert.equal(carrier.height, 52);
@@ -528,14 +534,17 @@ test('registered end-slot paints its complete 81px carrier beyond the content cl
           const actual = await page.screenshot(), y = carrier.y + carrier.height - 4;
           // This row lies below the 28px buttons. Sampling all 81 columns
           // protects the entire 52px carrier, including its native pe-2 edge.
+          // The new backing's ::after retains its native inset hairline over
+          // the final physical edge, independently of the carrier material.
           for (let x = carrier.x; x < carrier.x + carrier.width; x++) {
-            assert.deepEqual(pixel(actual, x, y), layout === 'full' ? pixel(baseline, x, y) : rgb, `${label}: continuous native endcap column ${x - carrier.x}`);
+            const nativeFrameEdge = x >= frameEdge.right - frameEdge.width;
+            assert.deepEqual(pixel(actual, x, y), layout === 'full' || nativeFrameEdge ? pixel(baseline, x, y) : rgb, `${label}: continuous native endcap column ${x - carrier.x}`);
           }
           if (width === 1280 && layout === 'split' && !remounted && process.env.WUKONG_HEADER_PREVIEW_DIRECTORY) {
             fs.mkdirSync(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY, { recursive: true });
             const clip = await page.locator('#right-header-slot').boundingBox();
             fs.writeFileSync(path.join(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY,
-              `${mode}-tab-header-endcap-fixture-20261109.png`), await page.screenshot({ clip }));
+              `${mode}-tab-header-endcap-fixture-20261122.png`), await page.screenshot({ clip }));
           }
           const tab = await page.locator('#right-tabstrip button[role="tab"]').boundingBox();
           assert.ok(contrastPixels(actual, tab, rgb) > 5, `${label}: native tab text remains visibly painted below the end-grid layer`);
@@ -568,6 +577,39 @@ test('registered end-slot paints its complete 81px carrier beyond the content cl
   } finally { await browser.close(); }
 });
 
+
+test('non-measured native end slots paint the live carrier while preserving their invisible sizing sibling', async () => {
+  const native = loadBrowserSurfaceNative(), browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) {
+      const page = await browser.newPage({ viewport: { width: 1000, height: 760 }, colorScheme: mode });
+      try {
+        await page.setContent(browserSurfaceFixture(native, { mode, registeredEndSlot: true, measureLiveContent: false }));
+        const before = await geometry(page), left = (await nativePaint(page)).filter(item => item.id.startsWith('left-'));
+        const read = () => page.locator('#registered-end-slot,#registered-end-measure,#registered-end-sizing').evaluateAll(elements => Object.fromEntries(elements.map(element => {
+          const style = getComputedStyle(element);
+          return [element.id, { background: style.backgroundColor, visibility: style.visibility, pointer: style.pointerEvents }];
+        })));
+        const original = await read(), surface = await page.locator('#toolbar-carrier').evaluate(element => getComputedStyle(element).backgroundColor);
+        assert.equal(original['registered-end-sizing'].visibility, 'hidden');
+        await page.evaluate(expression); await active(page);
+        const painted = await read();
+        assert.equal(painted['registered-end-slot'].background, 'rgba(0, 0, 0, 0)');
+        assert.equal(painted['registered-end-measure'].background, surface);
+        assert.deepEqual(painted['registered-end-sizing'], original['registered-end-sizing']);
+        assert.deepEqual(await geometry(page), before);
+        assert.deepEqual((await nativePaint(page)).filter(item => item.id.startsWith('left-')), left);
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: missingEndTheme, variables }));
+        assert.equal((await read())['registered-end-measure'].background, original['registered-end-measure'].background, 'Removing current end-slot paint must leave the native live carrier transparent');
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: theme, variables }));
+        await page.locator('#full-toggle').click(); await suspended(page);
+        await page.locator('#split-toggle').click(); await active(page);
+        assert.deepEqual(await geometry(page), before);
+        assert.equal(await page.evaluate(() => fixtureClicks), 2);
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
 
 test('native pane portal remounts preserve stylesheet media and root presentation without redundant writes', async () => {
   const native = loadBrowserSurfaceNative(), browser = await chromium.launch({ headless: true });

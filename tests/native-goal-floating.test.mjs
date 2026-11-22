@@ -29,13 +29,35 @@ const loadGoalNative = () => {
   assert.ok(backgroundMap, 'Native background variant map changed');
   const backgrounds = nativeObject(record, backgroundMap);
   const registry = harness.load(record.id).l;
-  const context = harness.createdContexts.find(value => value.defaultValue === null);
-  assert.ok(context, 'Native rail context boundary changed');
-  const renderItem = (options, embedded = true, { expandedTopTray = false, present = true } = {}) => {
+  const member = call => call?.callee?.type === 'SequenceExpression' ? call.callee.expressions.at(-1) : call?.callee;
+  const contextCalls = item.nodes.filter(node => node.type === 'CallExpression' && key(member(node)?.property) === 'useContext');
+  assert.equal(contextCalls.length, 1, 'Native Rail.Item context reader changed');
+  const contextCall = contextCalls[0], contextName = contextCall.arguments[0]?.name;
+  assert.ok(contextName, 'Native Rail.Item must read its module-owned context');
+  const contextDefinition = ownNodes(record.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === contextName);
+  assert.equal(key(member(contextDefinition?.init)?.property), 'createContext', 'Native rail context initializer changed');
+  assert.equal(contextDefinition.init.arguments[0]?.value, null, 'Native rail context default changed');
+  assert.equal(member(contextDefinition.init).object.name, member(contextCall).object.name,
+    'Native rail context creation and reading must use the same React transport');
+  assert.ok(rail.nodes.some(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
+    node.arguments[0].object.name === contextName && key(node.arguments[0].property) === 'Provider'),
+  'The actual rail provider must own the context read by Rail.Item');
+  const reactImport = bundle.imports(record)[member(contextCall).object.name];
+  const react = harness.modules[reactImport?.id];
+  assert.equal(typeof react?.useContext, 'function', 'Native rail React presentation transport changed');
+  const observed = [], readContext = react.useContext;
+  react.useContext = value => { observed.push(value); return readContext(value); };
+  // Capture the genuine private context through the one audited Item reader.
+  // Other presentation modules may create their own null-default contexts.
+  try { registry.Item({ children: null }); } finally { react.useContext = readContext; }
+  assert.equal(observed.length, 1, 'Native Rail.Item must retain one direct context read');
+  const [context] = observed;
+  assert.equal(context?.defaultValue, null, 'Native rail context boundary changed');
+  const renderItem = (options, embedded = true, { present = true } = {}) => {
     const presence = harness.modules.iodE;
     const previous = presence.tF;
     presence.tF = () => present;
-    harness.contexts.set(context, { embedded, expandedTopTray, placement: 'above', shouldUseReducedMotion: true });
+    harness.contexts.set(context, { embedded, placement: 'above', shouldUseReducedMotion: true });
     try { return registry.Item(options); } finally { harness.contexts.delete(context); presence.tF = previous; }
   };
   const railClasses = Object.fromEntries(['rail', 'embedded', 'item', 'attached'].map(name => [name,
@@ -72,7 +94,13 @@ test('native embedded goal rows have no background owner while independent defau
   assert.match(independent.props.className, /(?:^|\s)bg-surface-elevated-secondary(?:\s|$)/);
   assert.equal(independent.props['data-composer-rail-framed'], '');
   assert.match(native.renderItem({ variant: 'warning' }, false).props.className, /(?:^|\s)bg-\[/);
-  for (const variant of ['controls', 'inline']) assert.ok(!/(?:^|\s)bg-/.test(native.renderItem({ variant }).props.className));
+  for (const [variant, embedded, painted] of [
+    ['default', true, false], ['default', false, true],
+    ['warning', true, true], ['warning', false, true],
+    ['controls', true, false], ['controls', false, false],
+    ['inline', true, false], ['inline', false, false]
+  ]) assert.equal(/(?:^|\s)bg-/.test(native.renderItem({ variant }, embedded).props.className), painted,
+    `${variant}/${embedded ? 'embedded' : 'independent'} retains the current native background ownership`);
   const section = native.frame.nodes.find(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' && key(node.arguments[0].property) === 'section');
   const content = native.frame.nodes.find(node => node.type === 'CallExpression' && node.arguments[0]?.type === 'MemberExpression' &&
     key(node.arguments[0].property) === 'div' && prop(node.arguments[1], 'children')?.type === 'ArrayExpression' &&
@@ -242,7 +270,7 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
           native.renderItem({ id: 'queue-default', children: queueChildren }, false, { present }),
           native.renderItem({ id: 'warning', variant: 'warning', children: 'Connection warning' }, false, { present }),
           native.renderItem({ id: 'goal-embedded', children: 'Embedded goal' }, true, { present }),
-          native.renderItem({ id: 'goal-expanded', children: 'Expanded goal' }, false, { expandedTopTray: true, present }),
+          native.renderItem({ id: 'rail-controls', variant: 'controls', children: 'Native controls row' }, false, { present }),
           native.renderItem({ id: 'queue-inline', variant: 'inline', children: 'Floating queue' }, true, { present })
         ].map(quotaHtml).join('');
         const backdrop = previewBackdrop ? `body{background:center 55% / cover no-repeat url(data:image/jpeg;base64,${previewBackdrop})}` : '';
@@ -270,7 +298,7 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
             assert.match(values[id].image, /linear-gradient/);
             assert.match(values[id].filter, /blur\(/);
           }
-          for (const id of ['goal-embedded', 'goal-expanded', 'queue-inline', 'queue-leaf-1', 'queue-leaf-2']) {
+          for (const id of ['goal-embedded', 'rail-controls', 'queue-inline', 'queue-leaf-1', 'queue-leaf-2']) {
             assert.equal(values[id].fill, 'rgba(0, 0, 0, 0)');
             assert.equal(values[id].image, 'none');
             assert.equal(values[id].filter, 'none');
