@@ -6,11 +6,11 @@
 
 ## 效果预览
 
-悟空场景与深浅玻璃材质。以下为当前开发版的首页效果，设置交互、个人资料页、插件推荐和输入框见[组件预览](docs/previews/README.md)。
+悟空场景与深浅玻璃材质。以下展示当前开发版侧栏随实际壁纸取色的效果；首页、设置交互和其他区域见[组件预览](docs/previews/README.md)。
 
 | 深色 | 浅色 |
 | :---: | :---: |
-| ![深色首页组件夹具](docs/previews/dark-landing-first-paint-fixture-20261122.png) | ![浅色首页组件夹具](docs/previews/light-landing-first-paint-fixture-20261122.png) |
+| ![深色侧栏取色组件夹具](docs/previews/dark-sidebar-scene-palette-fixture-20261123.png) | ![浅色侧栏取色组件夹具](docs/previews/light-sidebar-scene-palette-fixture-20261123.png) |
 
 预览使用 Windows Codex 26.1117.4957.0 的原生结构、样式与示例内容生成，属于组件夹具；实机验收情况见 [验证记录](docs/VALIDATION.md)。正式下载仍为 v0.18.13，开发进展见 [下一版说明](docs/RELEASE_NEXT.md)。
 

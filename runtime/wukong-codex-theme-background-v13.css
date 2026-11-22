@@ -17,6 +17,14 @@
   --forge-shell-fill: rgba(20, 24, 28, var(--forge-shell-dark-alpha, .88));
   --forge-navigation-fill: rgba(20, 24, 28, .64);
   --forge-navigation-filter: blur(12px);
+  --forge-conversation-scene-tone: color-mix(in srgb, rgb(from var(--forge-sidebar-bg, var(--forge-navigation-fill)) r g b / 1) 65%, var(--forge-lacquer, var(--forge-navigation-fill)));
+  --forge-conversation-sampled-tone: rgb(from var(--forge-sidebar-sampled-color) calc(r * .22) calc(g * .22) calc(b * .22) / 1);
+  --forge-conversation-reading-tone: var(--forge-conversation-sampled-tone, var(--forge-conversation-scene-tone));
+  --forge-conversation-image-high: clamp(0, calc((var(--forge-shell-dark-alpha, .60) - .24) / .54), 1);
+  --forge-conversation-visible-high: clamp(0, calc(var(--forge-conversation-image-high) * var(--forge-scene-brightness, 1) * (1 - var(--forge-scene-thread-veil, .25))), 1);
+  --forge-conversation-alpha: clamp(.22, calc((var(--forge-conversation-visible-high) - .40) * 1.7), .76);
+  --forge-conversation-fill: rgb(from var(--forge-conversation-reading-tone) r g b / var(--forge-conversation-alpha));
+  --forge-conversation-shade: linear-gradient(180deg, rgb(from var(--forge-conversation-reading-tone) r g b / .04), rgb(from var(--forge-conversation-reading-tone) r g b / .10) 48%, rgb(from var(--forge-conversation-reading-tone) r g b / .24));
   --forge-catalog-fill: rgba(20,24,28,.86);
   --forge-nav-ink: #f4f0e8;
   --forge-nav-muted: #d0d2d3;
@@ -52,6 +60,9 @@
  * in dark mode. Avoid wallpaper-driven black text on the dark glass surface. */
 :root.forge-ink-mountain[data-forge-native-theme="light"] {
   --forge-navigation-fill: rgba(247,249,251,.60);
+  --forge-conversation-reading-tone: color-mix(in srgb, rgb(from var(--forge-navigation-fill) r g b / 1) 88%, rgb(from var(--forge-sidebar-sampled-color, var(--forge-conversation-scene-tone)) r g b / 1));
+  --forge-conversation-fill: rgb(from var(--forge-conversation-reading-tone) r g b / .64);
+  --forge-conversation-shade: linear-gradient(180deg, rgb(from var(--forge-conversation-reading-tone) r g b / 0), rgb(from var(--forge-conversation-reading-tone) r g b / .08) 48%, rgb(from var(--forge-conversation-reading-tone) r g b / .24));
   --forge-nav-ink: #182019;
   --forge-nav-muted: #303a32;
   --forge-nav-shadow: none;
@@ -62,6 +73,9 @@
   --forge-nav-current-edge: rgba(54,89,121,.30);
   --forge-settings-action-ink: #75552d;
   --forge-settings-row-glow: rgba(76,107,132,.16);
+}
+:root.forge-ink-mountain[data-forge-surface="landing"] {
+  --forge-conversation-visible-high: clamp(0, calc(var(--forge-conversation-image-high) * var(--forge-scene-brightness, 1)), 1);
 }
 
 /* The portalled tab content is clipped around the registered end actions.
@@ -369,6 +383,38 @@
 ) {
   background-color: var(--forge-navigation-fill) !important;
   background-image: none !important;
+}
+/* Follow the committed wallpaper palette only on native conversation owners.
+ * Settings/catalog keep the shared navigation material. Peek paints on its
+ * inner popover carrier while the outer owner supplies the existing blur. */
+@media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+  :root.forge-ink-mountain[data-forge-scene] aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"]
+    .sidebar-navigation:is([data-sidebar-navigation-root], [data-slate-sidebar-content]):not(.sidebar-navigation .sidebar-navigation):not(
+      [data-activity-sidebar-host],
+      :has(section.font-openai-sans[aria-label]),
+      :has([data-settings-nav-scroll-container])
+    ),
+  :root.forge-ink-mountain[data-forge-scene]
+    [data-slate-sidebar-content].sidebar-navigation[class~="bg-(--app-shell-sidebar-popover-background)"]:not(
+      [hidden], .hidden, .invisible, [hidden] *, .hidden *, .invisible *
+    ):not(
+      [data-activity-sidebar-host],
+      :has(section.font-openai-sans[aria-label]),
+      :has([data-settings-nav-scroll-container])
+    ) {
+    background-color: var(--forge-conversation-fill) !important;
+    background-image: var(--forge-conversation-shade) !important;
+  }
+  /* Inert/collapsed peek content still paints during native exit motion. */
+  :root.forge-ink-mountain[data-forge-scene] aside.app-shell-left-panel[data-app-shell-left-panel-appearance="default"]
+    [data-sidebar-navigation-root].sidebar-navigation:not(.sidebar-navigation .sidebar-navigation):not([data-activity-sidebar-host]):has(
+      [data-slate-sidebar-content].sidebar-navigation[class~="bg-(--app-shell-sidebar-popover-background)"]:not(
+        [hidden], .hidden, .invisible, [hidden] *, .hidden *, .invisible *
+      )
+    ):not(:has(section.font-openai-sans[aria-label], [data-settings-nav-scroll-container])) {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
 }
 :root.forge-ink-mountain .sidebar-navigation:is([class^="ConversationSidebar-"], [class*=" ConversationSidebar-"]) nav:is([class^="Navigation-"], [class*=" Navigation-"]) {
   --color-text: var(--forge-nav-ink) !important;

@@ -1,5 +1,15 @@
 # 原生 UI 与主题替换接口
 
+## 侧栏实际壁纸取色（2026-11-23，v131）
+
+普通聊天导航由 default aside 中最外层的 data-sidebar-navigation-root／data-slate-sidebar-content 识别，peek 使用带原生 popover 背景 token 的 slate 内层。两者只消费专用 conversation 材质变量；共享 navigation-fill 继续用于设置及目录。Activity 的直接宿主、标记 section 与真实 settings-nav-scroll-container 排除保持。
+
+沿用 adaptShellToImage 的真实 cover 裁切及 24×64 canvas。复用已读取像素和亮度上下阈值，对中段像素求 RGB 均值，原始像素均值提供回退；结果发布为 forge-sidebar-sampled-color。没有增加 canvas、DOM 测量或监听，sampleKey 缓存与原有亮度公式保留。dispose 和恢复原生均清除此新属性。
+
+深色材质保留采样色相并降低其亮度，以较低透明底配上下轻渐变；现有亮度样本结合场景 brightness／thread veil 自动提高亮背景衬底，首页不套对话 veil。浅色以原浅底为主、少量混入真实采样色。采样未就绪时回退既有场景配色，缺少场景标记则沿用原导航材质。
+
+可见 peek 由内层独占色层，外层保留原模糊而不重复填色。原生退出期间，即使已 inert／collapsed／aria-hidden，popover 背景 token 仍代表保留绘制，应等 token 退出后才恢复外层；真正 hidden／隐藏类及其祖先不清空可见外层。新材质仅在允许透明度且非强制色彩时启用，其余状态继续使用 Canvas 和无滤镜。
+
 ## 公共资料页、执行扫光与设置反馈（2026-11-22—23，v130）
 
 公共资料页通过自己的页面布局包装渲染，根是 `div.bg-surface`，直接包含标题包装及 `data-profile-scroll`。它没有资料设置组件的 `data-settings-search-root` 标记。主题依据真实的直接父子关系清除根底色，不依赖 main 祖先，覆盖独立页面及 tab 两种原生呈现。资料设置页的现有规则保留。
@@ -129,7 +139,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | 壁纸 | data-app-shell-page-surface 内 PageSurface 叶节点 | 继承边界和圆角，最多两层；叶节点无独立 data 属性，保留限定范围组件回退 |
 | 主内容与页框 | main-surface、main-content-layout 属性 | 布局层透明，目录正文增加阅读衬底 |
 | 图标轨道、应用顶栏 | sidebar rail、ApplicationMenuTopBar | 按实际图片裁切采样填色，不拼接固定宽高遮罩 |
-| 宽侧栏 | aside 的 appearance 属性、外层 sidebar-navigation；data-slate-sidebar-content 的原生 popover 底色 | 外层提供磨砂；拥有独立底色的 peek 包装映射导航色，Activity 保留原生；浮动侧栏按原生 testid |
+| 宽侧栏 | default aside 的原生导航标记；data-slate-sidebar-content 的 popover 背景 token | 真实图片裁切取色，普通／peek 按状态单层绘制；外层沿用模糊；设置及 Activity 排除，浮动壳保留原生归属 |
 | 导航文字 | ConversationSidebar / Navigation 范围 | 局部颜色变量随材质变化，不覆盖全局原生文字 |
 | 对话、dots | conversation 属性、embedded messaging | 风景队列与深色阅读色；原生消息气泡和操作语义保留 |
 | 输入框 | composer-surface-variant、composer-body | 使用原生绘制变量，首页 body 和对话 root 各自拥有表面 |

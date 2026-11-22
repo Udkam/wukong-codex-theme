@@ -79,7 +79,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v130-public-profile-surface';
+export const RUNTIME_REVISION = 'v131-sidebar-scene-palette';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -665,13 +665,24 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
       values.sort((a,b) => a-b);
       const low = values[Math.floor(values.length * .15)], high = values[Math.floor(values.length * .85)];
       const median = values[Math.floor(values.length * .5)];
+      const middleRgb = [0, 0, 0], rawRgb = [0, 0, 0];
+      let middleCount = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const brightness = (.2126*pixels[i] + .7152*pixels[i+1] + .0722*pixels[i+2]) / 255;
+        for (let channel = 0; channel < 3; channel++) rawRgb[channel] += pixels[i + channel];
+        if (brightness < low || brightness > high) continue;
+        middleCount++;
+        for (let channel = 0; channel < 3; channel++) middleRgb[channel] += pixels[i + channel];
+      }
+      const rgb = (middleCount ? middleRgb : rawRgb).map(value => Math.round(value / (middleCount || values.length)));
       const dark = Number((.24 + .54 * high).toFixed(3));
       // Use decoded wallpaper brightness in both themes. Do not assume a
       // white veil: landing has none and thread veils vary by scene.
       const light = Number((.10 + .32 * (1-low)).toFixed(3));
       root.style.setProperty('--forge-shell-dark-alpha', String(dark));
       root.style.setProperty('--forge-shell-light-alpha', String(light));
-      state.shellSample = { dark, light, low, high, median, samples: values.length };
+      root.style.setProperty('--forge-sidebar-sampled-color', `rgb(${rgb.join(', ')})`);
+      state.shellSample = { dark, light, low, high, median, samples: values.length, rgb };
       state.shellSampleKey = sampleKey;
       state.shellSampleCount = (state.shellSampleCount || 0) + 1;
     } catch { /* CORS or decode failure keeps the readable CSS fallback. */ }
@@ -2043,6 +2054,7 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
     pendingRegions.clear();
     root.style.removeProperty('--forge-shell-dark-alpha');
     root.style.removeProperty('--forge-shell-light-alpha');
+    root.style.removeProperty('--forge-sidebar-sampled-color');
     delete root.dataset.forgeSidebarInk;
     delete root.dataset.forgeBackgroundPlacement;
     state.firstPaintRefreshQueued = false;
@@ -2343,6 +2355,7 @@ export const RESTORE_EXPRESSION = `(async () => {
   delete document.documentElement.dataset.forgeGourdSafe;
   delete document.documentElement.dataset.forgeGourdPlacement;
   for (const property of [
+    '--forge-sidebar-sampled-color',
     '--forge-native-foreground',
     '--forge-native-token-foreground',
     '--forge-native-text-primary',
