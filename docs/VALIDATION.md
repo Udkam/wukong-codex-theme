@@ -14,7 +14,9 @@ Windows ZIP 包含 38 个文件、4,058,530 字节。36 个 app 文件与已验�
 
 使用同一 ZIP 的解压包恢复原生及原生状态断言通过：stylePresent=false、ownedNodeCount=0、所有主题运行时均不存在。重新应用返回 verified=true、deferred=false，documentHidden=false，v132 和壁纸已就绪。完整样式 SHA-256 仍为 b7331712fa011620d8428f3179c6c4a9b4c9a2900b7e31b2061958d90f7ee275，与源码一致。当前设置导入行未挂载，具体悬停状态由真实原生组件回归覆盖，不作为当前实机行的视觉验收。冷启动与卸载本轮未执行。
 
-ZIP SHA-256 为 965c03fc60c42f25e00846995c3ba9a9a9142c0935a157a6d6b01c7b51c55315，校验文件 SHA-256 为 429863ebde39b7fcb525b31283882de693e729bc53bcf98edb52f4ca98f1113e。远程发行与回下载结果在完成后补记。
+标签 v0.18.14 指向发行提交 `81f92c0f05c7e13a64e907d81b3e2ff761d92116`，源码与标签均已推送。已创建 [GitHub 最新正式发行](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.14)，非草稿、非预发行。两个发行资产重新下载后，大小、逐文件清单和 SHA-256 与本地及 GitHub asset digest 一致。
+
+ZIP SHA-256 为 965c03fc60c42f25e00846995c3ba9a9a9142c0935a157a6d6b01c7b51c55315；106 字节的校验文件 SHA-256 为 429863ebde39b7fcb525b31283882de693e729bc53bcf98edb52f4ca98f1113e。正式资产保留于 release/0.18.14，最终源码、测试、运行包、本机与远程凭据保留于忽略的 artifacts/settings-native-hover-20261123，不进入发行包。临时验证副本、回下载和日志清理情况见 [清理记录](CLEANUP.md)。
 
 ## v131-sidebar-scene-palette（2026-11-23 开发适配）
 
