@@ -17,11 +17,27 @@ const native = (() => {
     return values[0];
   };
   const staticClass = property => {
-    const record = records.find(record => !Object.keys(bundle.imports(record)).length &&
-      bundle.exports(record).A?.type === 'ObjectExpression' &&
-      prop(bundle.exports(record).A, property));
-    assert.ok(record, `Native CSS presentation map changed: ${property}`);
-    return nativeObject(record, bundle.exports(record).A)[property];
+    const maps = records.filter(record => !Object.keys(bundle.imports(record)).length)
+      .map(record => ({ record, expression: bundle.exports(record).A }))
+      .filter(({ expression }) => prop(expression?.type === 'ConditionalExpression' ? expression.consequent : expression, property));
+    assert.equal(maps.length, 1, `Native CSS presentation map changed: ${property}`);
+    const { record, expression } = maps[0];
+    if (expression.type !== 'ConditionalExpression') return nativeObject(record, expression)[property];
+    // Rspack guards the CSS export with the runtime entry chunk ID. Retain the
+    // real branch contract while reading the active entry's static class map.
+    const gate = expression.test;
+    assert.equal(gate.type, 'BinaryExpression');
+    assert.equal(gate.operator, '==');
+    assert.equal(gate.left.type, 'Literal');
+    assert.equal(typeof gate.left.value, 'number');
+    assert.equal(gate.right.type, 'MemberExpression');
+    assert.equal(gate.right.object.name, record.ast.params[2].name);
+    assert.equal(gate.right.property.name, 'j');
+    assert.equal(expression.alternate.type, 'Literal');
+    assert.equal(expression.alternate.value, null);
+    assert.ok(bundle.entryScripts.some(asset => asset.split('/').at(-1).startsWith(`${gate.left.value}.`)),
+      'Native CSS presentation map must belong to the active runtime entry');
+    return nativeObject(record, expression.consequent)[property];
   };
   const permissionRecords = records.filter(record => record.source.includes('browser-use-site-permissions-column-'));
   assert.equal(permissionRecords.length, 1, 'Native permissions renderer changed');

@@ -1,8 +1,10 @@
 # 当前目标与发行状态
 
-更新于 2026-11-17。**[v0.18.13](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.13) 已发布为 GitHub 最新正式版**。发行运行时为 v127-composer-status-first-paint，适配 Windows Codex 26.1111.2228.0（包内 26.1111.21308）。
+更新于 2026-11-22。**[v0.18.13](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.13) 已发布为 GitHub 最新正式版**。发行运行时为 v127-composer-status-first-paint，适配 Windows Codex 26.1111.2228.0（包内 26.1111.21308）。
 
 文件变更徽标、排队消息和目标条从首次挂载起应用主题材质。深浅色效果及回归范围见 [预览说明](previews/README.md) 和 [发行说明](RELEASE_0.18.13.md)。
+
+2026-11-22 开发版 v128 优化内置插件推荐卡片的玻璃底色、图标对比和按钮层次。适配来源已同步到当前运行的 Windows Codex 26.1111.9664.0，见 [下一版说明](RELEASE_NEXT.md) 和 [验证记录](VALIDATION.md)。
 
 此前标签页开合卡顿在恢复原生外观时也有复现。标签页开合沿用客户端动画。
 

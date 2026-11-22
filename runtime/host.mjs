@@ -24,16 +24,21 @@ export function createRuntimeProvider(modulePath) {
   let loaded;
   return async () => {
     const source = fs.readFileSync(modulePath,'utf8');
-    const contractImport = /(['"])\.\/native-ui-contract\.mjs\1/g;
-    const usesContract = /(['"])\.\/native-ui-contract\.mjs\1/.test(source);
-    const contractPath = path.join(path.dirname(modulePath),'native-ui-contract.mjs');
-    const contractSource = usesContract ? fs.readFileSync(contractPath,'utf8') : '';
-    const next = crypto.createHash('sha256').update(source).update('\0').update(contractSource).digest('hex');
+    const dependencies = ['native-ui-contract.mjs', 'plugin-suggestion-theme.mjs']
+      .filter(name => source.includes(`'./${name}'`) || source.includes(`"./${name}"`))
+      .map(name => ({ name, path: path.join(path.dirname(modulePath), name) }));
+    const hash = crypto.createHash('sha256').update(source);
+    for (const dependency of dependencies) hash.update('\0').update(fs.readFileSync(dependency.path, 'utf8'));
+    const next = hash.digest('hex');
     if (next !== fingerprint) {
-      // ESM parent cache keys do not invalidate static child imports. Bind the
-      // adapter to the same content revision, so a mapping-only update applies.
-      const moduleUrl = usesContract
-        ? 'data:text/javascript;base64,' + Buffer.from(source.replace(contractImport,JSON.stringify(`${pathToFileURL(contractPath).href}?revision=${next}`)),'utf8').toString('base64')
+      // Bind local presentation dependencies to the same content revision.
+      let currentSource = source;
+      for (const dependency of dependencies) {
+        const url = JSON.stringify(`${pathToFileURL(dependency.path).href}?revision=${next}`);
+        currentSource = currentSource.replaceAll(`'./${dependency.name}'`, url).replaceAll(`"./${dependency.name}"`, url);
+      }
+      const moduleUrl = dependencies.length
+        ? 'data:text/javascript;base64,' + Buffer.from(currentSource,'utf8').toString('base64')
         : `${pathToFileURL(modulePath).href}?revision=${next}`;
       const runtime = await import(moduleUrl);
       if (!runtime.RUNTIME_REVISION || typeof runtime.makeApplyExpression !== 'function') {

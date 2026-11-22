@@ -1,5 +1,5 @@
 /*
- * Native DOM contracts, audited against the packaged 26.1106 UI. Data attributes
+ * Native DOM contracts, audited against the packaged 26.1111.9664 UI. Data attributes
  * describe ownership; utility classes are only retained as bounded fallbacks.
  * Keep this module dependency-free: the factory is serialized into the client.
  */

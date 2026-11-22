@@ -1,4 +1,5 @@
 import { NATIVE_UI_SELECTORS, createNativeUiAdapter } from './native-ui-contract.mjs';
+import { createPluginSuggestionTheme } from './plugin-suggestion-theme.mjs';
 
 /* Scene lifecycle and theme decoration are independent of native paint mapping. */
 export const MARK_CLASSES = [
@@ -78,7 +79,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v127-composer-status-first-paint';
+export const RUNTIME_REVISION = 'v128-plugin-suggestion-material';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -92,7 +93,7 @@ const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV12'
 ];
 
-function applyRuntime(payload, createAdapter) {
+function applyRuntime(payload, createAdapter, createPluginTheme) {
   const root = document.documentElement;
   const runtimeKey = payload.runtimeKey;
   const markClasses = payload.markClasses;
@@ -2085,10 +2086,12 @@ function applyRuntime(payload, createAdapter) {
     delete root.dataset.forgePaperMaterial;
     delete root.dataset.forgeSettingsVeil;
     clearRetiredPalette();
+    return state.pluginSuggestions?.dispose();
   };
   state.patchedPushState = history.pushState;
   state.patchedReplaceState = history.replaceState;
   window[runtimeKey] = state;
+  state.pluginSuggestions = createPluginTheme(document);
   refresh();
   /*
    * Bounded startup probes cover React mounting the home hero after the first
@@ -2111,6 +2114,7 @@ export function makeStyleUpdateExpression({ styleSheet, variables }) {
     if (style.textContent !== next) style.textContent = next;
     const sceneVariables = document.getElementById('wukong-codex-theme-scene-variables');
     if (sceneVariables) sceneVariables.textContent = ${JSON.stringify(variables)};
+    window.__wukongCodexThemeRuntimeV13.pluginSuggestions?.refresh();
     return { updated: true, timeOrigin: performance.timeOrigin };
   })()`;
 }
@@ -2126,7 +2130,7 @@ export function makeApplyExpression({ styleSheet, variables, sourceFingerprint =
     retiredRuntimeKeys: RETIRED_RUNTIME_KEYS,
     nativeSelectors: NATIVE_UI_SELECTORS
   });
-  return `(${applyRuntime.toString()})(${payload}, ${createNativeUiAdapter.toString()})`;
+  return `(${applyRuntime.toString()})(${payload}, ${createNativeUiAdapter.toString()}, ${createPluginSuggestionTheme.toString()})`;
 }
 
 export const THEME_STATE_EXPRESSION = `(() => {
@@ -2289,13 +2293,14 @@ export const isNativeThemeState = state => Boolean(state) &&
   state.runtimeV12 === false &&
   state.runtimeV13 === false;
 
-export const RESTORE_EXPRESSION = `(() => {
+export const RESTORE_EXPRESSION = `(async () => {
+  const guestCleanup = [];
   for (const runtimeKey of [${[...RETIRED_RUNTIME_KEYS, RUNTIME_KEY].map(key => `'${key}'`).join(',')}]) {
     const runtime = window[runtimeKey];
     runtime?.observer?.disconnect();
     runtime?.nativeThemeObserver?.disconnect();
     runtime?.resizeObserver?.disconnect();
-    runtime?.dispose?.();
+    guestCleanup.push(runtime?.dispose?.());
     if (runtime?.timer) clearTimeout(runtime.timer);
     delete window[runtimeKey];
   }
@@ -2351,5 +2356,6 @@ export const RESTORE_EXPRESSION = `(() => {
     '--forge-native-sidebar-text-tertiary',
     '--forge-native-sidebar-description'
   ]) document.documentElement.style.removeProperty(property);
+  await Promise.all(guestCleanup);
   return true;
 })()`;

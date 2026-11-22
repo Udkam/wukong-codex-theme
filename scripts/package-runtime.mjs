@@ -11,6 +11,7 @@ const runtimeFiles = [
   'runtime/wukong-codex-theme-background-v13.css',
   'runtime/injection-plan-v13.mjs',
   'runtime/native-ui-contract.mjs',
+  'runtime/plugin-suggestion-theme.mjs',
   'runtime/injector.mjs',
   'runtime/host.mjs',
   'runtime/activate-appx.cs',

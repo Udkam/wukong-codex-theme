@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
   "scope": "browser only",
-  "installationDirectoryVersion": "26.1111.2228.0",
-  "packageDirectoryName": "OpenAI.Codex_26.1111.2228.0_x64__2p2nqsd0c76g0",
-  "internalPackageVersion": "26.1111.21308",
+  "installationDirectoryVersion": "26.1111.9664.0",
+  "packageDirectoryName": "OpenAI.Codex_26.1111.9664.0_x64__2p2nqsd0c76g0",
+  "internalPackageVersion": "26.1111.71704",
   "asarRelativePath": "app/resources/app.asar",
-  "sizeBytes": 783750654,
-  "asarSha256": "2551cba1057a05cdc5cf5d75b146fac4092bff4ce77a10c43e3286c88d24c82d",
-  "capturedAt": "2026-11-15",
+  "sizeBytes": 783725118,
+  "asarSha256": "a538c8bfa0bf6a43b06c4c62aad93616a78c4cad306602cc05f528844a551598",
+  "capturedAt": "2026-11-22",
   "captureMode": "installed browser portal source contract and full/split presentation fixtures",
   "assets": {
     "javascript": {
@@ -16,19 +16,19 @@
       "sha256": "84c3881d294dc4ac2892d9a58f7f60bed97cb061bde375a4fe2f1a768ea22379"
     },
     "stylesheet": {
-      "member": "webview/assets/async/66582da7ee6b.css",
-      "bytes": 1408648,
-      "sha256": "2d854de60f44d2f236a4bf789cb26ff050fc3c3d44b6ec3b8889b066247cc440"
+      "member": "webview/assets/async/2bc0f6e687cf.css",
+      "bytes": 1408813,
+      "sha256": "b1df75994fdc5a5056c9ec0b74869a54f10687284e35785f56b9754fa8993fbb"
     },
     "entrypoint": {
       "member": "webview/index.html",
       "bytes": 9697,
-      "sha256": "459e5fa804aa2bab25956d787e4d452b0ea7742784936d670be0f8c025340559"
+      "sha256": "8bba1ee1abdb5810274a1ed51d650feabaea587fcbd0f2397bc783ba9091d590"
     },
     "runtime": {
-      "member": "webview/assets/348410.374a9b8f98.js",
-      "bytes": 301863,
-      "sha256": "0524ee891262587e2605b573f75ebb1cce4df2b3db154a8f14a2f24a9e80dc0b"
+      "member": "webview/assets/348410.16a4406b14.js",
+      "bytes": 301912,
+      "sha256": "4d0d82af09c4413c58b1446e1a88658fd506f71222555747ac0f7e68f7e9c7de"
     }
   }
 }

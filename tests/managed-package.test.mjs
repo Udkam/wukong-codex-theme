@@ -19,6 +19,7 @@ test('minimal managed package imports independently and omits development surfac
   for (const required of [
     'runtime/wukong-codex-theme-background-v13.css',
     'runtime/injection-plan-v13.mjs',
+    'runtime/plugin-suggestion-theme.mjs',
     'runtime/host.mjs',
     'runtime/activate-appx.cs',
     'runtime/activate-appx.ps1',

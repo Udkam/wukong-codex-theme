@@ -179,6 +179,14 @@ test('updated runtime provider replaces cached code and rejects incomplete updat
     fs.writeFileSync(contract,'export const selector="updated";','utf8');
     assert.equal((await read()).makeApplyExpression(),'updated','a native mapping update must invalidate its imported dependency');
     assert.notEqual((await read()).SOURCE_FINGERPRINT,beforeMapping,'renderer freshness must change even when the declared revision stays the same');
+    const widget=path.join(dir,'plugin-suggestion-theme.mjs');
+    fs.writeFileSync(widget,'export const widget="first";','utf8');
+    fs.writeFileSync(file,'import {widget} from "./plugin-suggestion-theme.mjs"; export const RUNTIME_REVISION="d"; export const makeApplyExpression=()=>widget;','utf8');
+    assert.equal((await read()).makeApplyExpression(),'first');
+    const beforeWidget=(await read()).SOURCE_FINGERPRINT;
+    fs.writeFileSync(widget,'export const widget="updated";','utf8');
+    assert.equal((await read()).makeApplyExpression(),'updated');
+    assert.notEqual((await read()).SOURCE_FINGERPRINT,beforeWidget);
     fs.writeFileSync(file, 'export const broken=true;', 'utf8');
     await assert.rejects(read(), /missing its revision/);
   } finally { fs.rmSync(dir, { recursive:true }); }
@@ -269,6 +277,7 @@ test('mapping-only hot updates move the wallpaper owner and carry a new renderer
   const file=path.join(dir,'injection-plan-v13.mjs');
   const contract=path.join(dir,'native-ui-contract.mjs');
   fs.copyFileSync('runtime/injection-plan-v13.mjs',file);
+  fs.copyFileSync('runtime/plugin-suggestion-theme.mjs',path.join(dir,'plugin-suggestion-theme.mjs'));
   const original=fs.readFileSync('runtime/native-ui-contract.mjs','utf8');
   fs.writeFileSync(contract,original,'utf8');
   const browser=await chromium.launch({headless:true});
