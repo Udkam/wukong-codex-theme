@@ -1,12 +1,23 @@
 # 原生 UI 与主题替换接口
 
+## 公共资料页、执行扫光与设置反馈（2026-11-22—23，v130）
+
+公共资料页通过自己的页面布局包装渲染，根是 `div.bg-surface`，直接包含标题包装及 `data-profile-scroll`。它没有资料设置组件的 `data-settings-search-root` 标记。主题依据真实的直接父子关系清除根底色，不依赖 main 祖先，覆盖独立页面及 tab 两种原生呈现。资料设置页的现有规则保留。
+
+标题包装在 scrollTop>0 时才获得 `bg-surface/80` 与原生背景模糊，内部使用 `data-app-shell-header-toolbar`。主题只在这个实际滚动底板上应用共享玻璃材质；回顶部后不再匹配，保留原生透明标题、滚动遮挡、控件和尺寸。无关背景、错误嵌套的滚动节点及保留的隐藏页面不改变布局。
+
+执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页及独立表面继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
+
+
+设置「自定义规则」的实际行由 data-settings-search-entry 与原生 hover token 关联，内层按钮继承圆角并保留键盘轮廓；导入历史的实际按钮有 import-history- 前缀的 aria-controls 和同一 hover token。主题只在 data-settings-panel／data-settings-search-root 内替换这两类行的反馈：静止时底色透明，悬停／键盘焦点以 ellipse 60% 32px 的径向背景图从底部向上和两侧淡出，不增加整行实色、描边、阴影或圆角。自定义规则的直接末端 svg 与导入行 control 的末端 text-tertiary 图标单独着淡金色，不修改计数、文字和加载图标。鼠标移开清除反馈；aria-expanded 不作为持续高亮条件。原生圆角、divider 伪元素、键盘轮廓、布局和事件不变，强制色彩模式使用原生交互反馈。绘制边界检查只为两个组件的完整图标选择器及精确颜色变量放行，不增加几何例外。
+
 ## 当前工作区与资料页（2026-11-22，v129）
 
 当前核对 Windows Codex 26.1117.4957.0，包内 26.1117.41037。工作区在 retained pages 之外共用 `data-app-shell-surface-backing` 空装饰叶，原生侧栏动画控制其 inset 和圆角。壁纸继续覆盖视口，准备就绪后清除 frame 自己的窗口底色、docked 渐变及 backing 的底色；另一种 unified-tabs 布局在 main-content 直接包装的 `::before` 绘制同样底色，按相同就绪状态清除。布局、原生边缘细线和非主题状态不变。
 
 普通内容及 viewer header 的顶部渐变现在读取 `--app-shell-content-fade`。仅清除对应主内容或 header 内空、aria-hidden、pointer-events-none 的背景图；保留高度、定位、原生透明度和控件。Dots 继续按动态锚点清除自己的空装饰叶。
 
-新版设置用 `.settings-dialog` 统一绘制窗口材质，`.settings-dialog-sidebar` 提供阅读底色。`data-settings-panel` 内默认卡片已变为透明平铺行，主题让出其原生背景变量，显式 boxed 卡片继续使用玻璃底色。独立个人资料页没有 settings-panel 祖先，按 `data-settings-search-root` 及其直接 `data-profile-scroll` 子节点识别自己的背景壳；不依赖设置窗口容器。侧栏 peek 的嵌套 popover 绘制节点单独映射底色，不增加重复模糊。
+新版设置用 `.settings-dialog` 统一绘制窗口材质，`.settings-dialog-sidebar` 提供阅读底色。`data-settings-panel` 内默认卡片已变为透明平铺行，主题让出其原生背景变量，显式 boxed 卡片继续使用玻璃底色。资料设置页没有 settings-panel 祖先，按 `data-settings-search-root` 及其直接 `data-profile-scroll` 子节点识别自己的背景壳；不依赖设置窗口容器。侧栏 peek 的嵌套 popover 绘制节点单独映射底色，不增加重复模糊。
 
 首页字标的资源、168px 尺寸、文案及宿主透明度保持原样；首页壁纸不叠加灰雾或额外边缘遮罩。当前深浅色组件夹具与验证边界见 [预览说明](previews/README.md) 和 [验证记录](VALIDATION.md)。
 
@@ -129,7 +140,8 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
 | 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
 | dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
-| 设置 | data-settings-panel、settings-dialog；资料页的 data-settings-search-root 与 electron:bg-surface | 设置窗口整体及导航应用材质，正文壳透明；原生默认平铺设置行保留透明，显式盒装卡片使用玻璃，色卡与代码预览保留 |
+| 设置 | data-settings-panel、settings-dialog；资料设置页的 data-settings-search-root 与 electron:bg-surface | 设置窗口整体及导航应用材质，正文壳透明；默认平铺行静止时透明，动作行及导入行使用无描边的底部晕染反馈；显式盒装卡片使用玻璃，色卡与代码预览保留 |
+| 公共资料页 | bg-surface 直接包含 data-profile-scroll，滚动标题包装含 data-app-shell-header-toolbar | 页面根透明，滚动标题独立应用玻璃材质，顶部与回顶部保持原生透明标题及遮挡顺序 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |
 | 菜单、对话框、下拉 | role 与实际绘制面、cmdk-root/data-cmdk-root、Popover slot 的实际原生底色及直接内容面、限定的 Popover/确认/语音组件、FloatingSurface / ComposerTopMenuPanel、mention-list-scroll-area | bg-transparent 与无底色定位壳不绘制；命令根与添加列表使用浓阅读底色；内层表面与嵌入托盘单层玻璃；tooltip 保留反色配对，原生尺寸和行状态保留 |

@@ -26,6 +26,8 @@
   --forge-nav-selected-fill: rgba(129,168,201,.09);
   --forge-nav-current-fill: rgba(129,168,201,.16);
   --forge-nav-current-edge: rgba(167,200,229,.38);
+  --forge-settings-action-ink: #e4d5b4;
+  --forge-settings-row-glow: rgba(183,205,224,.25);
   --forge-shell-filter: blur(8px);
   --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
   /* Reading material defaults; custom themes can override these alongside
@@ -58,6 +60,8 @@
   --forge-nav-selected-fill: rgba(72,111,145,.07);
   --forge-nav-current-fill: rgba(72,111,145,.12);
   --forge-nav-current-edge: rgba(54,89,121,.30);
+  --forge-settings-action-ink: #75552d;
+  --forge-settings-row-glow: rgba(76,107,132,.16);
 }
 
 /* The portalled tab content is clipped around the registered end actions.
@@ -186,6 +190,16 @@
   --composer-layout-surface-background: var(--forge-glass-fill) !important;
   --composer-layout-surface-backdrop-filter: var(--forge-glass-filter) !important;
   --composer-layout-surface-shadow: var(--forge-glass-shadow) !important;
+}
+/* The native masked working-text sweep can bleed into a neighbouring thread
+ * composer's backdrop-filter. Keep its tint/highlight/shadow without sampling
+ * that animated backdrop; home and independent surfaces retain their filter. */
+:root.forge-ink-mountain [data-thread-composer-backdrop] :is(
+  [data-composer-surface-variant="default"],
+  [data-composer-surface-variant="opaque"],
+  [data-composer-surface-variant="secondary"]
+):not([data-composer-drag-active]) {
+  --composer-layout-surface-backdrop-filter: none !important;
 }
 :root.forge-ink-mountain :is(
   :is(
@@ -407,7 +421,8 @@
 :root.forge-ink-mountain :is(
   [class~="electron:bg-surface"]:has([class~="group/settings"]),
   [data-settings-panel] [class~="electron:bg-surface"],
-  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll])
+  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll]),
+  div[class~="bg-surface"]:has(> [data-profile-scroll])
 ) {
   background-color: var(--forge-shell-fill) !important;
   background-image: none !important;
@@ -415,13 +430,14 @@
   backdrop-filter: var(--forge-shell-filter) !important;
   -webkit-backdrop-filter: var(--forge-shell-filter) !important;
 }
-/* Settings and the standalone profile expose the wallpaper in both themes;
- * the profile has its own shell and no settings-panel ancestor. */
+/* Profile settings and the public profile own separate shells. The public
+ * route paints on the direct parent of its semantic profile scroller. */
 @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
 :root.forge-ink-mountain[data-forge-native-theme] :is(
   [class~="electron:bg-surface"]:has([class~="group/settings"]),
   [data-settings-panel] [class~="electron:bg-surface"],
-  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll])
+  [data-settings-search-root][class~="electron:bg-surface"]:has(> [data-profile-scroll]),
+  div[class~="bg-surface"]:has(> [data-profile-scroll])
 ) {
   background-color: transparent !important;
   background-image: none !important;
@@ -429,6 +445,15 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+}
+/* Public profile keeps its scrolled header as a separate occluding surface.
+ * The content scroller is its sibling; never paint the unscrolled toolbar. */
+:root.forge-ink-mountain div[class~="bg-surface"]:has(> [data-profile-scroll]) > div[class~="bg-surface/80"]:has([data-app-shell-header-toolbar]) {
+  background-color: var(--forge-glass-fill) !important;
+  background-image: var(--forge-glass-highlight) !important;
+  border-color: var(--forge-glass-edge) !important;
+  backdrop-filter: var(--forge-glass-filter) !important;
+  -webkit-backdrop-filter: var(--forge-glass-filter) !important;
 }
 /* SettingsDialog owns one backdrop for the window. Its separate navigation
  * keeps a reading tint without adding another blur layer or changing width. */
@@ -447,6 +472,33 @@
 :root.forge-ink-mountain [class~="group/settings"] > .sticky::after {
   background: none !important;
   box-shadow: none !important;
+}
+/* Settings feedback fades upward and sideways from the bottom of the row.
+ * Native corners, layout, dividers and keyboard focus outlines stay untouched. */
+@media (forced-colors: none) {
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root]) :is(
+    [data-settings-search-entry].group[class~="hover:bg-secondary-ghost-hover"],
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]
+  ) {
+    background-color: transparent !important;
+  }
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root]) :is(
+    [data-settings-search-entry].group[class~="hover:bg-secondary-ghost-hover"],
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]
+  ):is(:hover, :focus-visible, :has(:focus-visible)) {
+    background-image: radial-gradient(ellipse 60% 32px at 50% 100%, var(--forge-settings-row-glow), transparent) !important;
+  }
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    [data-settings-search-entry="personalization-custom-rules"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > button > [class~="col-start-3"] > svg:last-child,
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="text-tertiary"]:last-child,
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="whitespace-nowrap"] > span > svg[class~="text-tertiary"][class~="transition-transform"] {
+    color: var(--forge-settings-action-ink) !important;
+  }
 }
 /* SettingsCard uses an inline background variable, unlike the theme preview.
  * Paint the real cards without recolouring swatches or the code preview.

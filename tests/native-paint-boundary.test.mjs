@@ -267,6 +267,16 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
   [class~="hover:before:bg-secondary-ghost-hover"]
 ):not([data-app-action-sidebar-project-row], [data-app-action-sidebar-thread-row], [data-file-drop-active="true"], [class~="bg-text-info/10"], [class~="bg-text-accent/10"], [data-activity-sidebar-host] *)`;
   let navigationHoverSeen = false;
+  const settingsActionInkSelector = `:root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    [data-settings-search-entry="personalization-custom-rules"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > button > [class~="col-start-3"] > svg:last-child,
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="text-tertiary"]:last-child,
+  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
+    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
+      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="whitespace-nowrap"] > span > svg[class~="text-tertiary"][class~="transition-transform"]`;
+  let settingsActionInkSeen = false;
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
     // Only the independent recovery notice may adopt the adjacent native
@@ -299,6 +309,16 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
       navigationHoverSeen = true;
       return;
     }
+    // Only the two source-bound trailing action icons may use the theme accent.
+    if (s === settingsActionInkSelector) {
+      assert.equal(d.prop, 'color');
+      assert.equal(d.value, 'var(--forge-settings-action-ink)');
+      assert.equal(d.important, true);
+      assert.equal(d.parent.parent.params, '(forced-colors: none)');
+      assert.equal(settingsActionInkSeen, false);
+      settingsActionInkSeen = true;
+      return;
+    }
     const conversation = s.split(',').every(selector => selector.includes('[data-forge-native-theme="dark"]') && /\[data-thread-find-target="conversation"\]|\.messaging-root\.messaging-embedded \.messages-scroll/.test(selector));
     if (conversation && ['--color-text-secondary','--color-text-tertiary'].includes(d.prop)) return;
     if (s.includes('[data-forge-native-theme="dark"]') && s.includes('[data-markdown-text-style="assistant-message"] a') && d.prop === 'color') return;
@@ -327,6 +347,7 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     'The bounded quota contour rule retains both native variable declarations');
   assert.deepEqual([...sidebarHoverSeen].sort(), sidebarHoverTokens, 'Native hover tokens stay in the bounded row rule');
   assert.equal(navigationHoverSeen, true, 'The native navigation item receives its own bounded hover token');
+  assert.equal(settingsActionInkSeen, true, 'Only the requested settings action icons receive accent ink');
 });
 
 test('current client CSS: native geometry/semantic colours, home paint boundaries and popup first paint', {

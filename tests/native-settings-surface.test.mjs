@@ -54,7 +54,7 @@ assert.ok(defaultCard.props.style.backgroundColor.includes('--settings-surface-b
 const escape = value => String(value).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
 const cardHtml = (id, tree) => `<div id="${id}" class="${escape(tree.props.className)}" style="background-color:${escape(tree.props.style.backgroundColor)}"><button class="text-default" data-native-control>Preference</button><button disabled class="text-secondary" data-native-control>Unavailable</button></div>`;
 
-test('current settings window and profile shells receive material while native flat rows stay transparent', async () => {
+test('current settings window and profile-settings shells receive material while native flat rows stay transparent', async () => {
   const browser = await chromium.launch({ headless: true });
   try {
     for (const mode of ['dark', 'light']) {
