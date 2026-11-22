@@ -1,5 +1,11 @@
 # 原生 UI 与主题替换接口
 
+v0.18.14 使用 v132-settings-native-hover，原生来源为 Windows Codex 26.1117.4957.0。以下接口对应本轮发行输入，功能概览见 [发行说明](RELEASE_0.18.14.md)，验证范围见 [验证记录](VALIDATION.md)。
+
+## 设置原生整行悬停（2026-11-23，v132）
+
+设置「自定义规则」的实际行由 data-settings-search-entry 与原生 hover token 关联，导入历史的按钮带有 import-history- 前缀的 aria-controls。主题只在 data-settings-panel／data-settings-search-root 内给这两类行映射较淡的悬停底色，深色为 rgba(183,205,224,.055)，浅色为 rgba(76,107,132,.035)。整行反馈沿用原生 hover 状态，原生图标、分隔线、圆角、键盘焦点轮廓和事件继续由组件控制。鼠标反馈只更换底色，强制色彩模式使用原生颜色。
+
 ## 侧栏实际壁纸取色（2026-11-23，v131）
 
 普通聊天导航由 default aside 中最外层的 data-sidebar-navigation-root／data-slate-sidebar-content 识别，peek 使用带原生 popover 背景 token 的 slate 内层。两者只消费专用 conversation 材质变量；共享 navigation-fill 继续用于设置及目录。Activity 的直接宿主、标记 section 与真实 settings-nav-scroll-container 排除保持。
@@ -10,16 +16,13 @@
 
 可见 peek 由内层独占色层，外层保留原模糊而不重复填色。原生退出期间，即使已 inert／collapsed／aria-hidden，popover 背景 token 仍代表保留绘制，应等 token 退出后才恢复外层；真正 hidden／隐藏类及其祖先不清空可见外层。新材质仅在允许透明度且非强制色彩时启用，其余状态继续使用 Canvas 和无滤镜。
 
-## 公共资料页、执行扫光与设置反馈（2026-11-22—23，v130）
+## 公共资料页与执行扫光（2026-11-22—23，v130）
 
 公共资料页通过自己的页面布局包装渲染，根是 `div.bg-surface`，直接包含标题包装及 `data-profile-scroll`。它没有资料设置组件的 `data-settings-search-root` 标记。主题依据真实的直接父子关系清除根底色，不依赖 main 祖先，覆盖独立页面及 tab 两种原生呈现。资料设置页的现有规则保留。
 
 标题包装在 scrollTop>0 时才获得 `bg-surface/80` 与原生背景模糊，内部使用 `data-app-shell-header-toolbar`。主题只在这个实际滚动底板上应用共享玻璃材质；回顶部后不再匹配，保留原生透明标题、滚动遮挡、控件和尺寸。无关背景、错误嵌套的滚动节点及保留的隐藏页面不改变布局。
 
 执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页及独立表面继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
-
-
-设置「自定义规则」的实际行由 data-settings-search-entry 与原生 hover token 关联，内层按钮继承圆角并保留键盘轮廓；导入历史的实际按钮有 import-history- 前缀的 aria-controls 和同一 hover token。主题只在 data-settings-panel／data-settings-search-root 内替换这两类行的反馈：静止时底色透明，悬停／键盘焦点以 ellipse 60% 32px 的径向背景图从底部向上和两侧淡出，不增加整行实色、描边、阴影或圆角。自定义规则的直接末端 svg 与导入行 control 的末端 text-tertiary 图标单独着淡金色，不修改计数、文字和加载图标。鼠标移开清除反馈；aria-expanded 不作为持续高亮条件。原生圆角、divider 伪元素、键盘轮廓、布局和事件不变，强制色彩模式使用原生交互反馈。绘制边界检查只为两个组件的完整图标选择器及精确颜色变量放行，不增加几何例外。
 
 ## 当前工作区与资料页（2026-11-22，v129）
 
@@ -150,7 +153,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
 | 顶底渐变与底板 | thread footer、scroll container、composer、main-content-layout 内共享 footer background 的空惰性叶；main-content-top-fade | 覆盖 fade、surface、combined，清除绘制，保留布局预留与交互 |
 | dots 标题 | position-anchor 指向 orbit-messaging-header 动态锚点的空惰性节点 | 清除标题渐变，允许原生 portal 改变挂载位置；头像、通话与资料控件不参与替换；共享 composer 底部装饰渐变单独限定 |
-| 设置 | data-settings-panel、settings-dialog；资料设置页的 data-settings-search-root 与 electron:bg-surface | 设置窗口整体及导航应用材质，正文壳透明；默认平铺行静止时透明，动作行及导入行使用无描边的底部晕染反馈；显式盒装卡片使用玻璃，色卡与代码预览保留 |
+| 设置 | data-settings-panel、settings-dialog；资料设置页的 data-settings-search-root 与 electron:bg-surface | 设置窗口整体及导航应用材质，正文壳透明；默认平铺行静止时透明，动作行及导入行使用较淡的原生整行悬停底色；显式盒装卡片使用玻璃，色卡与代码预览保留 |
 | 公共资料页 | bg-surface 直接包含 data-profile-scroll，滚动标题包装含 data-app-shell-header-toolbar | 页面根透明，滚动标题独立应用玻璃材质，顶部与回顶部保持原生透明标题及遮挡顺序 |
 | 浏览器智能体权限表 | group/settings 内 table 的 browser-use-site-permissions-column-* 无障碍 ID | 局部单元格材质变量；固定列和表头用实色遮挡移动内容，保留原生边角、横向翻页及下拉权限状态 |
 | 目录、图像、插件、技能、计划页标题 | data-sticky、titlebar inset 变量、实际搜索输入 ID | 替换实际背景伪元素，不泛化处理任意 sticky 元素 |

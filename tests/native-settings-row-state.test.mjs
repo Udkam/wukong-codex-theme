@@ -134,7 +134,7 @@ const loadRows=()=>{
 test('native settings row feedback follows hover and keyboard focus without turning expansion into selection',async()=>{
   const native=loadRows(),old=postcss.parse(theme);let removed=0;
   old.walkRules(rule=>{if(rule.selector.includes('[data-settings-panel]')&&rule.selector.includes('import-history-')){rule.remove();removed++;}});
-  assert.equal(removed,3,'Remove only the settings-row idle, feedback and precise arrow-ink rules');
+  assert.equal(removed,2,'Remove only the settings-row idle and interaction feedback rules');
   const browser=await chromium.launch({headless:true});
   try{
     for(const mode of ['dark','light'])for(const scope of ['data-settings-panel','data-settings-search-root']){
@@ -183,13 +183,12 @@ test('native settings row feedback follows hover and keyboard focus without turn
             localBox={x:Math.round((r.x+r.width/2-width/2)*1000)/1000,y:Math.round((r.y+r.height/2-height/2)*1000)/1000,width,height};
           }
           const eligible=!!owner?.closest('[data-settings-panel],[data-settings-search-root]')&&owner.classList.contains('hover:bg-secondary-ghost-hover');
-          const active=eligible&&owner.matches(':is(:hover,:focus-visible,:has(:focus-visible))'),arrow=e.closest('svg[data-fixture-arrow]');
-          const ink=!!arrow&&active&&(arrow.dataset.fixtureArrow!=='custom'||owner.id==='personalization-custom-rules');
+          const active=eligible&&owner.matches(':is(:hover,:focus-visible,:has(:focus-visible))');
           const pseudo=name=>{const p=getComputedStyle(e,name);return [p.content,p.position,p.inset,p.width,p.height,p.backgroundColor,p.backgroundImage,p.boxShadow,p.pointerEvents];};
           return [e.id||'node-'+index,{rect:[localBox.x,localBox.y,localBox.width,localBox.height],geometry:[s.width,s.height,s.boxSizing,s.transformOrigin,s.padding,s.margin,s.borderWidth,s.position,s.overflow,s.display,s.font,s.lineHeight,s.cornerShape,s.opacity,s.pointerEvents,spinning?'native spin':s.transform,spinning?'native spin':s.rotate],
             animation:[s.animationName,s.animationDuration,s.animationTimingFunction,s.animationIterationCount,s.animationPlayState],
             radius:s.borderRadius,outline:[s.outlineWidth,s.outlineStyle,s.outlineColor,s.outlineOffset],paint:[s.backgroundColor,s.backgroundImage,s.boxShadow,s.color],before:pseudo('::before'),after:pseudo('::after'),
-            eligible:eligible&&e===owner,ink,iconPaint:[s.fill,s.stroke],currentFill:e.getAttribute('fill')==='currentColor',currentStroke:e.getAttribute('stroke')==='currentColor',
+            eligible:eligible&&e===owner,iconPaint:[s.fill,s.stroke],
             svg:[e.getAttribute('width'),e.getAttribute('height'),e.getAttribute('viewBox'),e.getAttribute('focusable'),e.getAttribute('aria-hidden')],
             active,disabled:e.disabled??null,tab:e.tabIndex,
             expanded:e.getAttribute('aria-expanded'),controls:e.getAttribute('aria-controls')}];
@@ -198,31 +197,24 @@ test('native settings row feedback follows hover and keyboard focus without turn
           for(const id of Object.keys(baseline)){
             for(const field of ['rect','geometry','animation','before','after','disabled','tab','expanded','controls','svg'])assert.deepEqual(themed[id][field],baseline[id][field],`${label}: ${id} ${field}`);
             assert.equal(themed[id].radius,baseline[id].radius,`${id} keeps its complete native radius`);
-            if(themed[id].ink&&baseline[id].outline[1]==='none'){
-              assert.deepEqual(themed[id].outline.filter((_,index)=>index!==2),baseline[id].outline.filter((_,index)=>index!==2),`${id} keeps its nonexistent SVG outline geometry`);
-              assert.equal(themed[id].outline[2],themed[id].paint[3],'An unpainted SVG outline follows its native currentColor binding');
-            }else assert.deepEqual(themed[id].outline,baseline[id].outline,`${id} keeps the complete native keyboard outline`);
-            const allowed=new Set([...(themed[id].eligible?[0,1]:[]),...(themed[id].ink?[3]:[])]);
+            assert.deepEqual(themed[id].outline,baseline[id].outline,`${id} keeps the complete native keyboard outline`);
+            const allowed=new Set(themed[id].eligible?[0,1]:[]);
             themed[id].paint.forEach((value,index)=>{if(!allowed.has(index))assert.equal(value,baseline[id].paint[index],`${id} preserves native paint channel ${index}`);});
-            if(!themed[id].ink)assert.deepEqual(themed[id].iconPaint,baseline[id].iconPaint,`${id} preserves ordinary icon/loader paint`);
+            assert.deepEqual(themed[id].iconPaint,baseline[id].iconPaint,`${id} preserves native icon and loader paint`);
           }
         };
         const verify=async(label,target)=>{
           await remove();const baseline=await capture();await apply();const after=await capture();compare(baseline,after,label);
-          const ink=await page.evaluate(()=>{const p=document.createElement('span');p.style.color='var(--forge-settings-action-ink)';document.body.append(p);const c=getComputedStyle(p).color;p.remove();return c;});
-          for(const [id,value]of Object.entries(after).filter(([,value])=>value.ink)){
-            assert.equal(value.paint[3],ink,`${id} receives only the exact trailing-action ink`);
-            value.iconPaint.forEach((color,index)=>assert.equal(color,(index===0?value.currentFill:value.currentStroke)?ink:baseline[id].iconPaint[index],`${id} keeps its native currentColor binding`));
-          }
           for(const [id,value]of Object.entries(after).filter(([,value])=>value.eligible)){
             if(value.active){
               const expected=await page.locator('#'+id).evaluate(e=>{
-                const p=document.createElement('span');p.style.backgroundImage='radial-gradient(ellipse 60% 32px at 50% 100%, var(--forge-settings-row-glow), transparent)';
-                e.append(p);const image=getComputedStyle(p).backgroundImage;p.remove();return image;
+                const p=document.createElement('span');p.style.backgroundColor='var(--forge-settings-row-hover)';
+                e.append(p);const color=getComputedStyle(p).backgroundColor;p.remove();return color;
               });
-              assert.equal(value.paint[1],expected,`${label}: ${id} uses only the approved bottom-centered feedback glow`);
-            }else assert.equal(value.paint[1],baseline[id].paint[1],`${label}: ${id} idle keeps its native background image`);
-            assert.equal(value.paint[0],'rgba(0, 0, 0, 0)',`${label}: ${id} keeps its base fill transparent`);
+              assert.notEqual(expected,'rgba(0, 0, 0, 0)',`${label}: ${id} resolves a visible hover fill`);
+              assert.equal(value.paint[0],expected,`${label}: ${id} receives the themed whole-row hover fill`);
+            }else assert.equal(value.paint[0],'rgba(0, 0, 0, 0)',`${label}: ${id} idle keeps its base fill transparent`);
+            assert.equal(value.paint[1],'none',`${label}: ${id} uses flat row paint`);
             assert.equal(value.paint[2],baseline[id].paint[2],`${label}: ${id} adds no edge or shadow`);
           }
           if(target)assert.equal(after[target].active,true);

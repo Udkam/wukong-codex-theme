@@ -34,8 +34,7 @@
   --forge-nav-selected-fill: rgba(129,168,201,.09);
   --forge-nav-current-fill: rgba(129,168,201,.16);
   --forge-nav-current-edge: rgba(167,200,229,.38);
-  --forge-settings-action-ink: #e4d5b4;
-  --forge-settings-row-glow: rgba(183,205,224,.25);
+  --forge-settings-row-hover: rgba(183,205,224,.055);
   --forge-shell-filter: blur(8px);
   --forge-summary-fill: rgb(from var(--forge-glass-fill) r g b / 1);
   /* Reading material defaults; custom themes can override these alongside
@@ -71,8 +70,7 @@
   --forge-nav-selected-fill: rgba(72,111,145,.07);
   --forge-nav-current-fill: rgba(72,111,145,.12);
   --forge-nav-current-edge: rgba(54,89,121,.30);
-  --forge-settings-action-ink: #75552d;
-  --forge-settings-row-glow: rgba(76,107,132,.16);
+  --forge-settings-row-hover: rgba(76,107,132,.035);
 }
 :root.forge-ink-mountain[data-forge-surface="landing"] {
   --forge-conversation-visible-high: clamp(0, calc(var(--forge-conversation-image-high) * var(--forge-scene-brightness, 1)), 1);
@@ -519,31 +517,21 @@
   background: none !important;
   box-shadow: none !important;
 }
-/* Settings feedback fades upward and sideways from the bottom of the row.
- * Native corners, layout, dividers and keyboard focus outlines stay untouched. */
+/* Keep native full-row feedback with a lighter theme-matched tint.
+ * Native corners, dividers, icons and keyboard focus outlines stay untouched. */
 @media (forced-colors: none) {
   :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root]) :is(
     [data-settings-search-entry].group[class~="hover:bg-secondary-ghost-hover"],
     button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]
   ) {
     background-color: transparent !important;
+    background-image: none !important;
   }
   :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root]) :is(
     [data-settings-search-entry].group[class~="hover:bg-secondary-ghost-hover"],
     button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]
   ):is(:hover, :focus-visible, :has(:focus-visible)) {
-    background-image: radial-gradient(ellipse 60% 32px at 50% 100%, var(--forge-settings-row-glow), transparent) !important;
-  }
-  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
-    [data-settings-search-entry="personalization-custom-rules"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
-      > button > [class~="col-start-3"] > svg:last-child,
-  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
-    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
-      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="text-tertiary"]:last-child,
-  :root.forge-ink-mountain :is([data-settings-panel], [data-settings-search-root])
-    button[aria-controls^="import-history-"][class~="hover:bg-secondary-ghost-hover"]:is(:hover, :focus-visible, :has(:focus-visible))
-      > [class~="@container/settings-row"] > [class~="justify-end"] > [class~="whitespace-nowrap"] > span > svg[class~="text-tertiary"][class~="transition-transform"] {
-    color: var(--forge-settings-action-ink) !important;
+    background-color: var(--forge-settings-row-hover) !important;
   }
 }
 /* SettingsCard uses an inline background variable, unlike the theme preview.
