@@ -1,6 +1,12 @@
 # 原生 UI 与主题替换接口
 
-v0.18.14 使用 v132-settings-native-hover，原生来源为 Windows Codex 26.1117.4957.0。以下接口对应本轮发行输入，功能概览见 [发行说明](RELEASE_0.18.14.md)，验证范围见 [验证记录](VALIDATION.md)。
+当前开发运行时为 v133-project-rail-compositing，原生来源为 Windows Codex 26.1117.4957.0。正式下载 v0.18.14 使用 v132-settings-native-hover，功能概览见 [发行说明](RELEASE_0.18.14.md)，验证范围见 [验证记录](VALIDATION.md)。
+
+## 项目条背景采样层（2026-11-24，v133）
+
+首页 UtilityBarSlot 是透明的 motion 定位壳，真正的项目条表面由带原生背景 token 的 data-composer-utility-rail 节点绘制。用户此前反馈该条内部偶尔出现横线，该间歇现象未能稳定复现。实际读取到该表面使用 12px backdrop-filter，controls 栏内部结构保持原生布局。
+
+参照既有普通对话输入框关闭背景模糊后移动遮盖消失的实机经验，本次在 utility rail 的实际材质表面将 backdrop-filter 和 -webkit-backdrop-filter 设为 none，消除同类背景采样层。底色、顶部高光和 1px 内阴影保留，原生尺寸、收起动画、负边距与事件继续由原生组件控制。透明变体和内部 scroll-area 仍按各自材料归属绘制，goal／排队消息的 data-composer-rail-item 沿用独立滤镜。回归用于核对材质与几何范围。用户验证后认为内部横线已不再出现，原触发条件仍不明确。
 
 ## 设置原生整行悬停（2026-11-23，v132）
 
@@ -22,7 +28,7 @@ v0.18.14 使用 v132-settings-native-hover，原生来源为 Windows Codex 26.11
 
 标题包装在 scrollTop>0 时才获得 `bg-surface/80` 与原生背景模糊，内部使用 `data-app-shell-header-toolbar`。主题只在这个实际滚动底板上应用共享玻璃材质；回顶部后不再匹配，保留原生透明标题、滚动遮挡、控件和尺寸。无关背景、错误嵌套的滚动节点及保留的隐藏页面不改变布局。
 
-执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页及独立表面继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
+执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页输入主体及独立表面继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
 
 ## 当前工作区与资料页（2026-11-22，v129）
 
@@ -60,7 +66,7 @@ v125 将普通导航入口的 secondary ghost 变量映射到通用悬停底色�
 
 首页标题game-source是heading div，并非hero布局祖先；其子span可能包含真实项目选择按钮。home-icon是独立motion图标容器，父级通过原生opacity动画进出。主题直接对这两个语义owner绘制，与后续运行时属性共享字标／题字；不强制父级visibility，不改真实标题子控件的点击或布局。quote关闭与高对比路径也覆盖未标记节点。
 
-home UtilityBarSlot仅承担透明motion定位；data-composer-utility-rail实际Item上的原生bg token决定是否拥有材料。只在该表面补齐首帧backdrop-filter，bg-transparent及无背景token的变体仍透明，内部scroll-area和上下定位不参与重复绘制。
+home UtilityBarSlot 仅承担透明 motion 定位；data-composer-utility-rail 实际 Item 上的原生 bg token 决定是否拥有材料。底色和高光从首帧应用，v133 在该材质表面停用背景滤镜。bg-transparent 及无背景 token 的变体仍透明，内部 scroll-area 和上下定位按自身归属绘制。
 
 ## 标签页标题与完整视图（2026-11-22，v129）
 

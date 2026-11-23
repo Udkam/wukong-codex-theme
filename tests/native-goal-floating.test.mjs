@@ -246,7 +246,7 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
   const oldPaint = postcss.parse(theme);
   let count = 0;
   oldPaint.walkRules(rule => {
-    if (rule.selector.includes('[data-composer-utility-rail]') && rule.nodes.some(node => node.prop === 'backdrop-filter')) {
+    if (rule.selector.includes('[data-composer-utility-rail]') && rule.nodes.some(node => node.prop === 'backdrop-filter' && node.value !== 'none')) {
       rule.selector = rule.selector.replace('[data-composer-rail-item]', '.forge-composer-panel');
       count++;
     }

@@ -14,8 +14,7 @@ const scene = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www
 const brand = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="168" height="168"><path fill="#f7d589" d="M18 68h132v32H18z"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${scene}");--forge-ui-landing-mark:url("${brand}");}`;
 const oldSheet = postcss.parse(theme);
-const railOwners = '[data-composer-rail-item], [data-composer-utility-rail]';
-let oldIcon = 0, oldTitle = 0, oldRail = 0;
+let oldIcon = 0, oldTitle = 0;
 oldSheet.walkRules(rule => {
   if (rule.selector.includes('[data-testid="home-icon"]')) {
     rule.selector = rule.selector.replaceAll('[data-testid="home-icon"]', '[data-testid="home-icon"][data-forge-mark="1"]'); oldIcon++;
@@ -23,15 +22,8 @@ oldSheet.walkRules(rule => {
   if (rule.selector.includes('[data-feature="game-source"]')) {
     rule.selector = rule.selector.replaceAll('[data-feature="game-source"]', '[data-forge-title-copy]'); oldTitle++;
   }
-  if (rule.selector.includes(railOwners) && rule.nodes.some(node => node.prop === 'backdrop-filter')) {
-    rule.selector = rule.selector.replace(
-      railOwners,
-      '[data-composer-rail-item]:not([data-composer-utility-rail]), .forge-composer-panel[data-composer-utility-rail]'
-    );
-    oldRail++;
-  }
 });
-assert.ok(oldIcon && oldTitle && oldRail === 1, 'First-paint negative control must retain marker paint while removing all three native interfaces');
+assert.ok(oldIcon && oldTitle, 'First-paint negative control must retain the former hero marker dependencies');
 const oldTheme = oldSheet.toString();
 const element = (tag, props) => ({ tag, props });
 const jsx = record => nodes(record.ast).filter(n => n.type === 'CallExpression' && n.arguments[1]?.type === 'ObjectExpression');
@@ -158,7 +150,7 @@ test('late native home paints its replacement before markers while preserving co
         const size = await page.locator('#home-icon').evaluate(element => Number.parseFloat(getComputedStyle(element, '::before').width));
         assert.equal(size, 168, 'The existing wordmark size stays unchanged across viewport widths');
         assert.equal(first.host.opacity, native.classes.icon.includes('opacity-30') ? '0.3' : '1', 'The existing native host opacity stays unchanged');
-        assert.equal(first.project.fill, 'rgba(0, 0, 0, 0)'); assert.notEqual(first.rail.blur, 'none');
+        assert.equal(first.project.fill, 'rgba(0, 0, 0, 0)'); assert.equal(first.rail.blur, 'none', 'Utility paint does not sample its animated surroundings');
         await page.evaluate(() => window.__wukongCodexThemeRuntimeV13.refresh());
         assert.deepEqual(await paint(page), first, `${mode}/${width}: marker arrival must not change hero or utility paint`);
         assert.deepEqual(await geometry(page), before);
@@ -186,7 +178,7 @@ test('late native home paints its replacement before markers while preserving co
       await prepare(negative, native, 'dark', oldTheme); await insert(negative, markup);
       const first = await paint(negative); assert.equal(first.logo.opacity, '1'); assert.equal(first.rail.blur, 'none'); assert.ok(!first.title.content || ['none', 'normal'].includes(first.title.content));
       await negative.evaluate(() => window.__wukongCodexThemeRuntimeV13.refresh());
-      const marked = await paint(negative); assert.equal(marked.logo.opacity, '0'); assert.notEqual(marked.rail.blur, 'none'); assert.match(marked.title.content, /此去，欲破何局/);
+      const marked = await paint(negative); assert.equal(marked.logo.opacity, '0'); assert.equal(marked.rail.blur, 'none'); assert.match(marked.title.content, /此去，欲破何局/);
     } finally { await negative.close(); }
     if (process.env.WUKONG_HOME_PREVIEW_DIRECTORY) {
       fs.mkdirSync(process.env.WUKONG_HOME_PREVIEW_DIRECTORY, { recursive: true });

@@ -645,6 +645,12 @@
   backdrop-filter: var(--forge-glass-filter) !important;
   -webkit-backdrop-filter: var(--forge-glass-filter) !important;
 }
+/* Project controls keep their material without sampling neighbouring animated
+ * layers. Their native attached overlap, clipping and highlight stay intact. */
+:root.forge-ink-mountain [data-composer-utility-rail]:is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
   :root.forge-ink-mountain {
     --forge-glass-fill: var(--color-surface, Canvas) !important;
