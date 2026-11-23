@@ -10,7 +10,9 @@ Windows ZIP 为 4,058,581 字节，包含 38 个文件。36 个 app 文件逐项
 
 使用同一 ZIP 的真实用户 Temp 解压包恢复原生、原生断言均通过；重新应用返回 verified=true、deferred=false。本机前台读回 v133、壁纸就绪，完整样式 SHA-256 为 `1b11d30bddeec9e786e21cecba0ca084e518ae13e3c1a0f5997b377bf6299d82`，与验证源码及活动变量一致。项目条当时未挂载，具体滤镜计算由源组件回归覆盖，实际改善由此前用户使用验证反馈支持。冷启动和卸载本轮未执行。
 
-ZIP SHA-256 为 `97789607405d87b1c71fde478d0f9b146dfddd36ee337aaa35d702683e387681`，校验文件 SHA-256 为 `9ffcf5fa6ca75b804e4804df73cf8e47a72fd20fb6ddb689056e15b47ad5f2b9`。远程发行与回下载结果在完成后补记。
+发行提交为 `44843e98acc24141fcc73f749cec5c4b60cb84a2`，源码与 v0.18.15 标签均已推送。[GitHub 正式发行](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.15) 已设为 Latest，非草稿、非预发行。两个资产重新下载后的大小、SHA-256 及 ZIP 内 38 文件与本地和 GitHub asset digest 一致。
+
+ZIP SHA-256 为 `97789607405d87b1c71fde478d0f9b146dfddd36ee337aaa35d702683e387681`；105 字节校验文件的 SHA-256 为 `9ffcf5fa6ca75b804e4804df73cf8e47a72fd20fb6ddb689056e15b47ad5f2b9`。正式资产保留于 release/0.18.15，最终源码、测试、包、同包实机及远程校验凭据保留于忽略的 artifacts/release-readiness-01815-20261124。临时副本清理见 [清理记录](CLEANUP.md)。
 
 ## v133-project-rail-compositing（2026-11-24 开发修正）
 

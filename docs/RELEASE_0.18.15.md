@@ -8,6 +8,8 @@
 
 发行输入的 218 项检查与 Studio 端到端测试全部通过。38 个运行文件与验证源码、ZIP 和解压内容一致；使用解压包恢复原生和重新应用通过，本机前台读回运行时与完整主题样式一致。
 
+本版已设为 GitHub 最新正式版，两个发行资产回下载后的 SHA-256 与本地文件和 GitHub 摘要一致。
+
 解压 Windows 运行包后，完全退出桌面客户端，再双击 `start.cmd`。[使用说明](QUICK_START.txt)
 
 [GitHub 发行页](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.15) · [Windows ZIP](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.15/Wukong-Codex-Theme-0.18.15-Windows.zip) · [SHA256SUMS.txt](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.15/SHA256SUMS.txt)
