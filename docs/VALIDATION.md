@@ -22,7 +22,9 @@ Windows ZIP 为 4,059,469 字节、38 个文件。36 个 app 文件逐项匹配�
 
 同一 ZIP 的真实用户 Temp 解压包恢复原生与原生断言通过，主题样式、自有节点和运行时均清除。重新应用最初因窗口在后台返回 deferred=true；用户将窗口置前台后，稳定读回 isActiveThemeState=true、documentHidden=false、backgroundReady=true、v134 与上述完整样式哈希一致。最后读回时目标／队列和右侧 pane 未挂载；对应组件的先前现场测量、用户对齐确认与源组件回归分开记录。冷启动和卸载本轮未执行。
 
-ZIP SHA-256 为 `60565831db01ad27200d8b988bdf8399a3d4d651f5b08d3b5703b8af95146d26`，校验文件 SHA-256 为 `073ba00c9ef42b314d72b74449379ddc2cffac49f6c34a181578754f6e6cb3ac`。正式包保留于 release/0.18.16，验证凭据位于忽略的 artifacts/release-readiness-01816-20261124。远程发行和临时副本清理按实际完成结果补齐。
+发行提交为 `1817fe71e7322b683b4e8dbdf2297e43c8c8dc71`，main 与 v0.18.16 标签均已推送。[GitHub 正式发行](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.16) 为 Latest，非草稿、非预发行。ZIP 和 105 字节校验文件重新下载后，大小、SHA-256、GitHub asset digest 及 ZIP 内 38 文件全部匹配本地包。
+
+ZIP SHA-256 为 `60565831db01ad27200d8b988bdf8399a3d4d651f5b08d3b5703b8af95146d26`，校验文件 SHA-256 为 `073ba00c9ef42b314d72b74449379ddc2cffac49f6c34a181578754f6e6cb3ac`。正式包保留于 release/0.18.16，验证凭据位于忽略的 artifacts/release-readiness-01816-20261124。本轮 32 个临时目录、714 个文件及调试日志已清理，共享依赖与任务前目录保留；辅助脚本和无用诊断已撤下，详见 [清理记录](CLEANUP.md)。
 
 ## v0.18.15 发行验证（2026-11-24）
 
