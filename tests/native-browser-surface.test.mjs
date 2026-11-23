@@ -14,10 +14,14 @@ const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-
 const source = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="24"><path fill="#47789b" d="M0 0h32v24H0z"/></svg>');
 const variables = `:root.forge-ink-mountain{--forge-scene-count:1;--forge-battle-scenes:0;--forge-scenery-scenes:0;--forge-bg-0:url("${source}");}`;
 const expression = makeApplyExpression({ styleSheet: theme, variables });
+const absoluteRightHeader = '[data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"][class~="absolute"]';
+const standaloneRightRow = '[data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]):not([data-app-shell-titlebar] *)';
+const headerMaterialRule = rule => rule.selector.includes(absoluteRightHeader) && rule.selector.includes(standaloneRightRow) &&
+  rule.nodes.some(node => node.prop === 'background-color' && node.value === 'var(--color-surface, Canvas)');
 const legacySheet = postcss.parse(theme);
 let removedHeaderRules = 0;
 legacySheet.walkRules(rule => {
-  if (rule.selector.includes('[data-app-shell-tab-row]') && rule.selector.includes('[data-app-shell-tab-strip-controller="right"]')) {
+  if (headerMaterialRule(rule)) {
     rule.remove(); removedHeaderRules++;
   }
 });
@@ -26,8 +30,7 @@ const legacyTheme = legacySheet.toString();
 const rowOnlySheet = postcss.parse(theme);
 let restoredRowOnlyRules = 0;
 rowOnlySheet.walkRules(rule => {
-  if (rule.selector.includes('[data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"]') &&
-    rule.selector.includes('[data-app-shell-tab-row]') && rule.selector.includes('[data-app-shell-tab-strip-controller="right"]')) {
+  if (headerMaterialRule(rule)) {
     rule.selector = ':root.forge-ink-mountain #root [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])';
     restoredRowOnlyRules++;
   }
@@ -38,8 +41,8 @@ const missingEndSheet = postcss.parse(theme), wholeEndGridSheet = postcss.parse(
 let missingEndRules = 0, wholeEndGridRules = 0;
 missingEndSheet.walkRules(rule => {
   if (!rule.selector.includes('[data-app-shell-header-slot="end"]') || !rule.selector.includes('[data-app-shell-workspace-layout-toggle="right-panel"]')) return;
-  assert.ok(rule.selector.includes('[data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"]') && rule.selector.includes('[data-app-shell-tab-row]'));
-  rule.selector = ':root.forge-ink-mountain #root :is([data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"], [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]))';
+  assert.ok(headerMaterialRule(rule));
+  rule.selector = `:root.forge-ink-mountain #root :is(${absoluteRightHeader}, ${standaloneRightRow})`;
   missingEndRules++;
 });
 wholeEndGridSheet.walkRules(rule => {
@@ -73,13 +76,13 @@ test('current native browser separates new-tab paint, transparent toolbar and it
   // runs no app code and does not freeze compiled module IDs or chunk hashes.
 });
 
-const geometry = page => page.locator('#main,#paint,#native-tabstrip,#right-header-slot,#right-header-track,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#tabs-body,#browser-panel,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
+const geometry = page => page.locator('#main,#paint,#native-tabstrip,#right-header-slot,#right-header-track,#native-header-divider,#right-pane-clip,#right-pane-surface,#right-pane-content,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#tabs-body,#browser-panel,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-content,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
   const s = getComputedStyle(element), r = element.getBoundingClientRect();
   return { id: element.id, rect: [r.x, r.y, r.width, r.height], radius: s.borderRadius, corner: s.cornerShape,
     border: s.borderWidth, padding: s.padding, margin: s.margin, position: s.position, overflow: s.overflow,
     font: s.font, opacity: s.opacity, disabled: element.disabled, tabIndex: element.tabIndex };
 }));
-const nativePaint = page => page.locator('html,body,#root,#layout,#main,#native-tabstrip,#right-header-slot,#right-header-track,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#workspace-content,#tabs-body,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
+const nativePaint = page => page.locator('html,body,#root,#layout,#main,#native-tabstrip,#right-header-slot,#right-header-track,#native-header-divider,#right-pane-clip,#right-pane-surface,#right-pane-content,#right-header-portal,#right-header-actions,#left-header-slot,#left-header-action,#full-toggle,#split-toggle,#right-tabstrip,#left-tabstrip,#workspace-content,#tabs-body,#toolbar-carrier,#toolbar,#back,#address,#reload,#new-tab,#new-tab-content,#new-tab-input,#new-tab-action,#nested-card,#right-header-clip,#registered-end-slot,#registered-end-measure,#registered-end-padding,#registered-slot-content,#registered-entry,#registered-action-root,#registered-action-group,#guest').evaluateAll(elements => elements.map(element => {
   const s = getComputedStyle(element), before = getComputedStyle(element, '::before'); return { id: element.id || element.tagName, background: s.backgroundColor,
     image: s.backgroundImage, shadow: s.boxShadow, blur: s.backdropFilter, color: s.color, opacity: s.opacity,
     borderColor: s.borderColor, clip: s.clipPath, before: { display: before.display, background: before.backgroundColor, image: before.backgroundImage, zIndex: before.zIndex } };
@@ -133,13 +136,6 @@ test('full workspace restores native paint while split reuses the same decoded t
         assert.deepEqual(await geometry(page), full, mode+'/'+width+': full native geometry');
         assert.deepEqual(await nativePaint(page), fullPaint, mode+'/'+width+': every sampled native paint/ink/filter is restored');
         const actualFull = await page.screenshot();
-        if (width === 1280 && process.env.WUKONG_BROWSER_PREVIEW_DIRECTORY) {
-          fs.mkdirSync(process.env.WUKONG_BROWSER_PREVIEW_DIRECTORY, { recursive: true });
-          const main = await page.locator('#main').boundingBox();
-          const preview = await page.screenshot({ clip: { x: main.x, y: main.y, width: main.width, height: Math.min(550, main.height) } });
-          fs.writeFileSync(path.join(process.env.WUKONG_BROWSER_PREVIEW_DIRECTORY,
-            `${mode}-native-full-view-fixture-20261122.png`), preview);
-        }
         for (const [x,y] of [[16,80],[100,80],[16,300],[100,300]]) assert.deepEqual(pixel(actualFull,x,y),pixel(nativeFull,x,y),'Full view has native paint across the former rail edge and tab strip');
         assert.deepEqual(pixel(actualFull,width-20,740),[15,180,117],'The separate guest document keeps its native paint');
         assert.equal(await page.evaluate(ACTIVE_PROBE_EXPRESSION),true,'Suspension remains a healthy installed runtime, preventing polling reinjection');
@@ -277,7 +273,8 @@ test('right-panel toggle overrides retained layout markers and the right tab hea
         await active(page);
         assert.deepEqual(await geometry(page), before, 'Giving the right header native paint must not change any native/control geometry');
         let paints = await nativePaint(page);
-        assert.equal(paints.find(item => item.id === 'right-tabstrip').background, nativeColor);
+        assert.equal(paints.find(item => item.id === 'right-header-slot').background, nativeColor);
+        assert.equal(paints.find(item => item.id === 'right-tabstrip').background, leftPaint.background, 'The portalled row keeps its native transparent paint over the outer header');
         assert.deepEqual(paints.find(item => item.id === 'left-tabstrip'), leftPaint, 'The left chat header remains outside the right-controller mapping');
         const row = await page.locator('#right-tabstrip').boundingBox();
         assert.deepEqual(pixel(await page.screenshot(), row.x + row.width - 6, row.y + row.height / 2), color,
@@ -540,12 +537,6 @@ test('registered end-slot paints its complete 81px carrier beyond the content cl
             const nativeFrameEdge = x >= frameEdge.right - frameEdge.width;
             assert.deepEqual(pixel(actual, x, y), layout === 'full' || nativeFrameEdge ? pixel(baseline, x, y) : rgb, `${label}: continuous native endcap column ${x - carrier.x}`);
           }
-          if (width === 1280 && layout === 'split' && !remounted && process.env.WUKONG_HEADER_PREVIEW_DIRECTORY) {
-            fs.mkdirSync(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY, { recursive: true });
-            const clip = await page.locator('#right-header-slot').boundingBox();
-            fs.writeFileSync(path.join(process.env.WUKONG_HEADER_PREVIEW_DIRECTORY,
-              `${mode}-tab-header-endcap-fixture-20261122.png`), await page.screenshot({ clip }));
-          }
           const tab = await page.locator('#right-tabstrip button[role="tab"]').boundingBox();
           assert.ok(contrastPixels(actual, tab, rgb) > 5, `${label}: native tab text remains visibly painted below the end-grid layer`);
           if (layout === 'split') {
@@ -606,6 +597,138 @@ test('non-measured native end slots paint the live carrier while preserving thei
         await page.locator('#split-toggle').click(); await active(page);
         assert.deepEqual(await geometry(page), before);
         assert.equal(await page.evaluate(() => fixtureClicks), 2);
+      } finally { await page.close(); }
+    }
+  } finally { await browser.close(); }
+});
+
+test('native inset titlebars align right-pane paint without moving launcher content or controls', async () => {
+  const native = loadBrowserSurfaceNative(), sampled = postcss.parse(theme); let removed = 0;
+  sampled.walkRules(rule => {
+    if (rule.selector.includes('[data-app-shell-titlebar][class~="me-1"]') && !rule.selector.includes('[data-app-shell-titlebar-divider=') &&
+        rule.nodes.some(node => ['background-image', 'background-position'].includes(node.prop))) {
+      rule.remove(); removed++;
+    }
+  });
+  assert.equal(removed, 4, 'The misaligned control removes only the logical header-fill offset and clipped end-strip rules');
+  const unshifted = postcss.parse(theme); let dividerRules = 0;
+  unshifted.walkRules(rule => {
+    if (rule.selector.includes('[data-app-shell-titlebar-divider="pane"]') && rule.nodes.some(node => node.prop === 'translate')) {
+      rule.remove(); dividerRules++;
+    }
+  });
+  assert.equal(dividerRules, 2, 'The divider control removes only the two directional empty-pane-divider offsets');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const mode of ['dark', 'light']) for (const direction of ['ltr', 'rtl']) for (const launcher of [false, true]) {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 760 }, colorScheme: mode });
+      try {
+        await page.setContent(browserSurfaceFixture(native, { mode, direction, launcher, nativeHeaderInset: true, headerHeight: 46, registeredEndSlot: true }));
+        assert.equal(await page.locator('#toolbar-carrier').count(), launcher ? 0 : 1, 'Launcher search omits the native navigation row while the browser branch retains it');
+        const before = await geometry(page), left = (await nativePaint(page)).filter(node => node.id.startsWith('left-'));
+        const dividerMaterial = () => page.locator('#native-header-divider').evaluate(node => {
+          const s = getComputedStyle(node), pseudo = type => { const p = getComputedStyle(node, type); return [p.content, p.backgroundColor, p.backgroundImage, p.boxShadow, p.pointerEvents]; };
+          return { paint: [s.backgroundColor, s.backgroundImage, s.boxShadow, s.borderColor, s.color], width: s.width, height: s.height,
+            outline: s.outline, pointer: s.pointerEvents, before: pseudo('::before'), after: pseudo('::after') };
+        });
+        const nativeDivider = await dividerMaterial();
+        const points = await page.evaluate(() => {
+          const header = document.getElementById('right-header-slot').getBoundingClientRect();
+          const pane = document.getElementById('right-panel').getBoundingClientRect(), main = document.getElementById('main').getBoundingClientRect();
+          const body = document.getElementById('right-pane-surface'), border = getComputedStyle(body), bodyBox = body.getBoundingClientRect();
+          const titlebar = document.getElementById('native-tabstrip'), inset = parseFloat(getComputedStyle(titlebar).marginInlineEnd);
+          const rtl = document.documentElement.dir === 'rtl', y = header.bottom - 6;
+          return { inset, header: [header.x, header.y, header.width, header.height], pane: [pane.x, pane.y, pane.width, pane.height],
+            start: [rtl ? header.right - inset / 2 : header.left + inset / 2, y],
+            aligned: [rtl ? pane.right - inset - 1 : pane.left + inset + 1, y],
+            end: [rtl ? main.left + inset / 2 : main.right - inset / 2, y],
+            borderWidth: parseFloat(rtl ? border.borderRightWidth : border.borderLeftWidth),
+            lineX: rtl ? bodyBox.right - parseFloat(border.borderRightWidth) / 2 : bodyBox.left + parseFloat(border.borderLeftWidth) / 2,
+            lineY: y, bodyY: bodyBox.top + 32, paneEdge: rtl ? bodyBox.right : bodyBox.left };
+        });
+        assert.equal(points.inset, 4, 'Native me-1 input matches the measured 4px titlebar end gutter');
+        assert.equal(points.header[2], points.pane[2], 'The titlebar keeps the pane width while retaining its native shifted origin');
+        assert.equal(direction === 'ltr' ? points.pane[0] - points.header[0] : points.header[0] - points.pane[0], points.inset);
+        assert.equal(points.header[1] + points.header[3], points.pane[1], 'The pane begins immediately below the native 46px header');
+        assert.ok(points.borderWidth > 0, 'The real pane surface retains its native border edge');
+        const expectedGeometry = structuredClone(before), dividerGeometry = expectedGeometry.find(node => node.id === 'native-header-divider');
+        assert.ok(dividerGeometry);
+        dividerGeometry.rect[0] += direction === 'rtl' ? -points.inset : points.inset;
+        const surface = await page.locator('#new-tab').evaluate(node => getComputedStyle(node).backgroundColor);
+        const rgb = await page.evaluate(value => {
+          const canvas = document.createElement('canvas'), context = canvas.getContext('2d'); canvas.width = canvas.height = 1;
+          context.fillStyle = value; context.fillRect(0, 0, 1, 1); return [...context.getImageData(0, 0, 1, 1).data].slice(0, 3);
+        }, surface);
+        await page.evaluate(() => fixtureLayout('full'));
+        const fullGeometry = await geometry(page), fullPaint = await nativePaint(page);
+        await page.evaluate(() => fixtureLayout('split'));
+        await page.evaluate(expression); await active(page);
+        assert.deepEqual(await geometry(page), expectedGeometry, 'Only the empty pane decoration shifts; every native input, border carrier and control stays fixed');
+        assert.deepEqual(await dividerMaterial(), nativeDivider, 'The native divider retains its colour, width, outline, pseudos and pointer boundary');
+        const verifyPixels = async () => {
+          const image = await page.screenshot();
+          assert.notDeepEqual(pixel(image, ...points.start), rgb, 'The logical start gutter keeps the adjacent chat material');
+          assert.deepEqual(pixel(image, ...points.aligned), rgb, 'The header fill begins on the actual pane boundary');
+          assert.deepEqual(pixel(image, ...points.end), rgb, 'The clipped logical end gutter continues the native pane fill');
+          const divider = await page.locator('#native-header-divider').boundingBox();
+          assert.equal(direction === 'rtl' ? divider.x + divider.width : divider.x, points.paneEdge, 'The actual header line meets the body border at the same physical edge');
+          assert.notDeepEqual(pixel(image, points.lineX, points.lineY), rgb, 'A real header divider stroke is visible on the aligned body edge');
+          assert.notDeepEqual(pixel(image, points.lineX, points.bodyY), pixel(image, points.lineX + (direction === 'rtl' ? 2 : -2), points.bodyY), 'The native body border remains visibly distinct from the adjacent chat material');
+        };
+        await verifyPixels();
+        if (launcher && direction === 'ltr' && process.env.WUKONG_TAB_ALIGNMENT_PREVIEW_DIRECTORY) {
+          const box = await page.locator('#main').boundingBox();
+          await page.evaluate(box => {
+            const caption = document.createElement('div'); caption.id = 'fixture-preview-caption';
+            caption.textContent = '原生组件夹具 · 新标签页顶部与页面边界对齐';
+            caption.style.cssText = `position:fixed;left:${box.x + 12}px;top:${box.y + 58}px;z-index:100;padding:4px 8px;font:12px/1.5 system-ui;color:CanvasText;background:Canvas;border-radius:4px`;
+            document.body.append(caption);
+          }, box);
+          fs.mkdirSync(process.env.WUKONG_TAB_ALIGNMENT_PREVIEW_DIRECTORY, { recursive: true });
+          await page.screenshot({ path: path.join(process.env.WUKONG_TAB_ALIGNMENT_PREVIEW_DIRECTORY,
+            `${mode}-native-pane-alignment-fixture-20261124.png`), clip: { ...box, height: Math.min(420, box.height) } });
+          await page.locator('#fixture-preview-caption').evaluate(node => node.remove());
+        }
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: sampled.toString(), variables }));
+        const misaligned = await page.screenshot();
+        assert.deepEqual(pixel(misaligned, ...points.start), rgb, 'The previous solid owner reproduces the extra 4px at the start');
+        assert.notDeepEqual(pixel(misaligned, ...points.end), rgb, 'The previous owner leaves the matching native end gutter unpainted');
+        assert.deepEqual(await geometry(page), expectedGeometry);
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: theme, variables }));
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: unshifted.toString(), variables }));
+        const wrongLine = await page.screenshot();
+        assert.deepEqual(pixel(wrongLine, points.lineX, points.lineY), rgb, 'The unshifted real divider leaves no header stroke on the body edge despite correct background fill');
+        assert.deepEqual(await geometry(page), before, 'The unshifted divider control retains all original native geometry');
+        await page.evaluate(makeStyleUpdateExpression({ styleSheet: theme, variables }));
+        await page.evaluate(() => {
+          const old = document.getElementById('right-header-portal'), next = old.cloneNode(false);
+          old.before(next); next.append(document.getElementById('shared-titlebar-content')); old.remove();
+        });
+        await verifyPixels();
+        assert.deepEqual(await geometry(page), expectedGeometry, 'Portal remount leaves controls and launcher content in their native positions');
+        assert.deepEqual((await nativePaint(page)).filter(node => node.id.startsWith('left-')), left);
+        for (const state of ['invisible', 'aria-hidden', 'inert', 'closed', 'inactive']) {
+          await page.evaluate(state => {
+            const header = document.getElementById('right-header-slot');
+            if (state === 'invisible') header.classList.add('invisible');
+            if (state === 'aria-hidden') header.setAttribute('aria-hidden', 'true');
+            if (state === 'inert') header.inert = true;
+            if (state === 'closed') document.getElementById('workspace').dataset.appShellUnifiedTabStrip = 'false';
+            if (state === 'inactive') document.getElementById('active-page').dataset.appShellActivePage = 'false';
+          }, state);
+          assert.equal(await page.locator('#main').evaluate(node => getComputedStyle(node).backgroundImage), 'none', `${state}: retained panel nodes cannot activate the end strip`);
+          await page.evaluate(() => {
+            const header = document.getElementById('right-header-slot'); header.classList.remove('invisible');
+            header.removeAttribute('aria-hidden'); header.inert = false;
+            document.getElementById('workspace').dataset.appShellUnifiedTabStrip = 'true';
+            document.getElementById('active-page').dataset.appShellActivePage = 'true';
+          });
+        }
+        await page.evaluate(() => fixtureLayout('full')); await suspended(page);
+        assert.deepEqual(await geometry(page), fullGeometry);
+        assert.deepEqual(await nativePaint(page), fullPaint, 'Complete view retains its native header and pane paint');
+        await page.evaluate(() => fixtureLayout('split')); await active(page);
+        await verifyPixels(); assert.deepEqual(await geometry(page), expectedGeometry);
       } finally { await page.close(); }
     }
   } finally { await browser.close(); }

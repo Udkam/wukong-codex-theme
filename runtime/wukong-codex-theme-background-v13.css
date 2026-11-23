@@ -76,18 +76,37 @@
   --forge-conversation-visible-high: clamp(0, calc(var(--forge-conversation-image-high) * var(--forge-scene-brightness, 1)), 1);
 }
 
-/* The portalled tab content is clipped around the registered end actions.
- * Paint both native header owners, including their gaps and full-height padding;
- * retain a row fallback for non-portalled tabs. Native geometry stays intact.
+/* The portalled header has one absolute paint owner, separate from its controls.
+ * The registered end actions retain their own padding carrier; only tabs outside
+ * the titlebar need the row fallback. Native geometry stays intact.
  */
-:root.forge-ink-mountain #root :is(
-  [data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"],
+:root.forge-ink-mountain #root :where(
+  [data-app-shell-titlebar] [data-app-shell-focus-area="right-panel"][class~="absolute"],
   [data-app-shell-titlebar] [data-app-shell-header-slot="end"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .col-span-full.row-start-1.h-full.min-w-max,
   [data-app-shell-titlebar] [data-app-shell-header-slot="end"]:has([data-app-shell-workspace-layout-toggle="right-panel"]) > .pointer-events-none.relative.col-start-1.row-start-1.h-full.w-full.min-w-0,
-  [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"])
+  [data-app-shell-tab-row]:has([data-app-shell-tab-strip-controller="right"]):not([data-app-shell-titlebar] *)
 ) {
   background-color: var(--color-surface, Canvas) !important;
   background-image: none !important;
+}
+/* The Windows application-menu titlebar ends one native spacing unit before
+ * its content pane. Keep that control layout: offset only the header fill's
+ * start, then paint the clipped end gutter on the underlying main surface. */
+:root.forge-ink-mountain #root [data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"] {
+  background-color: transparent !important;
+  background-image: linear-gradient(to right, transparent var(--spacing), var(--color-surface, Canvas) var(--spacing)) !important;
+}
+:root.forge-ink-mountain:dir(rtl) #root [data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"] {
+  background-image: linear-gradient(to left, transparent var(--spacing), var(--color-surface, Canvas) var(--spacing)) !important;
+}
+/* The native empty divider is decorative, unlike the separate panel resizer.
+ * Shift its paint with the same gutter without changing native line colour,
+ * pixel snapping, tab controls or the resize target. */
+:root.forge-ink-mountain #root [data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"] [data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"]:not(.invisible):not([aria-hidden="true"]):not([inert]) > .absolute.inset-y-0 > [data-app-shell-titlebar-divider="pane"][aria-hidden="true"].pointer-events-none:empty {
+  translate: var(--spacing) 0 !important;
+}
+:root.forge-ink-mountain:dir(rtl) #root [data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"] [data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"]:not(.invisible):not([aria-hidden="true"]):not([inert]) > .absolute.inset-y-0 > [data-app-shell-titlebar-divider="pane"][aria-hidden="true"].pointer-events-none:empty {
+  translate: calc(-1 * var(--spacing)) 0 !important;
 }
 /* Transparent layout carriers. Native controls beneath them keep their own paint. */
 :root.forge-ink-mountain[data-forge-background-ready="true"] #root :is(
@@ -642,12 +661,23 @@
   box-shadow: 0 1px 0 rgba(255,255,255,.12) inset !important;
 }
 :root.forge-ink-mountain :is([data-composer-rail-item], [data-composer-utility-rail]):is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
-  backdrop-filter: var(--forge-glass-filter) !important;
-  -webkit-backdrop-filter: var(--forge-glass-filter) !important;
+  /* Status and project strips keep their material without sampling animated
+   * neighbours. Native clipping, corners and separators remain authoritative. */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
-/* Project controls keep their material without sampling neighbouring animated
- * layers. Their native attached overlap, clipping and highlight stay intact. */
-:root.forge-ink-mountain [data-composer-utility-rail]:is([class^="bg-"], [class*=" bg-"]):not([class~="bg-transparent"]) {
+/* Embedded items are transparent. Their actual material is the frame's
+ * independent background slot, alongside the native floating content slot.
+ * Stop that slot sampling only while it carries a status rail; transport
+ * positioning and optional drag/obstacle hooks do not determine ownership. */
+:root.forge-ink-mountain section:is([class^="floatingSurface-"], [class*=" floatingSurface-"]):has(> div > [data-floating-chat-surface] [data-composer-rail-item]) > div > :is([class^="floatingSurface-"], [class*=" floatingSurface-"]):is([class~="bg-surface-elevated-secondary"], [class~="bg-surface-canvas"]) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* The compact minimized preview has its own notice surface outside the
+ * composer slot. Keep working-text sweeps out of that sampling surface too;
+ * ordinary ready notices retain their independent material. */
+:root.forge-ink-mountain [data-pip-obstacle="quick-chat"] > :is([class^="floatingSurface-"], [class*=" floatingSurface-"])[class~="bg-surface-elevated-secondary"]:has([role="status"] :is([class^="workingTextShimmer-"], [class*=" workingTextShimmer-"])) {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -702,6 +732,19 @@
 :root.forge-ink-mountain[data-forge-background-ready="true"] [data-app-shell-main-surface] [aria-hidden="true"].pointer-events-none:empty[class*="bg-[image:var(--app-shell-content-fade,"],
 :root.forge-ink-mountain[data-forge-background-ready="true"] header[data-viewer-content-fade] > [aria-hidden="true"].pointer-events-none:empty[class*="bg-[image:var(--app-shell-content-fade,"] {
   background-image: none !important;
+}
+
+/* unified=true plus a visible right header is the native open split branch.
+ * Scope both owners to that active workspace, including retained zero-width
+ * asides. This strip fills only the titlebar's clipped logical end gutter. */
+:root.forge-ink-mountain[data-forge-background-ready="true"] #root [data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"]:has([data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"]:not(.invisible):not([aria-hidden="true"]):not([inert])) [data-app-shell-main-surface]:has(aside[data-app-shell-focus-area="right-panel"]) {
+  background-image: linear-gradient(var(--color-surface, Canvas), var(--color-surface, Canvas)) !important;
+  background-size: var(--spacing) var(--app-shell-header-height, var(--height-toolbar)) !important;
+  background-position: right top !important;
+  background-repeat: no-repeat !important;
+}
+:root.forge-ink-mountain[data-forge-background-ready="true"]:dir(rtl) #root [data-app-shell-active-page="true"] [data-app-shell-unified-tab-strip="true"]:has([data-app-shell-titlebar][class~="me-1"] [data-app-shell-focus-area="right-panel"][class~="absolute"]:not(.invisible):not([aria-hidden="true"]):not([inert])) [data-app-shell-main-surface]:has(aside[data-app-shell-focus-area="right-panel"]) {
+  background-position: left top !important;
 }
 
 :root.forge-ink-mountain body {

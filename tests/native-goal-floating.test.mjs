@@ -9,10 +9,10 @@ import { loadQuotaNative, quotaNativeSkip, quotaHtml, key, text, prop, nodes } f
 
 const theme = fs.readFileSync(new URL('../runtime/wukong-codex-theme-background-v13.css', import.meta.url), 'utf8');
 const element = (tag, props) => ({ tag, props });
-const frameSlots = frame => {
+const frameSlots = (frame, transportClass = 'contents') => {
   const content = frame.props.children;
   assert.equal(content?.tag, 'div', 'Native floating section must retain its content transport wrapper');
-  assert.equal(content.props.className, 'contents', 'The resting native content wrapper must not add paint or geometry');
+  assert.equal(content.props.className, transportClass, 'The floating content wrapper retains the selected native transport branch');
   assert.equal(content.props.children.length, 4, 'Native floating content must retain background, resize, minimized and composer slots');
   return content.props.children;
 };
@@ -77,9 +77,51 @@ const loadGoalNative = () => {
   const frameClass = frame.nodes.map(text).find(value => /^frame-\S+$/.test(value));
   assert.ok(frameClass, 'Native floating frame CSS module changed');
   const renderFrame = harness.compile(frame);
+  const status = nativeFunction(frame.record, 'relative flex shrink-0 select-none');
+  const statusImports = bundle.imports(frame.record);
+  const statusGate = status.nodes.find(node => node.type === 'CallExpression' && key(member(node)?.property) === 'Zj');
+  const localizer = status.nodes.find(node => node.type === 'CallExpression' && key(member(node)?.property) === 'A' && node.arguments.length === 0);
+  const statusButton = status.nodes.find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'focusRing')) === 'inset');
+  const dismiss = status.nodes.find(node => node.type === 'CallExpression' && key(node.arguments[0]?.property) === 'Gmf');
+  assert.ok(statusGate && localizer && statusButton && dismiss, 'Native compact response-preview controls changed');
+  const iconRecord = bundle.module(statusImports[dismiss.arguments[0].object.name].id);
+  const iconAlias = bundle.exports(iconRecord)[key(dismiss.arguments[0].property)];
+  const iconFactory = ownNodes(iconRecord.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === iconAlias.name)?.init;
+  const presetRef = iconFactory?.arguments[0], presetRecord = bundle.module(bundle.imports(iconRecord)[presetRef.object.name].id);
+  const presetAlias = bundle.exports(presetRecord)[key(presetRef.property)];
+  const presetCall = ownNodes(presetRecord.ast).find(node => node.type === 'VariableDeclarator' && node.id.name === presetAlias.name)?.init;
+  const presetObject = presetCall.arguments[0];
+  const preset = { canvas: nativeObject(presetRecord, prop(presetObject, 'canvas')),
+    paint: nativeObject(presetRecord, prop(presetObject, 'paint')), body: text(prop(presetObject, 'body')) };
+  assert.equal(preset.paint.kind, 'monochrome');
+  const dismissPath = preset.body.match(/^<path d="([^"]+)"/);
+  assert.ok(dismissPath, 'Native dismiss icon keeps its single path');
+  const renderStatus = harness.compile(status, {
+    [member(statusGate).object.name]: { [key(member(statusGate).property)]: () => true },
+    [member(localizer).object.name]: { A: () => ({ formatMessage: message => message.defaultMessage }) },
+    [statusButton.arguments[0].object.name]: { [key(statusButton.arguments[0].property)]: native.renderButton },
+    [dismiss.arguments[0].object.name]: { [key(dismiss.arguments[0].property)]: props => element('svg', {
+      ...props, width: preset.canvas.width, height: preset.canvas.height, viewBox: preset.canvas.viewBox,
+      children: element('path', { d: dismissPath[1], fill: 'currentColor' })
+    }) }
+  });
+  const workingRecords = bundle.findModules('workingTextShimmer-');
+  assert.equal(workingRecords.length, 1, 'Native working preview presentation changed');
+  const workingRecord = workingRecords[0], working = nativeFunction(workingRecord, 'truncate text-sm font-semibold text-default');
+  const workingClass = ownNodes(workingRecord.ast).find(node => node.type === 'VariableDeclarator' && text(node.init)?.startsWith('workingTextShimmer-'));
+  const workingGate = working.nodes.find(node => node.type === 'CallExpression' && key(member(node)?.property) === 'Zj');
+  const sweepCall = working.nodes.find(node => node.type === 'CallExpression' && prop(node.arguments[1], 'className') && key(node.arguments[0]?.property) === 'N');
+  const sweepRecord = bundle.module(bundle.imports(workingRecord)[sweepCall.arguments[0].object.name].id);
+  const sweep = nativeFunction(sweepRecord, 'useLayoutEffect');
+  assert.ok(workingClass && workingGate && sweep.nodes.some(node => text(node) === 'relative inline-block align-top'));
+  const renderWorking = harness.compile(working, {
+    [workingClass.id.name]: text(workingClass.init),
+    [member(workingGate).object.name]: { [key(member(workingGate).property)]: () => true },
+    [sweepCall.arguments[0].object.name]: { [key(sweepCall.arguments[0].property)]: harness.compile(sweep) }
+  });
   cached = { ...native, item, rail, backgrounds, railClasses, floating, floatingClasses, frame, source: frameRecords[0].source,
-    css: `${native.css}\n${bundle.css(floatingClasses.floatingSurface)}\n${bundle.css(frameClass)}\n${bundle.css(railClasses.item)}`,
-    renderItem, renderRail: registry, renderFloating: harness.load(floatingRecord[0].id).kW, renderFrame };
+    css: `${native.css}\n${bundle.css(floatingClasses.floatingSurface)}\n${bundle.css(frameClass)}\n${bundle.css(railClasses.item)}\n${bundle.css(text(workingClass.init))}\n${bundle.css('cadencedShimmer')}`,
+    renderItem, renderRail: registry, renderFloating: harness.load(floatingRecord[0].id).kW, renderFrame, status, renderStatus, renderWorking };
   return cached;
 };
 
@@ -115,6 +157,40 @@ test('native embedded goal rows have no background owner while independent defau
   assert.equal(frame.tag, 'section');
   assert.ok(!/(?:^|\s)bg-/.test(frame.props.className), 'The drag frame must remain unpainted');
   assert.match(frameSlots(frame)[0].props.className, /(?:^|\s)bg-surface-elevated-secondary(?:\s|$)/);
+  const surfaceCalls = nodes(native.frame.record.ast).filter(node => node.type === 'CallExpression' && prop(node.arguments[1], 'data-floating-chat-surface'));
+  assert.equal(surfaceCalls.length, 1, 'The real floating caller retains one semantic content surface');
+  const surfaceCall = surfaceCalls[0], caller = nativeFunction(native.frame.record, surfaceCall.start);
+  const composerProp = caller.nodes.find(node => node.type === 'ObjectPattern' && node.properties.some(property => key(property.key) === 'renderComposer'));
+  const composerBinding = composerProp?.properties.find(property => key(property.key) === 'renderComposer')?.value;
+  assert.equal(composerBinding?.type, 'Identifier', 'The real floating caller retains its renderComposer callback');
+  const composerCalls = caller.nodes.filter(node => node.type === 'CallExpression' && node.callee?.name === composerBinding.name);
+  assert.equal(composerCalls.length, 1, 'The real composer callback still produces the floating composer content');
+  const frameCalls = caller.nodes.filter(node => node.type === 'CallExpression' && node.arguments[0]?.name === native.frame.ast.id.name && prop(node.arguments[1], 'children'));
+  assert.equal(frameCalls.length, 1, 'The semantic floating surface still belongs to the real native frame');
+  const bindings = new Map();
+  for (const node of caller.nodes) {
+    const name = node.type === 'AssignmentExpression' && node.left.type === 'Identifier' ? node.left.name
+      : node.type === 'VariableDeclarator' && node.id.type === 'Identifier' ? node.id.name : null;
+    if (name) bindings.set(name, [...(bindings.get(name) || []), node.right || node.init]);
+  }
+  // Follow the actual JSX children through native memo-cache bindings. A
+  // hand-authored fixture hook alone cannot satisfy this caller relationship.
+  const reaches = (root, target, seen = new Set()) => ownNodes(root).some(node => {
+    if (node === target) return true;
+    if (node.type !== 'Identifier' || seen.has(node.name)) return false;
+    seen.add(node.name);
+    return (bindings.get(node.name) || []).some(value => reaches(value, target, seen));
+  });
+  assert.ok(reaches(prop(frameCalls[0].arguments[1], 'children'), surfaceCall), 'The native frame contains its semantic floating content surface');
+  assert.ok(reaches(prop(surfaceCall.arguments[1], 'children'), composerCalls[0]), 'The semantic floating surface contains the actual composer callback output');
+  const previewCalls = caller.nodes.filter(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'data-pip-obstacle')) === 'quick-chat');
+  assert.equal(previewCalls.length, 1, 'The native response-preview slot retains its own quick-chat obstacle marker');
+  const noticeCalls = nodes(prop(previewCalls[0].arguments[1], 'children')).filter(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'variant')) === 'notice');
+  assert.equal(noticeCalls.length, 1, 'The compact response-preview slot retains its direct notice carrier');
+  const workingStatus = caller.nodes.find(node => node.type === 'CallExpression' && node.arguments[0]?.name === native.status.ast.id.name && prop(node.arguments[1], 'isWorking'));
+  assert.ok(workingStatus && prop(workingStatus.arguments[1], 'workingContent'), 'The actual working preview retains its status renderer and working content');
+  assert.ok(reaches(prop(noticeCalls[0].arguments[1], 'children'), workingStatus), 'The compact notice carrier contains the real working status presentation');
+  assert.ok(reaches(prop(frameCalls[0].arguments[1], 'children'), previewCalls[0]), 'The response preview remains in the real frame slot');
 });
 
 const legacyRailPaint = current => {
@@ -124,13 +200,9 @@ const legacyRailPaint = current => {
     if (rule.selector.includes('[data-composer-rail-item]') && rule.nodes.some(node => node.prop === 'background-color')) {
       rule.selector = ':root.forge-ink-mountain :is(.forge-composer-panel[class*="bg-"], [data-composer-rail-item])';
       restored++;
-    } else if (rule.selector.includes('[data-composer-rail-item]') && rule.selector.includes('[data-composer-utility-rail]') &&
-        rule.nodes.some(node => node.prop === 'backdrop-filter')) {
-      rule.selector = ':root.forge-ink-mountain .forge-composer-panel[class*="bg-"]';
-      restored++;
     }
   });
-  assert.equal(restored, 2, 'The negative control must restore both original rail paint selectors');
+  assert.equal(restored, 1, 'The negative control restores only the former broad rail fill selector');
   return sheet.toString();
 };
 
@@ -151,10 +223,11 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
           children: native.renderComposerBody({ layout, children: [element('input', { id: 'message', 'aria-label': 'Fixture message', value: 'Draft' }), button('send', '发送')] }) });
         const content = element('div', { 'data-floating-chat-surface': true, className: 'relative z-0 flex min-h-0 flex-1 flex-col',
           children: element('div', { 'data-codex-composer-root': '', children: [rail, input] }) });
-        const frame = native.renderFrame({ background: 'panel', prefersCompactPresentation: true, keepSurfaceInset: true,
+        const frameOptions = { background: 'panel', prefersCompactPresentation: true, keepSurfaceInset: true,
           isCompact: layout === 'single-line', resizable: false, shouldReduceMotion: true,
           sectionProps: { id: 'frame', 'data-quick-chat-drag-handle': true, 'data-pip-obstacle': 'quick-chat',
-            style: { top: '40px', left: '40px', width: '580px', height: layout === 'single-line' ? '150px' : '230px' } }, children: content });
+            style: { top: '40px', left: '40px', width: '580px', height: layout === 'single-line' ? '150px' : '230px' } }, children: content };
+        const frame = native.renderFrame(frameOptions);
         frameSlots(frame)[0].props.id = 'floating-paint';
         const independent = native.renderItem({ id: 'independent', className: 'forge-composer-panel', children: button('independent-control', '独立目标') }, false);
         const warning = native.renderItem({ id: 'warning', className: 'forge-composer-panel', variant: 'warning', children: 'Native warning' }, false);
@@ -172,6 +245,7 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
           const style = getComputedStyle(node), rect = node.getBoundingClientRect();
           const pseudo = name => { const p = getComputedStyle(node, name); return [p.content, p.backgroundColor, p.backgroundImage, p.borderRadius, p.boxShadow, p.backdropFilter]; };
           return [node.id || `node-${index}`, { rect: [rect.x, rect.y, rect.width, rect.height], geometry: [style.borderRadius, style.cornerShape, style.padding, style.margin, style.borderWidth, style.position, style.overflow, style.font],
+            animation: [style.animationName, style.animationDuration, style.animationTimingFunction, style.transitionProperty, style.transitionDuration, style.transitionTimingFunction],
             paint: [style.backgroundColor, style.backgroundImage, style.boxShadow, style.backdropFilter, style.color], before: pseudo('::before'), after: pseudo('::after'),
             disabled: node.disabled ?? null, tabindex: node.tabIndex, value: node.value ?? null }];
         })));
@@ -190,6 +264,7 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
         for (const id of Object.keys(baseline)) {
           assert.deepEqual(after[id].rect, baseline[id].rect, `${mode}/${layout}: ${id} retains native bounds`);
           assert.deepEqual(after[id].geometry, baseline[id].geometry, `${mode}/${layout}: ${id} retains native geometry`);
+          assert.deepEqual(after[id].animation, baseline[id].animation, `${mode}/${layout}: ${id} retains native animation styling`);
           assert.deepEqual(after[id].before, baseline[id].before, `${mode}/${layout}: ${id} before pseudo stays native`);
           assert.deepEqual(after[id].after, baseline[id].after, `${mode}/${layout}: ${id} after pseudo stays native`);
           for (const field of ['disabled', 'tabindex', 'value']) assert.deepEqual(after[id][field], baseline[id][field]);
@@ -201,9 +276,33 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
         for (const id of ['floating-paint', 'independent', 'warning']) {
           assert.notEqual(after[id].paint[0], 'rgba(0, 0, 0, 0)', `${id} retains readable fill`);
           assert.match(after[id].paint[1], /linear-gradient/);
-          assert.match(after[id].paint[3], /blur\(/);
         }
+        assert.equal(after['floating-paint'].paint[3], 'none', 'The real outer paint owner stops sampling while a contained goal is present');
+        for (const id of ['independent', 'warning']) assert.equal(after[id].paint[3], 'none', `${id} has no background sampling layer`);
         for (const id of ['message', 'send', 'pause-goal', 'expand-goal', 'independent-control']) assert.deepEqual(after[id], baseline[id], `${id} remains a native control`);
+        await page.locator('#frame [data-composer-rail]').evaluate(node => { window.fixtureGoalRail = node; node.remove(); });
+        const withoutGoal = await capture();
+        assert.match(withoutGoal['floating-paint'].paint[3], /blur\(/, 'The same floating surface keeps its normal material when it has no status rail');
+        assert.deepEqual(withoutGoal['floating-paint'].geometry, after['floating-paint'].geometry);
+        await page.locator('#frame [data-codex-composer-root]').evaluate(node => node.prepend(window.fixtureGoalRail));
+        assert.equal((await capture())['floating-paint'].paint[3], 'none', 'Reinserting a goal immediately disables owner sampling');
+        await page.locator('#frame').evaluate(node => { node.removeAttribute('data-quick-chat-drag-handle'); node.removeAttribute('data-pip-obstacle'); });
+        assert.equal((await capture())['floating-paint'].paint[3], 'none', 'Compact frames need no optional drag or obstacle markers');
+        const relativeClass = native.frame.nodes.map(text).find(value => value === 'relative flex h-full min-h-0 w-full shrink-0 flex-col rounded-[inherit]');
+        assert.ok(relativeClass, 'The native contentStyle transport branch changed');
+        const relativeFrame = native.renderFrame({ ...frameOptions, contentStyle: {},
+          sectionProps: { id: 'frame', style: frameOptions.sectionProps.style } });
+        frameSlots(relativeFrame, relativeClass)[0].props.id = 'floating-paint';
+        await page.locator('#frame').evaluate((node, markup) => { node.outerHTML = markup; }, quotaHtml(relativeFrame));
+        await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
+        const relativeBaseline = await capture();
+        await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
+        const relativeAfter = await capture();
+        for (const id of Object.keys(relativeBaseline)) for (const field of ['rect', 'geometry', 'animation', 'before', 'after', 'disabled', 'tabindex', 'value']) {
+          assert.deepEqual(relativeAfter[id][field], relativeBaseline[id][field], `${mode}/${layout}: relative transport preserves ${id} ${field}`);
+        }
+        assert.deepEqual(relativeAfter.goal.paint, relativeBaseline.goal.paint, 'The relative transport still leaves the contained goal transparent');
+        assert.equal(relativeAfter['floating-paint'].paint[3], 'none', 'The native relative transport keeps the same outer status paint owner');
         await page.getByRole('textbox', { name: 'Fixture message' }).fill('Input still works');
         assert.equal(await page.locator('#message').inputValue(), 'Input still works');
         await page.getByRole('button', { name: '暂停目标', exact: true }).click();
@@ -211,6 +310,56 @@ test('body-portal floating goals remain transparent in collapsed/expanded layout
         await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
         const restored = await capture();
         for (const id of ['goal', 'floating-paint', 'independent', 'warning']) assert.deepEqual(restored[id].paint, baseline[id].paint, `${id} restores native material`);
+        const previewSlot = nodes(native.frame.record.ast).find(node => node.type === 'CallExpression' && text(prop(node.arguments[1], 'data-pip-obstacle')) === 'quick-chat');
+        const previewClass = nodes(prop(previewSlot.arguments[1], 'className')).map(text).find(value => value.startsWith('pointer-events-auto absolute inset-x-'));
+        assert.ok(previewClass, 'The native minimized response-preview slot changed');
+        const previewFrames = ['working', 'ready', 'unscoped-working'].map((kind, index) => {
+          const working = kind !== 'ready', id = `minimized-${kind}`;
+          const status = native.renderStatus({ title: '示例响应预览', preview: '响应已就绪', isWorking: working,
+            workingContent: working ? element('span', { className: 'flex flex-col', children: native.renderWorking({ startedAtMs: null, heading: '正在检查状态条' }) }) : undefined,
+            onOpen: () => {}, onDismiss: () => {} });
+          status.props.id = `${id}-status`;
+          const paint = native.renderFloating({ variant: 'notice', children: status });
+          paint.props.id = `${id}-paint`;
+          const preview = element('div', { id: `${id}-slot`, 'data-pip-obstacle': kind === 'unscoped-working' ? 'unrelated' : 'quick-chat',
+            className: `${previewClass} pb-1`, children: paint });
+          return native.renderFrame({ background: 'panel', prefersCompactPresentation: true, keepSurfaceInset: true, isCompact: true,
+            isMinimized: true, resizable: false, shouldReduceMotion: true, sectionProps: { id: `${id}-frame`,
+              style: { top: `${330 + index * 100}px`, left: '40px', width: '580px', height: '80px' } }, children: preview });
+        });
+        await page.locator('body').evaluate((body, markup) => body.insertAdjacentHTML('beforeend', `<div id="minimized-examples">${markup}</div>`), quotaHtml(previewFrames));
+        const previewRead = () => page.locator('#minimized-examples [id],#minimized-examples button').evaluateAll(elements => elements.map(node => {
+          const s = getComputedStyle(node), r = node.getBoundingClientRect();
+          const pseudo = name => { const p = getComputedStyle(node, name); return [p.content, p.backgroundColor, p.backgroundImage, p.boxShadow, p.backdropFilter]; };
+          return { id: node.id, rect: [r.x, r.y, r.width, r.height], geometry: [s.borderRadius, s.cornerShape, s.borderWidth, s.padding, s.margin, s.overflow, s.font],
+            paint: [s.backgroundColor, s.backgroundImage, s.boxShadow, s.borderColor, s.color], filter: [s.backdropFilter, s.webkitBackdropFilter],
+            animation: [s.animationName, s.animationDuration, s.transitionProperty, s.transitionDuration], before: pseudo('::before'), after: pseudo('::after'),
+            outline: s.outline, tab: node.tabIndex, disabled: node.disabled ?? null };
+        }));
+        const previewNative = await previewRead();
+        const sampledPreview = postcss.parse(theme); let previewRules = 0;
+        sampledPreview.walkRules(rule => {
+          if (rule.selector.includes('workingTextShimmer-') && rule.nodes.some(node => node.prop === 'backdrop-filter' && node.value === 'none')) {
+            rule.remove(); previewRules++;
+          }
+        });
+        assert.equal(previewRules, 1, 'The negative control removes only the working response-preview sampling override');
+        await style.evaluate((node, css) => { node.textContent = css; }, sampledPreview.toString());
+        await page.evaluate(() => document.documentElement.classList.add('forge-ink-mountain'));
+        const previewBefore = await previewRead();
+        const workingPaint = previewBefore.find(node => node.id === 'minimized-working-paint');
+        assert.match(workingPaint.filter[0], /blur\(/, 'The working notice had a real backdrop sampling layer');
+        await style.evaluate((node, css) => { node.textContent = css; }, theme);
+        const previewAfter = await previewRead();
+        previewAfter.forEach((node, index) => {
+          const expected = structuredClone(previewBefore[index]);
+          if (node.id === 'minimized-working-paint') expected.filter = expected.filter.map(value => value === undefined ? value : 'none');
+          assert.deepEqual(node, expected, `${mode}/${layout}: ${node.id || 'preview action'} keeps all material and native interaction channels except the working notice filter`);
+        });
+        for (const id of ['minimized-ready-paint', 'minimized-unscoped-working-paint']) assert.match(previewAfter.find(node => node.id === id).filter[0], /blur\(/, `${id} retains its independent notice material`);
+        assert.ok(await page.locator('#minimized-working-status [class*="workingTextShimmer-"]').count());
+        await page.evaluate(() => document.documentElement.classList.remove('forge-ink-mountain'));
+        assert.deepEqual(await previewRead(), previewNative, 'Removing the theme restores all native preview carriers and actions');
       } finally { await page.close(); }
     }
   } finally { await browser.close(); }
@@ -246,12 +395,14 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
   const oldPaint = postcss.parse(theme);
   let count = 0;
   oldPaint.walkRules(rule => {
-    if (rule.selector.includes('[data-composer-utility-rail]') && rule.nodes.some(node => node.prop === 'backdrop-filter' && node.value !== 'none')) {
-      rule.selector = rule.selector.replace('[data-composer-rail-item]', '.forge-composer-panel');
+    if (rule.selector.includes(':is([data-composer-rail-item], [data-composer-utility-rail])') &&
+        rule.nodes.some(node => node.prop === 'backdrop-filter' && node.value === 'none')) {
+      assert.ok(rule.nodes.some(node => node.prop === '-webkit-backdrop-filter' && node.value === 'none'));
+      rule.walkDecls(/^(?:-webkit-)?backdrop-filter$/, declaration => { declaration.value = 'var(--forge-glass-filter)'; });
       count++;
     }
   });
-  assert.equal(count, 1, 'Restore only the former runtime-mark dependency in the rail filter');
+  assert.equal(count, 1, 'The negative control restores only shared status-rail sampling, without claiming a reproduced line');
   const previewDirectory = process.env.WUKONG_COMPOSER_RAIL_PREVIEW_DIRECTORY;
   const previewBackdrop = previewDirectory
     ? fs.readFileSync(new URL('../themes/backgrounds/scenery-08.jpg', import.meta.url)).toString('base64') : '';
@@ -284,19 +435,21 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
             state: node.getAttribute('data-composer-rail-item'), inert: node.inert }];
         })));
         const previously = await read();
-        for (const id of ['goal-default', 'queue-default', 'warning']) assert.equal(previously[id].filter, 'none');
+        for (const id of ['goal-default', 'queue-default', 'warning']) assert.match(previously[id].filter, /blur\(/);
         await page.locator('#theme').evaluate((style, next) => { style.textContent = next; }, theme);
         const mounted = await read();
         for (const [id, row] of Object.entries(mounted)) {
           assert.deepEqual(row.rect, previously[id].rect);
           assert.equal(row.radius, previously[id].radius);
           assert.equal(row.opacity, previously[id].opacity);
+          assert.equal(row.fill, previously[id].fill);
+          assert.equal(row.image, previously[id].image);
         }
         const verifyPaint = values => {
           for (const id of ['goal-default', 'queue-default', 'warning']) {
             assert.notEqual(values[id].fill, 'rgba(0, 0, 0, 0)');
             assert.match(values[id].image, /linear-gradient/);
-            assert.match(values[id].filter, /blur\(/);
+            assert.equal(values[id].filter, 'none');
           }
           for (const id of ['goal-embedded', 'rail-controls', 'queue-inline', 'queue-leaf-1', 'queue-leaf-2']) {
             assert.equal(values[id].fill, 'rgba(0, 0, 0, 0)');
@@ -308,9 +461,15 @@ test('newly mounted and exiting native goals and queues keep the same themed pai
         assert.equal(await page.locator('[data-forge-mark],.forge-composer-panel').count(), 0);
         if (previewDirectory) {
           fs.mkdirSync(previewDirectory, { recursive: true });
+          await page.evaluate(mode => {
+            const label = document.createElement('p');
+            label.textContent = '原生组件夹具 · 目标与排队消息停止背景采样';
+            label.style.cssText = `margin:0 0 12px;padding:4px 6px;font:12px/1.5 system-ui;text-align:center;color:${mode === 'dark' ? '#f0f3f6' : '#263541'};background:${mode === 'dark' ? 'rgba(12,20,28,.65)' : 'rgba(247,249,251,.85)'}`;
+            document.body.prepend(label);
+          }, mode);
           const queueBox = await page.locator('#queue-default').boundingBox();
           assert.ok(queueBox);
-          await page.screenshot({ path: path.join(previewDirectory, `${mode}-goal-queue-fixture-20261117.png`),
+          await page.screenshot({ path: path.join(previewDirectory, `${mode}-goal-queue-fixture-20261124.png`),
             clip: { x: 0, y: 0, width: 640, height: Math.ceil(queueBox.y + queueBox.height) } });
         }
         await page.locator('[data-composer-rail]').evaluate((rail, html) => { rail.innerHTML = html; }, parts(false));

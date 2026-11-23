@@ -118,20 +118,21 @@ const markup = native => {
 };
 
 const oldFilterTheme = () => {
-  const parsed = postcss.parse(theme); let removed = 0;
+  const parsed = postcss.parse(theme); let restored = 0;
   parsed.walkRules(rule => {
-    if (rule.selector.includes('[data-composer-utility-rail]') &&
+    if (rule.selector.includes(':is([data-composer-rail-item], [data-composer-utility-rail])') &&
       rule.nodes.some(node => node.prop === 'backdrop-filter' && node.value === 'none')) {
       assert.ok(rule.nodes.some(node => node.prop === '-webkit-backdrop-filter' && node.value === 'none'));
-      rule.remove(); removed++;
+      rule.walkDecls(/^(?:-webkit-)?backdrop-filter$/, declaration => { declaration.value = 'var(--forge-glass-filter)'; });
+      restored++;
     }
   });
-  assert.equal(removed, 1, 'Negative control removes only the project utility sampling override');
+  assert.equal(restored, 1, 'Negative control restores only shared status-rail sampling');
   return parsed.toString();
 };
 const fixture = (native, mode, html, backdrop = '') => `<html data-theme="${mode}" data-forge-native-theme="${mode}" data-codex-window-type="electron" data-codex-os="win32" style="color-scheme:${mode}"><head>
   <style>${native.css}</style><style>body{margin:0;background:#47789b;font-family:system-ui}main{padding:28px 24px 40px}#example{max-width:710px;margin:auto}#fixture-label{font:12px/1.5 system-ui;margin:0 0 65px;text-align:center;color:CanvasText}#editor{display:block;box-sizing:border-box;width:100%;height:90px;resize:none;background:transparent;padding:14px;border:0}#body-controls{padding:0 12px 10px;display:flex;justify-content:flex-end}#independent{display:grid;gap:30px;margin-top:52px}.independent-example{position:relative;padding-bottom:20px}#project-row{min-width:0}${backdrop}</style>
-  <style id="theme">${theme}</style></head><body><div id="root"><main><div id="example"><p id="fixture-label">原生组件夹具 · 项目条不采样背景 · 非客户端截图 / 未复现间歇横线</p><div id="mount">${html}</div></div></main></div></body></html>`;
+  <style id="theme">${theme}</style></head><body><div id="root"><main><div id="example"><p id="fixture-label">原生组件夹具 · 项目、目标与队列条停止背景采样</p><div id="mount">${html}</div></div></main></div></body></html>`;
 const capture = page => page.locator('#mount [id]').evaluateAll(elements => Object.fromEntries(elements.map(node => {
   const s = getComputedStyle(node), r = node.getBoundingClientRect();
   const pseudo = type => { const p = getComputedStyle(node, type); return [p.content,p.opacity,p.backgroundColor,p.backgroundImage,p.boxShadow,p.borderWidth,p.borderColor,p.clipPath,p.position,p.inset]; };
@@ -167,13 +168,15 @@ test('native home project rail retains the slot, attached tuck and independent p
         await page.locator('#theme').evaluate((style,css)=>style.textContent=css,theme);
         const after = await capture(page);
         assert.deepEqual(geometry(after),geometry(baseline),`${mode}/${width}: preserve all native geometry, clipping and pseudos`);
-        assert.equal(after['project-item'].paint[3],'none');
-        if (after['project-item'].paint[4] !== null) assert.equal(after['project-item'].paint[4],'none');
-        assert.deepEqual(after['project-item'].paint.slice(0,3),previous['project-item'].paint.slice(0,3),'Keep tint, continuous highlight and the existing top inset');
-        for (const id of ['composer-body','goal','queue']) {
-          assert.match(after[id].paint[3],/blur\(/,`${id} keeps its separate sampling owner`);
-          assert.deepEqual(after[id].paint,previous[id].paint,`${id} paint remains unchanged`);
+        for (const id of ['project-item','goal','queue']) {
+          assert.match(previous[id].paint[3],/blur\(/,`${id} previously had background sampling`);
+          assert.equal(after[id].paint[3],'none');
+          if (after[id].paint[4] !== null) assert.equal(after[id].paint[4],'none');
+          assert.deepEqual(after[id].paint.slice(0,3),previous[id].paint.slice(0,3),`${id} retains tint, continuous highlight and the existing top inset`);
+          assert.equal(after[id].paint[5],previous[id].paint[5],`${id} retains the native edge colour`);
         }
+        assert.match(after['composer-body'].paint[3],/blur\(/,'The composer body keeps its separate sampling owner');
+        assert.deepEqual(after['composer-body'].paint,previous['composer-body'].paint,'The composer body paint remains unchanged');
         for (const id of ['project-0','project-1']) {
           await page.locator(`#${id}`).evaluate(node=>{node.onclick=()=>node.dataset.fixtureClicked='true';});
           await page.locator(`#${id}`).click();

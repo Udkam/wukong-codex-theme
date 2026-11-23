@@ -1,5 +1,29 @@
 # 当前适配验证
 
+## v0.18.16 / v134-status-rail-compositing（2026-11-24）
+
+用户反馈 goal 与排队消息出现类似的间歇竖线，并授权修正、发布及检查同类问题。当前 Windows Codex 26.1117.4957.0（包内 26.1117.41037）来源锁未漂移，ASAR 为 443,800,006 字节、SHA-256 `8A437AAD94098770C1BF5FD5385C204E162B62C6D7917F688741D74E05BABE90`。
+
+有真实原生背景 token 的目标、队列和警告 rail Item 停止背景采样，覆盖 present 与 exiting，不依赖运行时面板标记。透明 embedded Item 仍透明：其实际材质归属为浮动 frame 独立背景槽，仅在真实浮动内容包含 rail Item 时停止该槽的背景采样；可选拖动／障碍标记及 content transport 的定位变化均不作为匹配条件。没有状态条的独立浮层保留原材质。保留原生 divider、边框、ring、attached 外轮廓、clip、tuck、负边距和控件。
+
+同类检查另发现 compact 浮动聊天最小化后的 working response-preview 通过独立 FloatingSurface notice 绘制，真实调用链包含工作计时和标题的 cadenced sweep。它不在浮动 composer 内容槽内，本次也仅停止这个工作提示背景的采样；没有工作扫光的 ready notice 及普通菜单仍按原材质绘制。额度 Recovery 原生提示未加此类背景滤镜，文件进度胶囊没有第二采样层，无须改变；紧凑 warning Notice 左侧强调线属于原生设计，予以保留。
+
+修正前在本机前台读取到两条有真实背景的 framed Item，分别为 710×32.8 与 710×36.8 CSS px，均使用 12px 背景模糊。注入 v134 后再次读回，两条滤镜均为 none，位置、尺寸、半透明底色、斜向高光和顶部 inset 阴影不变。当前现场未挂载浮动 frame。此读回证明目标材质规则生效；间歇竖线尚未稳定复现，不将结构检查或夹具结果写成原异常复现和用户视觉验收。
+
+用户随后反馈右侧标签页顶部／边界错位。本机读到标题栏 right focus 为 x=1023.5875、y=44、宽 1020.4125、高 46 CSS px，右内容 aside 为 x=1027.5875、y=90、同宽；原生 application-menu 的 me-1 留白使主题直接涂色整体左偏 4px。修正将顶部底色起点对齐，并在 main 自身背景补齐被原生 titlebar clip 截断的末端留白，RTL 反转。仅实际 absolute 外层和注册式 endcap 负责绘制，不再给嵌套 focus、按钮和 portalled row 重复涂底。
+
+首次仅调整底色后，用户仍报告错位。局部像素与原生节点进一步证实，顶部独立装饰 divider 仍在旧位置；最终只对真实 data-app-shell-titlebar-divider=pane 的空、aria-hidden、pointer-events-none 绘制叶平移一个原生 spacing。保留其 1 CSS px、原生 bg-border 颜色和 DPR 栅格化，不移动标签、按钮、内容或拖拽区域。前台读回装饰线为 x=1027.5875、y=44、宽 1、高 46，与下方 aside 边界一致；正文底色从其 0.8px 原生左边框之后开始。用户随后明确确认“现在已对齐”。
+
+右端补绘限定在同一活动工作区的 unified=true 且可见 split 顶栏，源码绑定证明关闭／零宽保留 pane、完整视图和非活动页不应参与。没有新增运行时节点、监听、测量或动画。最终热更新样式 SHA-256 为 `1745017ce74c0dffc6ffd4932679df77ae0733c0e276aecb725c97c6591cc697`；最后哈希读回时窗口在后台、壁纸已就绪，和上述前台 divider 测量及用户确认分开记录。
+
+最终从精确暂存索引独立导出 209 个文件，全部逐字节匹配 Git blob，无 CRLF 差异。该输入的 `npm run check` **219/219 通过**，0 失败、取消或跳过，约 129.9 秒；同一输入的 Studio E2E 通过。回归包含真实 floating 工作提示／状态条的材料归属，以及新版 launcher、原生 me-1、独立 divider、RTL、关闭与零宽保留、完整视图、非活动页、portal 和 endcap 边界。仅空装饰 divider 的横向绘制位移允许变化，控件、正文、拖拽区域、原生线宽和颜色继续精确对照。验证后只补写实证文档，产品、测试与资源保持相同。
+
+Windows ZIP 为 4,059,469 字节、38 个文件。36 个 app 文件逐项匹配独立源码与暂存生产输入，根启动器及中文说明另行核对；ZIP CRC、归档内容与解压 SHA-256 一致。相对 v0.18.15 仅 app/package.json、注入计划和主题 CSS 三项变化，其余 35 项相同。独立只读审计重新推导白名单及原始 ZIP 清单通过，未混入诊断、taskbar、未跟踪壁纸或本机路径材料。
+
+同一 ZIP 的真实用户 Temp 解压包恢复原生与原生断言通过，主题样式、自有节点和运行时均清除。重新应用最初因窗口在后台返回 deferred=true；用户将窗口置前台后，稳定读回 isActiveThemeState=true、documentHidden=false、backgroundReady=true、v134 与上述完整样式哈希一致。最后读回时目标／队列和右侧 pane 未挂载；对应组件的先前现场测量、用户对齐确认与源组件回归分开记录。冷启动和卸载本轮未执行。
+
+ZIP SHA-256 为 `60565831db01ad27200d8b988bdf8399a3d4d651f5b08d3b5703b8af95146d26`，校验文件 SHA-256 为 `073ba00c9ef42b314d72b74449379ddc2cffac49f6c34a181578754f6e6cb3ac`。正式包保留于 release/0.18.16，验证凭据位于忽略的 artifacts/release-readiness-01816-20261124。远程发行和临时副本清理按实际完成结果补齐。
+
 ## v0.18.15 发行验证（2026-11-24）
 
 用户明确确认项目条横线应已消失，并授权发布。发行运行时保持 v133-project-rail-compositing，原生来源为 Windows Codex 26.1117.4957.0（包内 26.1117.41037）。本轮只把已通过实机使用反馈与源组件回归的项目条局部滤镜修正纳入正式运行包，具体适配与未能稳定复现原异常的边界见下节。

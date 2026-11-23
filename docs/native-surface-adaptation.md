@@ -1,12 +1,28 @@
 # 原生 UI 与主题替换接口
 
-当前开发运行时为 v133-project-rail-compositing，原生来源为 Windows Codex 26.1117.4957.0。正式下载 v0.18.14 使用 v132-settings-native-hover，功能概览见 [发行说明](RELEASE_0.18.14.md)，验证范围见 [验证记录](VALIDATION.md)。
+当前适配运行时为 v134-status-rail-compositing，原生来源为 Windows Codex 26.1117.4957.0。状态条与标签页绘制调整概览见 [v0.18.16 发行说明](RELEASE_0.18.16.md)，验证范围见 [验证记录](VALIDATION.md)。
+
+## 状态条实际材质表面的背景采样（2026-11-24，v134）
+
+目标与排队消息共用 Rail.Item。带原生未加状态前缀的 bg-* token 且非 bg-transparent 的 data-composer-rail-item 拥有独立材质，本轮与项目条一并将该表面的 backdrop-filter 和 -webkit-backdrop-filter 设为 none。原生边框、分隔线、圆角、负边距、退出状态与交互继续由组件控制。
+
+浮动输入框使用透明的状态条，背景滤镜由外层 FloatingSurface 的实际背景子节点持有。主题按 section.floatingSurface-* 中直接内容包装下的 data-floating-chat-surface 识别内容槽，槽内存在 data-composer-rail-item 时，只对同一包装下具有 bg-surface-elevated-secondary／bg-surface-canvas 的直接 FloatingSurface 背景子节点停用采样。该关系沿用内容槽与背景槽的真实父子结构，适配宿主定位类和可选拖动标记的变化。透明定位壳、无状态条的浮动输入框、普通首页输入主体及独立菜单各自保留材料归属。间歇竖线尚未稳定复现，源组件回归用于检查绘制范围与动态状态，本轮实机确认另记验证记录。
+
+同类检查发现 compact 浮动聊天最小化后的 working response-preview 使用独立 FloatingSurface notice，工作文字通过真实 cadencedShimmer 链渲染。该提示位于 data-floating-chat-surface 之外，其原生包装固定发布 data-pip-obstacle="quick-chat"。主题在该包装的直接 FloatingSurface 背景子节点具有 bg-surface-elevated-secondary 且包含 role=status 中的 workingTextShimmer-* 时，停用此表面的两种背景滤镜。ready 状态的独立 notice 和菜单使用各自滤镜。额度恢复提示的原生表面没有背景滤镜，文件进度徽标也没有第二采样层；紧凑 warning 左侧强调线沿用原生设计。
+
+## 右侧标签页标题背景与面板边界（2026-11-24，v134）
+
+实机标题栏带原生 me-1 末端间距，绝对定位的 right-panel 标题背景与内容 aside 宽度相同、起点相差 4 CSS px。主题只给标题栏内绝对定位的外层 right-panel 载体绘制原生 surface 底色，内层 focus、按钮和已传送到标题栏的 tab row 继续由原生内容绘制。独立注册 end-slot 的实际按钮载体和未传送到标题栏的 tab row 维持各自背景归属。
+
+对于 me-1 分支，外层标题背景用 linear-gradient 在起端保留一个 --spacing，再绘制原生底色；壁纸就绪后，底下的 main surface 在逻辑末端补一条 --spacing 宽、原生标题高度高的同色背景。末端补色限定到 data-app-shell-active-page=true 与 data-app-shell-unified-tab-strip=true 的工作区，并要求存在可见的绝对定位 right-panel 标题。该组合对应打开的分栏，收起、完整视图和非活动工作区按自身状态绘制。RTL 将渐变和补色方向反转。
+
+标题边界线来自同一外层 right-panel 载体内直接 absolute.inset-y-0 轨道中的空装饰叶。主题进一步要求 data-app-shell-titlebar-divider="pane"、aria-hidden=true、pointer-events-none 和 :empty，使用独立 translate 属性沿 --spacing 平移，RTL 使用负值。该范围沿用活动工作区、unified 分栏、me-1 与可见标题条件。原生 1 CSS px 线宽、边框颜色、阴影和像素对齐规则保留，原生标签、按钮、内容与拖拽区域几何保持。修正后前台读回该线与内容 aside 起点一致，内容绘制仍从原生边框之后开始。用户已实机确认右侧标签页现在对齐，最终样式读回和可见性范围见 [验证记录](VALIDATION.md)。
 
 ## 项目条背景采样层（2026-11-24，v133）
 
 首页 UtilityBarSlot 是透明的 motion 定位壳，真正的项目条表面由带原生背景 token 的 data-composer-utility-rail 节点绘制。用户此前反馈该条内部偶尔出现横线，该间歇现象未能稳定复现。实际读取到该表面使用 12px backdrop-filter，controls 栏内部结构保持原生布局。
 
-参照既有普通对话输入框关闭背景模糊后移动遮盖消失的实机经验，本次在 utility rail 的实际材质表面将 backdrop-filter 和 -webkit-backdrop-filter 设为 none，消除同类背景采样层。底色、顶部高光和 1px 内阴影保留，原生尺寸、收起动画、负边距与事件继续由原生组件控制。透明变体和内部 scroll-area 仍按各自材料归属绘制，goal／排队消息的 data-composer-rail-item 沿用独立滤镜。回归用于核对材质与几何范围。用户验证后认为内部横线已不再出现，原触发条件仍不明确。
+参照既有普通对话输入框关闭背景模糊后移动遮盖消失的实机经验，v133 在 utility rail 的实际材质表面将 backdrop-filter 和 -webkit-backdrop-filter 设为 none，消除同类采样层。底色、顶部高光和 1px 内阴影保留，原生尺寸、收起动画、负边距与事件继续由原生组件控制。透明变体和内部 scroll-area 按各自材料归属绘制。用户验证后认为项目条内部横线已不再出现，原触发条件仍不明确。v134 将相同处理扩展到目标条与排队消息。
 
 ## 设置原生整行悬停（2026-11-23，v132）
 
@@ -28,7 +44,7 @@
 
 标题包装在 scrollTop>0 时才获得 `bg-surface/80` 与原生背景模糊，内部使用 `data-app-shell-header-toolbar`。主题只在这个实际滚动底板上应用共享玻璃材质；回顶部后不再匹配，保留原生透明标题、滚动遮挡、控件和尺寸。无关背景、错误嵌套的滚动节点及保留的隐藏页面不改变布局。
 
-执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页输入主体及独立表面继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
+执行状态文字的原生 cadenced 蒙版扫光及旧式 text-clip 扫光保持。实机对照中仅关闭输入框背景模糊后，用户确认移动遮盖消失；限制状态行 paint 范围的候选无效，已撤回。正式规则只在 `data-thread-composer-backdrop` 内的 default／opaque／secondary 非拖放输入表面令 `--composer-layout-surface-backdrop-filter:none`。普通对话的半透明底色、高光和阴影保留；首页输入主体及独立菜单继续使用自己的玻璃滤镜。临时模糊诊断规则已移除。离线夹具不声称重现 Windows 合成异常，而是验证真实动画保留、绘制范围、输入框像素稳定及材质边界。
 
 ## 当前工作区与资料页（2026-11-22，v129）
 
@@ -74,7 +90,7 @@ home UtilityBarSlot 仅承担透明 motion 定位；data-composer-utility-rail �
 
 全局 HeaderAction 的 unified-workspace-controls 仍以 align=end、slotPosition=right 注册到 titlebar，focus-area 可为 main。end-slot 使用 data-app-shell-header-slot="end"；测量分支的实际载体为 col-span-full／row-start-1／h-full／min-w-max，非测量分支为 pointer-events-none／relative／col-start-1／row-start-1／h-full／w-full／min-w-0。只绘制对应 live 载体，不绘制同级不可见尺寸副本，也不把整个注册 grid 涂成实色。
 
-主题在 end-slot 含原生 right-panel toggle 时给上述实际整高载体使用原生 surface 并清除背景图；右侧 content 槽位与非 portal row 保留对应覆盖。选择器不依赖模块 hash、按钮中文文案或固定像素，不改裁切、尺寸与定位，不匹配左侧标题或外部网页。源码合同保护两种载体和注册／渲染关系；原生工作区 backing 的边缘细线保留，并与原生像素基线比较。
+主题在 end-slot 含原生 right-panel toggle 时给上述实际整高载体使用原生 surface 并清除背景图；v134 的标题背景归属收敛到绝对定位外层 right-panel 载体，非 portal row 保留自身覆盖。选择器不依赖模块 hash、按钮中文文案或固定像素。原生标签、按钮、内容与拖拽区域几何保持，边界装饰线的绘制偏移见上方 v134 范围。源码合同保护两种载体和注册／渲染关系；原生工作区 backing 的边缘细线保留，并与原生像素基线比较。
 
 完整视图不延伸主题壁纸。原生 right-panel 切换按钮的 aria-pressed 组合显式 full 布局与独立完整视图覆盖状态；后者允许 workspace-layout 仍为 split。当前使用可见原生按钮作为优先依据，按钮缺失时才检查活动 workspace 的显式 full 状态。
 
@@ -98,7 +114,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 
 ## 浏览器浮动输入框的 goal 背景归属（2026-10-24，v0.18.8／v117）
 
-核对 Windows Codex 26.1016.8622.0。浮动输入框经 body portal 挂载在 #root 外；带 data-quick-chat-drag-handle 的 section 是透明定位／拖动外壳，保留 overflow-visible。它的直接 FloatingSurface 背景子节点负责整个组件的 22px 圆角、底色和滤镜；data-floating-chat-surface 内使用 compact／inline composer。不得通过给外壳加裁切或给 goal 行硬加圆角来修复材料归属。
+核对 Windows Codex 26.1016.8622.0。浮动输入框经 body portal 挂载在 #root 外；带 data-quick-chat-drag-handle 的 section 是透明定位／拖动外壳，保留 overflow-visible。它的直接 FloatingSurface 背景子节点负责整个组件的 22px 圆角和底色；data-floating-chat-surface 内使用 compact／inline composer。v134 在带状态条时停用实际背景载体的采样。不得通过给外壳加裁切或给 goal 行硬加圆角来修复材料归属。
 
 当前 26.1117.4957.0 的原生 rail Item 背景选择为 `(variant !== "default" || !embedded) && backgroundMap[variant]`。默认 embedded 行没有背景类，controls 和 inline 在嵌入与独立状态下都透明；独立 default 使用 bg-surface-elevated-secondary，warning 在两种状态下均使用原生 color-mix 背景类。data-composer-rail-contained 只表示存在 rail 上下文，本身不能证明有底色。
 
@@ -153,7 +169,7 @@ PageSurface、CodeSurface、Popover、FloatingSurface、确认／语音面板、
 | 对话、dots | conversation 属性、embedded messaging | 风景队列与深色阅读色；原生消息气泡和操作语义保留 |
 | 输入框 | composer-surface-variant、composer-body | 使用原生绘制变量，首页 body 和对话 root 各自拥有表面 |
 | 项目、分支信息条 | utility-bar-scroll-area、具体 navigation target | 按控件归属识别，不依赖固定行高或工具类顺序 |
-| 目标、排队消息 | 带原生底色的 data-composer-rail-item | 外层从首次挂载至退出保持玻璃材质，队列子项沿用原生绘制 |
+| 目标、排队消息 | 带原生底色的 data-composer-rail-item；含透明状态条的浮动输入框实际背景子节点 | 材质载体停用背景采样，保留底色、高光、原生边框及分隔线；队列子项沿用原生绘制 |
 | 文件变更等进度区 | data-in-progress-fixed-content 内的原生圆角进度表面 | 首次挂载即替换底色；无独立背景的紧凑 portal 保留继承绘制 |
 | 摘要、环境、变更面板 | data-summary-panel-variant、summary item slot | 卡片及 sticky 标题共用不透明底，遮挡滚动文字 |
 | dots 处理框与资料收起标题 | summary 范围内共享 sticky 标题的空惰性渐变叶、带实色底板的装饰分支 | 渐变局部取摘要材质色，实色底板同色；保留原生透明度、portal、遮挡和控件 |
