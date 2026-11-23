@@ -1,12 +1,12 @@
 # 当前目标与发行状态
 
-2026-11-24，当前开发运行时为 **v133-project-rail-compositing**，原生来源仍为 Windows Codex 26.1117.4957.0（包内 26.1117.41037）。用户此前反馈项目条内部偶尔出现横线，该间歇现象未能稳定复现。
+2026-11-24，本轮准备发布 **v0.18.15**，运行时为 **v133-project-rail-compositing**，原生来源为 Windows Codex 26.1117.4957.0（包内 26.1117.41037）。用户已授权发布项目条的针对性调整。
 
-参照普通对话输入框关闭背景模糊后移动遮盖消失的实机经验，本次仅停用项目条实际材质节点的背景模糊，消除同类采样层。底色、顶部高光、阴影和原生布局继续由各自节点绘制。用户验证后认为内部横线已不再出现，原触发条件仍不明确。改动范围与预览见 [开发说明](RELEASE_NEXT.md)，检查和注入结果见 [验证记录](VALIDATION.md)。
+参照普通对话输入框关闭背景模糊后移动遮盖消失的实机经验，本次仅停用项目条实际材质节点的背景模糊，消除同类采样层。底色、顶部高光、阴影和原生布局继续由各自节点绘制。首页输入主体、目标条和排队消息沿用各自滤镜。用户验证后认为内部横线已不再出现，原触发条件仍不明确。改动范围与预览见 [发行说明](RELEASE_0.18.15.md)，检查和注入结果见 [验证记录](VALIDATION.md)。
 
-更新于 2026-11-23。**v0.18.14 已发布为 GitHub 最新正式版**，运行时 **v132-settings-native-hover**，适配 Windows Codex 26.1117.4957.0（包内 26.1117.41037）。
+上一正式版为 **v0.18.14**，于 2026-11-23 发布，运行时为 **v132-settings-native-hover**，适配 Windows Codex 26.1117.4957.0（包内 26.1117.41037）。
 
-本轮包含侧栏实际壁纸取色、设置整行淡悬停、公共资料页与输入框修复，以及新版工作区、浏览器、查找条和内置插件推荐的材质适配，详见 [发行说明](RELEASE_0.18.14.md)。
+此前的侧栏实际壁纸取色、设置整行淡悬停、公共资料页与输入框修复，以及新版工作区、浏览器、查找条和内置插件推荐的材质适配，详见 [v0.18.14 发行说明](RELEASE_0.18.14.md)。
 
 设置「自定义规则」和导入历史恢复原生整行悬停，底色随深浅主题使用更淡的蓝灰色。侧栏使用用户已确认的实际壁纸取色与通透分层材质。
 
@@ -16,10 +16,10 @@
 
 设置行的深色悬停底为 rgba(183,205,224,.055)，浅色为 rgba(76,107,132,.035)。鼠标交互沿用整行底色，键盘焦点沿用原生轮廓，图标使用原生颜色。深浅预览来源见 [预览说明](previews/README.md)，本次检查与注入结果见 [验证记录](VALIDATION.md)。
 
-独立源码 217/217 检查和 Studio E2E 通过。38 个运行文件与源码、ZIP 和解压内容一致；解压包恢复原生及重新应用通过，本机前台读回运行时、壁纸和完整样式一致。发行资产重新下载后的 SHA-256 与本地及 GitHub 摘要一致，详见 [验证记录](VALIDATION.md)。
+本轮发行源码检查、运行包核验、实际注入与上传回读按执行结果记入 [验证记录](VALIDATION.md)。
 
 此前标签页开合卡顿在恢复原生外观时也有复现。标签页开合沿用客户端动画。
 
-[v0.18.14 发行页](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.14) · [Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.14/Wukong-Codex-Theme-0.18.14-Windows.zip) · [SHA256SUMS.txt](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.14/SHA256SUMS.txt)。过程材料状态见 [清理记录](CLEANUP.md)。
+[v0.18.15 发行页](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.15) · [Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.15/Wukong-Codex-Theme-0.18.15-Windows.zip) · [SHA256SUMS.txt](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.15/SHA256SUMS.txt)。过程材料状态见 [清理记录](CLEANUP.md)。
 
-上一版的文件变更徽标、目标条和排队消息适配见 [v0.18.13 发行说明](RELEASE_0.18.13.md)。
+文件变更徽标、目标条和排队消息的首帧材质适配见 [v0.18.13 发行说明](RELEASE_0.18.13.md)。

@@ -2,17 +2,17 @@
 
 为 Windows Codex / ChatGPT 桌面客户端带来悟空背景与玻璃材质，支持深色和浅色主题。内置 10 张战斗图与 3 张风景图，可用快捷键切换。
 
-**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.14/Wukong-Codex-Theme-0.18.14-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
+**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.15/Wukong-Codex-Theme-0.18.15-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
 
 ## 效果预览
 
-悟空场景与深浅玻璃材质，侧栏随实际壁纸取色。项目条间歇横线的开发调整见[开发说明](docs/RELEASE_NEXT.md)，更多效果见[组件预览](docs/previews/README.md)。
+悟空场景与深浅玻璃材质。以下展示本轮项目条的深浅色效果，更多区域见[组件预览](docs/previews/README.md)。
 
 | 深色 | 浅色 |
 | :---: | :---: |
-| ![深色侧栏取色组件夹具](docs/previews/dark-sidebar-scene-palette-fixture-20261123.png) | ![浅色侧栏取色组件夹具](docs/previews/light-sidebar-scene-palette-fixture-20261123.png) |
+| ![深色项目条组件夹具](docs/previews/dark-project-rail-compositing-fixture-20261124.png) | ![浅色项目条组件夹具](docs/previews/light-project-rail-compositing-fixture-20261124.png) |
 
-预览使用 Windows Codex 26.1117.4957.0 的原生结构、样式与示例内容生成，属于组件夹具；具体变化见 [发行说明](docs/RELEASE_0.18.14.md)，检查与实机验收情况见 [验证记录](docs/VALIDATION.md)。
+预览使用 Windows Codex 26.1117.4957.0 的原生结构、样式与示例内容生成，属于组件夹具；具体变化见 [发行说明](docs/RELEASE_0.18.15.md)，检查与实机验收情况见 [验证记录](docs/VALIDATION.md)。
 
 ## 开始使用
 
@@ -28,4 +28,4 @@
 
 ---
 
-[开发文档](docs/DEVELOPMENT.md) · [当前发行说明](docs/RELEASE_0.18.14.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)
+[开发文档](docs/DEVELOPMENT.md) · [当前发行说明](docs/RELEASE_0.18.15.md) · [验证记录](docs/VALIDATION.md) · [问题反馈](https://github.com/Udkam/wukong-codex-theme/issues)
