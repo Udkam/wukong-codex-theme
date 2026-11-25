@@ -1,5 +1,13 @@
 # 原生 UI 与主题替换接口
 
+## 正文与输入区的轮廓隔离（2026-11-25，v135）
+
+当前 Windows Codex 26.1120.5083.0 的 ThreadScrollLayout 在普通布局中将 transcript wrapper 和 footer 放在同一滚动容器内，compact 布局则将 footer 放在外部。依据直接子节点的 data-thread-user-message-navigation-content 识别正文 wrapper，不给滚动容器或 footer 加遮罩。
+
+遮罩是滚动视口大小的 SVG luminance 图：白色保留正文，黑色路径取自真实 composer surface 和 rail Item 的边界及四角半径。半径按 CSS 的统一缩放规则归一化。原生 attached Rail 的 Item 通常没有自身圆角，可见顶角属于 overflow:clip 的 Rail 外层；因此每条黑路径同时与真实祖先的 overflow 裁切求交，包括 portal target 的层级。重叠黑路径形成遮挡区域的并集，保留输入区两侧和圆角外正文。
+
+布局刷新或现有 ResizeObserver 回调缓存轮廓与坐标。passive scroll 回调只读取 scrollTop，并合并到一次 requestAnimationFrame 更新 mask-position；不读取布局或遍历消息。输入框的尺寸、材质、滤镜和原生滚动范围保持。专用释放事件允许原生恢复在 runtime 对象丢失时仍移除滚动监听、排队帧与自有属性。原生资料、Dots、首页及无 footer 的嵌套滚动区不靠首个子节点猜测匹配。
+
 当前适配运行时为 v134-status-rail-compositing，原生来源为 Windows Codex 26.1117.4957.0。状态条与标签页绘制调整概览见 [v0.18.16 发行说明](RELEASE_0.18.16.md)，验证范围见 [验证记录](VALIDATION.md)。
 
 ## 状态条实际材质表面的背景采样（2026-11-24，v134）
@@ -26,7 +34,7 @@
 
 ## 设置原生整行悬停（2026-11-23，v132）
 
-设置「自定义规则」的实际行由 data-settings-search-entry 与原生 hover token 关联，导入历史的按钮带有 import-history- 前缀的 aria-controls。主题只在 data-settings-panel／data-settings-search-root 内给这两类行映射较淡的悬停底色，深色为 rgba(183,205,224,.055)，浅色为 rgba(76,107,132,.035)。整行反馈沿用原生 hover 状态，原生图标、分隔线、圆角、键盘焦点轮廓和事件继续由组件控制。鼠标反馈只更换底色，强制色彩模式使用原生颜色。
+设置可点击行由 data-settings-search-entry 与原生 hover token 关联；26.1120.5083.0 已撤去原自定义规则入口，通用反馈回归改由真实 security-linked-apps 的同一 clickable Row caller 承担，导入历史的按钮带有 import-history- 前缀的 aria-controls。主题只在 data-settings-panel／data-settings-search-root 内给这两类行映射较淡的悬停底色，深色为 rgba(183,205,224,.055)，浅色为 rgba(76,107,132,.035)。整行反馈沿用原生 hover 状态，原生图标、分隔线、圆角、键盘焦点轮廓和事件继续由组件控制。鼠标反馈只更换底色，强制色彩模式使用原生颜色。
 
 ## 侧栏实际壁纸取色（2026-11-23，v131）
 

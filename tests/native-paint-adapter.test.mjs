@@ -52,6 +52,27 @@ const native = (() => {
   const viewport = permissionNodes.find(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'div' &&
     text(prop(node.arguments[1], 'className')).startsWith('viewport-'));
   assert.ok(table && heading && viewport, 'Native permissions table/heading/viewport boundary changed');
+  // The active renderer passes its memoized class-join result to the table.
+  // Recover the real source-bound class and responsive utilities, not an empty
+  // class from text(Identifier), which silently drops native cell painting.
+  const tableClassBinding = prop(table.arguments[1], 'className');
+  assert.equal(tableClassBinding?.type, 'Identifier', 'Native permissions table class binding changed');
+  const tableRenderer = nativeFunction(permissions, table.start);
+  const tableClassCalls = ownNodes(tableRenderer.ast).filter(node => node.type === 'AssignmentExpression' &&
+    node.left.type === 'Identifier' && node.left.name === tableClassBinding.name &&
+    node.right.type === 'CallExpression').map(node => node.right);
+  assert.equal(tableClassCalls.length, 1, 'Native permissions table class join must remain unique');
+  const tableClassCall = tableClassCalls[0];
+  const joinMember = tableClassCall.callee.type === 'SequenceExpression'
+    ? tableClassCall.callee.expressions.at(-1) : tableClassCall.callee;
+  assert.equal(bundle.imports(permissions)[joinMember.object?.name]?.id, 'on57',
+    'Only the audited native class join may supply permissions table presentation');
+  assert.ok(tableClassCall.arguments.every(node => node.type === 'Literal' && typeof node.value === 'string'),
+    'Native permissions table classes must remain static presentation inputs');
+  const tableClasses = tableClassCall.arguments.map(text);
+  const tableModuleClass = tableClasses[0];
+  assert.match(tableModuleClass, /^table-[\w-]+$/, 'Native permissions table CSS module class changed');
+  const tableClassName = tableClasses.join(' ');
   assert.ok(prop(table.arguments[1], 'ref') && prop(table.arguments[1], 'onScroll'),
     'Native permissions scrolling must remain owned by the table, not its tbody');
   assert.ok(!permissionNodes.some(node => node.type === 'CallExpression' && text(node.arguments[0]) === 'tbody' &&
@@ -96,7 +117,7 @@ const native = (() => {
     popoverClass: family('Popover'), confirmationClass: family('chatgptConfirmationSurface'),
     voicePickerClass: family('voicePickerSurface'), topTrayClass, homePayloadClass: payloadClass,
     floatingClass: staticClass('floatingSurface'), suggestionClass: staticClass('suggestionMenu'),
-    permissionsClass: text(prop(table.arguments[1], 'className')),
+    permissionsClass: tableClassName, permissionsModuleClass: tableModuleClass,
     permissionsViewportClass: text(prop(viewport.arguments[1], 'className')),
     headingClass: text(prop(heading.arguments[1], 'className')),
     disabledRowClass: text(prop(disabledRows[0].arguments[1], 'className')),
@@ -114,7 +135,7 @@ const native = (() => {
     bundle.stylesheetAssets(['[cmdk-root],[data-cmdk-root]'])[0]]);
   assert.ok(!cssAssets.has(undefined), 'Native command-menu CSS missing');
   return { ...presentation, css: [bundle.layerOrder, ...[...cssAssets].map(asset => bundle.read(asset))].join('\n'),
-    permissionsCss: bundle.read(stylesheet(presentation.permissionsClass)),
+    permissionsCss: bundle.read(stylesheet(presentation.permissionsModuleClass)),
     popoverCss: bundle.read(stylesheet(presentation.popoverClass)) };
 })();
 

@@ -84,11 +84,19 @@ const loadNative = () => {
   const renderSurface = compile(surface);
   const visibilityHook = frame.nodes.find(node => node.type === 'CallExpression' && key(node.callee.expressions?.at(-1)?.property) === 'useSyncExternalStore');
   assert.equal(visibilityHook?.arguments[2]?.type, 'Identifier');
+  const member = call => call?.callee?.type === 'SequenceExpression' ? call.callee.expressions.at(-1) : call?.callee;
+  const stateReader = frame.nodes.find(node => node.type === 'CallExpression' && key(member(node)?.property) === 'Ul');
+  const stateImport = bundle.imports(caller)[member(stateReader)?.object?.name];
+  assert.ok(stateImport && bundle.exports(bundle.module(stateImport.id)).Ul, 'Find visibility must use its actual native state transport export');
+  const scopeReader = overlay => overlay.nodes.find(node => node.type === 'CallExpression' && key(member(node)?.property) === 'gh');
   const renderFrame = compile(frame, { [surfaceImport.local]: { [surfaceImport.name]: renderSurface },
-    ...bindingsFor(caller, 'qmMi', { Ul: () => true }), ...bindingsFor(caller, 'zd8w', { useSyncExternalStore: () => false }), [visibilityHook.arguments[2].name]: () => false });
+    ...bindingsFor(caller, stateImport.id, { Ul: () => true }), ...bindingsFor(caller, 'zd8w', { useSyncExternalStore: () => false }), [visibilityHook.arguments[2].name]: () => false });
   const overlay = nativeFunction(caller, 'data-content-search-overlay');
   const closeState = { SY: () => {} }, scope = {};
-  const renderOverlay = compile(overlay, { ...bindingsFor(caller, 'qmMi', { gh: () => scope }), ...bindingsFor(caller, 'TwSq', closeState) });
+  const scopeImport = bundle.imports(caller)[member(scopeReader(overlay))?.object?.name];
+  assert.equal(scopeImport?.id, stateImport.id, 'Visibility and close scope retain their shared source-bound state transport');
+  assert.ok(bundle.exports(bundle.module(scopeImport.id)).gh, 'The native close-scope transport must still exist');
+  const renderOverlay = compile(overlay, { ...bindingsFor(caller, scopeImport.id, { gh: () => scope }), ...bindingsFor(caller, 'TwSq', closeState) });
   const parameterCallbacks = Object.fromEntries(input.nodes.filter(node => node.type === 'ObjectPattern').flatMap(node => node.properties.filter(item => item.type === 'Property' && key(item.key).startsWith('on')).map(item => [item.value.name, key(item.key)])));
   const callbacks = Object.fromEntries(['onChange', 'onEnter', 'onEscape', 'onFocus', 'onNext', 'onPrevious', 'onClose'].map(name => [name, Object.assign(() => {}, { eventName: name })]));
   const render = ({ expanded = false, matches = 4 } = {}) => renderOverlay({ children: renderFrame({ children: [

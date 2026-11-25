@@ -994,3 +994,13 @@
     opacity: 1 !important;
   }
 }
+
+/* Follow native composer and rail outlines; keep text beside their rounded
+   corners visible and let the translucent material show only wallpaper. */
+.forge-ink-mountain [data-forge-transcript-occlusion="true"] {
+  mask-image: var(--forge-transcript-mask);
+  mask-mode: luminance;
+  mask-size: var(--forge-transcript-mask-size);
+  mask-position: 0 var(--forge-transcript-mask-y);
+  mask-repeat: no-repeat;
+}

@@ -241,6 +241,15 @@ test('model/permission clicks do not schedule submit follow-up scans', async () 
 });
 
 test('active paint sheet preserves geometry and scopes ink to navigation and dark conversation', () => {
+  const transcriptMaskSelector = '.forge-ink-mountain [data-forge-transcript-occlusion="true"]';
+  const transcriptMaskValues = new Map([
+    ['mask-image', 'var(--forge-transcript-mask)'],
+    ['mask-mode', 'luminance'],
+    ['mask-size', 'var(--forge-transcript-mask-size)'],
+    ['mask-position', '0 var(--forge-transcript-mask-y)'],
+    ['mask-repeat', 'no-repeat']
+  ]);
+  const transcriptMaskSeen = new Set();
   const quotaContourSelector = `:root.forge-ink-mountain [data-codex-composer-root]:has(
   [data-composer-layout="multiline"][data-composer-radius-variant="default"][data-composer-surface-variant="default"]
 ) aside[role="status"][aria-live="polite"]:is([class^="banner-"], [class*=" banner-"]):not(:is(
@@ -269,6 +278,16 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
   let navigationHoverSeen = false;
   postcss.parse(theme).walkDecls(d => {
     const s = d.parent.selector || '';
+    // This owned transcript marker is the only mask exception. Native geometry,
+    // scrollport/footer, fonts and all other client masks remain protected.
+    if (s === transcriptMaskSelector) {
+      assert.ok(transcriptMaskValues.has(d.prop), `Unexpected transcript declaration: ${d.prop}`);
+      assert.equal(d.value, transcriptMaskValues.get(d.prop));
+      assert.equal(Boolean(d.important), false);
+      assert.ok(!transcriptMaskSeen.has(d.prop), `Duplicate transcript mask: ${d.prop}`);
+      transcriptMaskSeen.add(d.prop);
+      return;
+    }
     // Only the independent recovery notice may adopt the adjacent native
     // composer's contour; every other native geometry guard remains active.
     if (s === quotaContourSelector) {
@@ -323,6 +342,8 @@ test('active paint sheet preserves geometry and scopes ink to navigation and dar
     assert.ok(!/^(?:color|-webkit-text-fill-color|fill|stroke|font.*|line-height|letter-spacing|text-shadow|border(?:-.*)?-radius|border-radius|corner-shape|clip-path|mask.*|transform|(?:min-|max-)?(?:width|height)|padding.*|margin.*|inset.*|top|right|bottom|left|position|display|flex.*|grid.*|gap|overflow.*|opacity|border(?:-.*)?-width)$/.test(d.prop), `${d.prop}: ${s}`);
     assert.ok(!/^--color-/.test(d.prop), `Client token override: ${d.prop}`);
   });
+  assert.deepEqual([...transcriptMaskSeen].sort(), [...transcriptMaskValues.keys()].sort(),
+    'Only the five owned transcript mask declarations are permitted');
   assert.deepEqual([...quotaContourSeen].sort(), [...quotaContourValues.keys()].sort(),
     'The bounded quota contour rule retains both native variable declarations');
   assert.deepEqual([...sidebarHoverSeen].sort(), sidebarHoverTokens, 'Native hover tokens stay in the bounded row rule');

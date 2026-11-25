@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import postcss from 'postcss';
-import { loadNativeBundle, key, text, prop, nodes, nativeObject } from './native-bundle-current-helper.mjs';
+import { loadNativeBundle, key, text, prop, nodes, ownNodes, nativeFunction, nativeObject } from './native-bundle-current-helper.mjs';
 import { loadNativeShell } from './native-shell-current-helper.mjs';
 const provenance = JSON.parse(fs.readFileSync(
   new URL('../docs/native-asar-provenance.json', import.meta.url),
@@ -107,7 +107,23 @@ test('native Dots header exposes an empty decorative anchor surface separate fro
   const nativeDivs = headerNodes.filter(node => node.type === 'CallExpression' &&
     text(node.arguments[0]) === 'div' && node.arguments[1]?.type === 'ObjectExpression')
     .map(node => node.arguments[1]);
-  const anchored = nativeDivs.filter(props => anchors.has(prop(prop(props, 'style'), 'positionAnchor')?.name));
+  const positionAnchor = props => {
+    const style = prop(props, 'style');
+    if (style?.type !== 'Identifier') return prop(style, 'positionAnchor');
+    // The current compiler memoizes the interactive header's style object.
+    // Resolve only literal object assignments in this renderer's own scope;
+    // do not mistake a same-named binding in a nested renderer for its anchor.
+    const owner = nativeFunction(header, props.start);
+    const boundStyles = ownNodes(owner.ast).flatMap(node => {
+      if (node.type === 'VariableDeclarator' && node.id?.name === style.name) return [node.init];
+      if (node.type === 'AssignmentExpression' && node.left.type === 'Identifier' &&
+          node.left.name === style.name) return [node.right];
+      return [];
+    }).filter(node => node?.type === 'ObjectExpression' && anchors.has(prop(node, 'positionAnchor')?.name));
+    assert.ok(boundStyles.length <= 1, `${drift}: ambiguous memoized anchor style`);
+    return prop(boundStyles[0], 'positionAnchor');
+  };
+  const anchored = nativeDivs.filter(props => anchors.has(positionAnchor(props)?.name));
   const isTrue = node => node?.type === 'Literal' && node.value === true ||
     node?.type === 'UnaryExpression' && node.operator === '!' && node.argument?.value === 0;
   const decorative = anchored.filter(props => isTrue(prop(props, 'aria-hidden')) &&

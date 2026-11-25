@@ -79,7 +79,7 @@ export const MARK_CLASSES = [
 ];
 
 const RUNTIME_KEY = '__wukongCodexThemeRuntimeV13';
-export const RUNTIME_REVISION = 'v134-status-rail-compositing';
+export const RUNTIME_REVISION = 'v135-transcript-occlusion';
 const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV13',
   '__wukongCodexForgeRuntimeV4',
@@ -93,7 +93,169 @@ const RETIRED_RUNTIME_KEYS = [
   '__wukongCodexForgeRuntimeV12'
 ];
 
-function applyRuntime(payload, createAdapter, createPluginTheme) {
+// Mask only the native transcript sibling. The default footer is inside the
+// scrollport, so masking that scrollport would also mask its input and controls.
+export function createTranscriptOcclusion({ document, getComputedStyle,
+  requestAnimationFrame, cancelAnimationFrame }) {
+  const disposeEvent = 'wukong-codex-transcript-dispose';
+  document.dispatchEvent(new Event(disposeEvent));
+  const marker = 'data-forge-transcript-occlusion';
+  const properties = ['--forge-transcript-mask', '--forge-transcript-mask-size', '--forge-transcript-mask-y'];
+  const bindings = new Map();
+  let disposed = false;
+  const removePaint = binding => {
+    binding.enabled = false;
+    binding.wrapper.removeAttribute(marker);
+    properties.forEach(property => binding.wrapper.style.removeProperty(property));
+  };
+  const clear = binding => {
+    binding.scroller.removeEventListener('scroll', binding.onScroll);
+    if (binding.frame) cancelAnimationFrame(binding.frame);
+    removePaint(binding);
+  };
+  const setProperty = (element, property, value) => {
+    if (element.style.getPropertyValue(property) !== value) element.style.setProperty(property, value);
+  };
+  const number = value => Math.round(value * 100) / 100;
+  const paint = binding => {
+    if (!binding.enabled) return;
+    setProperty(binding.wrapper, properties[2], `${number(binding.base + binding.scroller.scrollTop)}px`);
+    if (!binding.wrapper.hasAttribute(marker)) binding.wrapper.setAttribute(marker, 'true');
+  };
+  const roundedPath = (rect, style, origin) => {
+    const left = number(rect.left - origin.left), right = number(rect.right - origin.left);
+    const top = number(rect.top - origin.top), bottom = number(rect.bottom - origin.top);
+    const radius = value => {
+      const parts = value.split(/\s+/);
+      const px = (part, size) => Math.max(0,
+        parseFloat(part) * (part.includes('%') ? size / 100 : 1) || 0);
+      return [px(parts[0], rect.width), px(parts[1] || parts[0], rect.height)];
+    };
+    const radii = [style.borderTopLeftRadius, style.borderTopRightRadius,
+      style.borderBottomRightRadius, style.borderBottomLeftRadius].map(radius);
+    const [a, b, c, d] = radii;
+    // CSS scales all eight radii together when adjacent corners overlap.
+    const scale = Math.min(1, rect.width / (a[0] + b[0] || 1),
+      rect.width / (d[0] + c[0] || 1), rect.height / (a[1] + d[1] || 1),
+      rect.height / (b[1] + c[1] || 1));
+    const [tl, tr, br, bl] = radii.map(pair => pair.map(value => number(value * scale)));
+    return `M${left + tl[0]} ${top}H${right - tr[0]}A${tr[0]} ${tr[1]} 0 0 1 ${right} ${top + tr[1]}` +
+      `V${bottom - br[1]}A${br[0]} ${br[1]} 0 0 1 ${right - br[0]} ${bottom}` +
+      `H${left + bl[0]}A${bl[0]} ${bl[1]} 0 0 1 ${left} ${bottom - bl[1]}` +
+      `V${top + tl[1]}A${tl[0]} ${tl[1]} 0 0 1 ${left + tl[0]} ${top}Z`;
+  };
+  const measure = binding => {
+    const viewport = binding.scroller.getBoundingClientRect();
+    const content = binding.wrapper.getBoundingClientRect();
+    const footer = binding.footer.getBoundingClientRect();
+    if (viewport.width <= 0 || viewport.height <= 0 || footer.height <= 0 ||
+        getComputedStyle(binding.footer).visibility === 'hidden') {
+      removePaint(binding);
+      return;
+    }
+    // Native paint boxes, not the full-width footer, define the cutout. Black
+    // paths in a luminance mask form a union even when surfaces overlap.
+    const surfaces = [...binding.layout.querySelectorAll(
+      '.composer-surface-chrome, [data-composer-surface-variant], [data-composer-rail-item]')]
+      .filter(node => !binding.wrapper.contains(node));
+    const shapes = [], clips = new Map(), geometry = new Map();
+    const origin = { left: content.left, top: viewport.top };
+    const read = node => {
+      if (!geometry.has(node)) geometry.set(node, {
+        rect: node.getBoundingClientRect(), style: getComputedStyle(node)
+      });
+      return geometry.get(node);
+    };
+    for (const surface of surfaces) {
+      const { rect, style } = read(surface);
+      if (rect.width <= 0 || rect.height <= 0 || style.visibility === 'hidden') continue;
+      let shape = `<path fill="black" d="${roundedPath(rect, style, origin)}"/>`;
+      // Rail.Item is square in an attached rail. Its visible corners belong to
+      // the overflow-clipping Rail ancestor, including the native portal target.
+      for (let parent = surface.parentElement; parent && parent !== binding.layout; parent = parent.parentElement) {
+        const { rect: outer, style: outerStyle } = read(parent);
+        if (!['clip', 'hidden', 'auto', 'scroll'].some(value =>
+          outerStyle.overflowX === value || outerStyle.overflowY === value)) continue;
+        if (!clips.has(parent)) clips.set(parent, {
+          id: `c${clips.size}`, path: roundedPath(outer, outerStyle, origin)
+        });
+        shape = `<g clip-path="url(#${clips.get(parent).id})">${shape}</g>`;
+      }
+      shapes.push(shape);
+    }
+    if (!shapes.length) { removePaint(binding); return; }
+    binding.targets = [binding.scroller, binding.footer, binding.footer.parentElement, ...surfaces, ...clips.keys()];
+    binding.base = viewport.top - content.top - binding.scroller.scrollTop;
+    const width = number(content.width), height = number(viewport.height);
+    const definitions = [...clips.values()].map(clip =>
+      `<clipPath id="${clip.id}"><path d="${clip.path}"/></clipPath>`).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+      `<defs>${definitions}</defs><path fill="white" d="M0 0H${width}V${height}H0Z"/>${shapes.join('')}</svg>`;
+    setProperty(binding.wrapper, properties[0], `url("data:image/svg+xml,${encodeURIComponent(svg)}")`);
+    setProperty(binding.wrapper, properties[1], `${width}px ${height}px`);
+    binding.enabled = true;
+    paint(binding);
+  };
+  const refresh = () => {
+    if (disposed) return;
+    const active = new Set();
+    for (const scroller of document.querySelectorAll('.thread-scroll-container')) {
+      const wrapper = [...scroller.children].find(child => [...child.children]
+        .some(node => node.hasAttribute('data-thread-user-message-navigation-content')));
+      const layout = scroller.parentElement;
+      if (!wrapper || !layout) continue;
+      const footer = [...layout.querySelectorAll('[data-thread-scroll-footer="true"]')]
+        .find(node => !wrapper.contains(node) &&
+          (!node.closest('.thread-scroll-container') || node.closest('.thread-scroll-container') === scroller) &&
+          node.getBoundingClientRect().height > 0);
+      if (!footer) continue;
+      active.add(scroller);
+      let binding = bindings.get(scroller);
+      if (binding && (binding.wrapper !== wrapper || binding.footer !== footer)) {
+        clear(binding);
+        bindings.delete(scroller);
+        binding = null;
+      }
+      if (!binding) {
+        binding = { scroller, wrapper, layout, footer, base: 0, frame: 0, targets: [] };
+        binding.onScroll = () => {
+          if (binding.frame || disposed) return;
+          binding.frame = requestAnimationFrame(() => {
+            binding.frame = 0;
+            if (!disposed) paint(binding);
+          });
+        };
+        scroller.addEventListener('scroll', binding.onScroll, { passive: true });
+        bindings.set(scroller, binding);
+      }
+      measure(binding);
+    }
+    for (const [scroller, binding] of bindings) {
+      if (!active.has(scroller)) { clear(binding); bindings.delete(scroller); }
+    }
+  };
+  const dispose = () => {
+    disposed = true;
+    document.removeEventListener(disposeEvent, dispose);
+    for (const binding of bindings.values()) clear(binding);
+    bindings.clear();
+  };
+  document.addEventListener(disposeEvent, dispose);
+  return {
+    refresh,
+    resizeTargets: () => [...new Set([...bindings.values()].flatMap(binding => binding.targets).filter(Boolean))],
+    handleResize: entries => {
+      if (disposed) return;
+      const targets = new Set(entries.map(entry => entry.target));
+      for (const binding of bindings.values()) {
+        if (binding.targets.some(target => targets.has(target))) measure(binding);
+      }
+    },
+    dispose
+  };
+}
+
+function applyRuntime(payload, createAdapter, createPluginTheme, createOcclusion) {
   const root = document.documentElement;
   const runtimeKey = payload.runtimeKey;
   const markClasses = payload.markClasses;
@@ -1344,7 +1506,8 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
       '[data-testid="home-icon"]',
       '[data-vscode-context*="supportsNewChatMenu"] [role="main"]'
     ].join(','))];
-    setResizeTargets([
+    state.transcriptOcclusion.refresh();
+    const standardResizeTargets = [
       workspace,
       ...topbarTargets,
       ...composerTargets,
@@ -1352,7 +1515,9 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
       ...rightPanelTargets,
       ...pageTargets,
       ...landingMountTargets
-    ]);
+    ];
+    state.standardResizeTargets = new Set(standardResizeTargets);
+    setResizeTargets([...standardResizeTargets, ...state.transcriptOcclusion.resizeTargets()]);
     state.lastRefreshDurationMs = performance.now() - refreshStartedAt;
     state.maxRefreshDurationMs = Math.max(state.maxRefreshDurationMs || 0, state.lastRefreshDurationMs);
   };
@@ -1368,6 +1533,7 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
     observer: null,
     resizeObserver: null,
     observedResizeTargets: [],
+    standardResizeTargets: new Set(),
     lastRefreshAt: 0,
     timer: 0,
     timerDueAt: 0,
@@ -1990,7 +2156,10 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
     }
   });
   const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(entries => {
-    const regions = entries.map(entry => changedRegion(entry.target));
+    state.transcriptOcclusion.handleResize(entries);
+    const standardEntries = entries.filter(entry => state.standardResizeTargets.has(entry.target));
+    if (!standardEntries.length) return;
+    const regions = standardEntries.map(entry => changedRegion(entry.target));
     scheduleRefresh(undefined, regions.every(Boolean) ? regions : ['all']);
   }) : null;
   const syncNativeTheme = () => {
@@ -2050,6 +2219,7 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
   state.resizeObserver = resizeObserver;
   state.dispose = () => {
     state.disposed = true;
+    state.transcriptOcclusion.dispose();
     regionCache.clear();
     pendingRegions.clear();
     root.style.removeProperty('--forge-shell-dark-alpha');
@@ -2104,6 +2274,9 @@ function applyRuntime(payload, createAdapter, createPluginTheme) {
   state.patchedReplaceState = history.replaceState;
   window[runtimeKey] = state;
   state.pluginSuggestions = createPluginTheme(document);
+  state.transcriptOcclusion = createOcclusion({ document, getComputedStyle,
+    requestAnimationFrame: callback => window.requestAnimationFrame(callback),
+    cancelAnimationFrame: frame => window.cancelAnimationFrame(frame) });
   refresh();
   /*
    * Bounded startup probes cover React mounting the home hero after the first
@@ -2142,7 +2315,7 @@ export function makeApplyExpression({ styleSheet, variables, sourceFingerprint =
     retiredRuntimeKeys: RETIRED_RUNTIME_KEYS,
     nativeSelectors: NATIVE_UI_SELECTORS
   });
-  return `(${applyRuntime.toString()})(${payload}, ${createNativeUiAdapter.toString()}, ${createPluginSuggestionTheme.toString()})`;
+  return `(${applyRuntime.toString()})(${payload}, ${createNativeUiAdapter.toString()}, ${createPluginSuggestionTheme.toString()}, ${createTranscriptOcclusion.toString()})`;
 }
 
 export const THEME_STATE_EXPRESSION = `(() => {
@@ -2306,6 +2479,7 @@ export const isNativeThemeState = state => Boolean(state) &&
   state.runtimeV13 === false;
 
 export const RESTORE_EXPRESSION = `(async () => {
+  document.dispatchEvent(new Event('wukong-codex-transcript-dispose'));
   const guestCleanup = [];
   for (const runtimeKey of [${[...RETIRED_RUNTIME_KEYS, RUNTIME_KEY].map(key => `'${key}'`).join(',')}]) {
     const runtime = window[runtimeKey];
@@ -2335,6 +2509,12 @@ export const RESTORE_EXPRESSION = `(async () => {
     element.style.removeProperty('--forge-image-viewer-scene-position');
     element.classList.remove(${MARK_CLASSES.map(name => `'${name}'`).join(',')});
     delete element.dataset.forgeMark;
+  });
+  document.querySelectorAll('[data-forge-transcript-occlusion]').forEach(element => {
+    element.removeAttribute('data-forge-transcript-occlusion');
+    element.style.removeProperty('--forge-transcript-mask');
+    element.style.removeProperty('--forge-transcript-mask-size');
+    element.style.removeProperty('--forge-transcript-mask-y');
   });
   document.documentElement.classList.remove('forge-ink-mountain');
   delete document.documentElement.dataset.forgeSurface;

@@ -28,16 +28,24 @@ const loadRows=()=>{
   const row=one(bundle.findModules(['highlightOnFocus','"group w-full items-center"']),'Native clickable settings row changed');
   const clickableExport=one(Object.entries(bundle.exports(row)).filter(([,fn])=>nodes(fn).some(node=>text(node)==='group w-full items-center')),'Clickable row presentation export changed')[0];
   const wrapperCandidates=bundle.findModules(['"AWNZ"','searchAnchor:','entry:']);
-  const metadata=one(bundle.findModules(['id:"personalization-custom-rules"']),'Custom rules metadata changed');
-  const entryNode=one(nodes(metadata.ast).filter(node=>node.type==='ObjectExpression'&&text(prop(node,'id'))==='personalization-custom-rules'),'Custom rules entry changed');
-  const title=one(nodes(metadata.ast).filter(node=>node.type==='ObjectExpression'&&text(prop(node,'id'))==='settings.userRules.title'),'Custom rules title changed');
+  const metadata=one(bundle.findModules(['id:"security-linked-apps"']),'Current settings entry metadata changed');
+  const entryNode=one(nodes(metadata.ast).filter(node=>node.type==='ObjectExpression'&&text(prop(node,'id'))==='security-linked-apps'),'Current settings entry entry changed');
+  const title=one(nodes(metadata.ast).filter(node=>node.type==='ObjectExpression'&&text(prop(node,'id'))==='settings.chatGpt.security.overview.linkedApps.title'),'Current settings entry title changed');
   const entry={section:text(prop(entryNode,'section')),id:text(prop(entryNode,'id')),title:nativeObject(metadata,title)};
   const callers=bundle.findModules([`"${metadata.id}"`]);
   const calls=callers.flatMap(record=>nodes(record.ast).filter(node=>node.type==='CallExpression'&&
     wrapperCandidates.some(candidate=>candidate.id===bundle.imports(record)[node.arguments[0]?.object?.name]?.id)&&
-    bundle.imports(record)[prop(node.arguments[1],'entry')?.object?.name]?.id===metadata.id&&
+    prop(node.arguments[1],'entry')?.object?.type==='MemberExpression'&&
+    bundle.imports(record)[prop(node.arguments[1],'entry').object.object.name]?.id===metadata.id&&
+    key(prop(node.arguments[1],'entry').property)==='linkedApps'&&
     text(prop(node.arguments[1],'edgeRounding'))==='surface').map(call=>({record,call})));
-  const caller=one(calls,'Custom rules must retain its actual surface-rounded caller');
+  const caller=one(calls,'Current settings entry must retain its actual surface-rounded caller');
+  // The former Custom rules entry is absent in this client. Preserve the same
+  // generic Row feedback coverage through the current real linked-apps caller.
+  const entryReference=prop(caller.call.arguments[1],'entry');
+  const registryExport=bundle.exports(metadata)[key(entryReference.object.property)];
+  const registry=registryExport?.type==='Identifier'?ownNodes(metadata.ast).find(node=>node.type==='VariableDeclarator'&&node.id.name===registryExport.name)?.init:registryExport;
+  assert.equal(prop(registry,key(entryReference.property)),entryNode,'The actual caller must resolve to this exact metadata entry through its exported registry');
   const wrappers=bundle.module(bundle.imports(caller.record)[caller.call.arguments[0].object.name].id),wrapperExport=key(caller.call.arguments[0].property);
   assert.ok(nodes(bundle.exports(wrappers)[wrapperExport]).some(node=>node.type==='CallExpression'&&key(node.arguments[0]?.property)===clickableExport),
     'The actual settings entry wrapper must use the native clickable row');
@@ -71,8 +79,7 @@ const loadRows=()=>{
   const iconModules=['ESTr','ZWS5','RyCm','Y62k','HOLv','gT86','yX0s','GCsp','lCMb','UxN3','FyDI'];
   const harness=presentationHarness(bundle,[row.id,wrappers.id,expand.id,divider.id,card.id,...iconModules]);
   const renderEntry=harness.load(wrappers.id)[wrapperExport],renderTrigger=harness.compile(trigger),renderExpand=harness.load(expand.id)[expandExport],renderCard=harness.load(card.id)[cardExport];
-  const customCaller=nativeFunction(caller.record,caller.call.start);
-  const customArrowCall=one(customCaller.nodes.filter(node=>node.type==='CallExpression'&&key(node.arguments[0]?.property)==='uM3'),'Actual Custom rules chevron call changed');
+  const customArrowCall=one(nodes(prop(caller.call.arguments[1],'trailing')).filter(node=>node.type==='CallExpression'&&key(node.arguments[0]?.property)==='uM3'),'Actual current settings entry chevron call changed');
   const iconRecord=bundle.module(bundle.imports(caller.record)[customArrowCall.arguments[0].object.name].id);
   const iconAlias=bundle.exports(iconRecord)[key(customArrowCall.arguments[0].property)];
   const iconFactory=ownNodes(iconRecord.ast).find(node=>node.type==='VariableDeclarator'&&node.id.name===iconAlias.name)?.init;
@@ -106,7 +113,7 @@ const loadRows=()=>{
     if(spinner){spinner.props.id='custom-loading';walk(spinner).filter(node=>node.tag==='svg').forEach(node=>node.props.id='custom-loading-svg');}
     const tree=renderEntry({entry:{...entry,id,title:disabled?{localizedText:'Disabled fixture'}:entry.title},edgeRounding:'surface',disabled,
       description:'Manage permissions and global rules',trailing:[spinner,!pending&&count>0?String(count):null,markArrow(CustomArrow({}),'custom',id)],onClick:customClick});
-    const button=one(walk(tree).filter(node=>node.tag==='button'),'Native custom-rules button missing');button.props.id=id+'-button';
+    const button=one(walk(tree).filter(node=>node.tag==='button'),'Native settings-entry button missing');button.props.id=id+'-button';
     assert.equal(button.props.onClick,customClick,'The native entry must preserve its caller click handler');
     return tree;
   };
@@ -161,7 +168,7 @@ test('native settings row feedback follows hover and keyboard focus without turn
             document.getElementById('import-arrow').setAttribute('class',next.arrowClass);
             document.getElementById('import-history-fixture')?.remove();if(next.content)root.insertAdjacentHTML('beforeend',next.content);
           };
-          document.getElementById('personalization-custom-rules-button').onclick=eval('('+custom+')');
+          document.getElementById('security-linked-apps-button').onclick=eval('('+custom+')');
           document.getElementById('import-toggle').onclick=eval('('+imported+')');
         },{custom:native.customClick.toString(),imported:native.importClick.toString(),toggle:native.toggle.toString()});
         const style=await page.addStyleTag({content:old.toString()});
@@ -220,26 +227,26 @@ test('native settings row feedback follows hover and keyboard focus without turn
           if(target)assert.equal(after[target].active,true);
           await remove();assert.deepEqual(await capture(),baseline,'Theme removal restores native feedback and state');await apply();return after;
         };
-        await reset();await apply();await page.locator('#personalization-custom-rules-button').click();await page.mouse.move(1000,800);
-        assert.equal(await page.locator('#personalization-custom-rules-button').evaluate(e=>e.matches(':focus-visible')),false);
-        assert.notEqual((await capture())['personalization-custom-rules'].paint[0],'rgba(0, 0, 0, 0)','Old CSS preserves the clicked focus-within gray block');
+        await reset();await apply();await page.locator('#security-linked-apps-button').click();await page.mouse.move(1000,800);
+        assert.equal(await page.locator('#security-linked-apps-button').evaluate(e=>e.matches(':focus-visible')),false);
+        assert.notEqual((await capture())['security-linked-apps'].paint[0],'rgba(0, 0, 0, 0)','Old CSS preserves the clicked focus-within gray block');
         await style.evaluate((e,css)=>e.textContent=css,theme);
-        assert.equal((await capture())['personalization-custom-rules'].paint[0],'rgba(0, 0, 0, 0)','Mouse focus after leaving does not persist as selected paint');
+        assert.equal((await capture())['security-linked-apps'].paint[0],'rgba(0, 0, 0, 0)','Mouse focus after leaving does not persist as selected paint');
         await reset();await verify('idle');
-        await page.locator('#personalization-custom-rules-button').hover();await verify('custom hover','personalization-custom-rules');
+        await page.locator('#security-linked-apps-button').hover();await verify('custom hover','security-linked-apps');
         const pending=native.custom(native.entry.id,false,{pending:true});
         const pendingTrailing=walk(pending).find(node=>node.props?.className?.split(' ').includes('col-start-3'));
-        await page.locator('#personalization-custom-rules-button > .col-start-3').evaluate((e,value)=>e.innerHTML=value,html(pendingTrailing.props.children));
-        await verify('loading icon isolation','personalization-custom-rules');
+        await page.locator('#security-linked-apps-button > .col-start-3').evaluate((e,value)=>e.innerHTML=value,html(pendingTrailing.props.children));
+        await verify('loading icon isolation','security-linked-apps');
         assert.equal(await page.locator('#custom-loading [data-fixture-arrow]').count(),0,'The pending indicator is not an action arrow');
         assert.equal(await page.locator('#custom-loading').evaluate(e=>e.getAnimations().some(a=>a.effect?.getTiming().iterations===Infinity&&a.playState==='running')),true,
           'The real native loading spinner keeps running; snapshots compare its layout rather than rotation phase');
         const counted=native.custom(),countedTrailing=walk(counted).find(node=>node.props?.className?.split(' ').includes('col-start-3'));
-        await page.locator('#personalization-custom-rules-button > .col-start-3').evaluate((e,value)=>e.innerHTML=value,html(countedTrailing.props.children));
-        assert.equal(await page.locator('#personalization-custom-rules-button > .col-start-3').evaluate(e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')),'3');
+        await page.locator('#security-linked-apps-button > .col-start-3').evaluate((e,value)=>e.innerHTML=value,html(countedTrailing.props.children));
+        assert.equal(await page.locator('#security-linked-apps-button > .col-start-3').evaluate(e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')),'3');
         await reset();await page.locator('#before-custom').focus();await page.keyboard.press('Tab');
-        assert.equal(await page.locator('#personalization-custom-rules-button').evaluate(e=>e.matches(':focus-visible')),true);
-        await verify('custom keyboard','personalization-custom-rules');
+        assert.equal(await page.locator('#security-linked-apps-button').evaluate(e=>e.matches(':focus-visible')),true);
+        await verify('custom keyboard','security-linked-apps');
         await reset();await page.locator('#import-toggle').hover();await verify('import hover','import-toggle');
         await reset();await page.locator('#before-import').focus();await page.keyboard.press('Tab');
         assert.equal(await page.locator('#import-toggle').evaluate(e=>e.matches(':focus-visible')),true);await verify('import keyboard','import-toggle');
@@ -261,7 +268,7 @@ test('native settings row feedback follows hover and keyboard focus without turn
         await page.locator('#import-toggle').click();await page.waitForFunction(()=>document.getElementById('import-toggle').getAttribute('aria-expanded')==='false');
         assert.equal(await page.locator('#import-history-fixture').count(),0);assert.equal(await page.evaluate(()=>fixtureImportClicks),2);
         assert.equal(await page.evaluate(()=>fixtureCustomClicks),1);
-        await reset();await remove();await page.emulateMedia({forcedColors:'active'});await page.locator('#personalization-custom-rules-button').hover();
+        await reset();await remove();await page.emulateMedia({forcedColors:'active'});await page.locator('#security-linked-apps-button').hover();
         const forced=await capture();await apply();assert.deepEqual(await capture(),forced,'Forced colors retain all native row feedback');
         await page.emulateMedia({forcedColors:'none'});
         if(process.env.WUKONG_SETTINGS_ROW_PREVIEW_DIRECTORY&&scope==='data-settings-panel'){

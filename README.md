@@ -2,17 +2,17 @@
 
 为 Windows Codex / ChatGPT 桌面客户端带来悟空背景与玻璃材质，支持深色和浅色主题。内置 10 张战斗图与 3 张风景图，可用快捷键切换。
 
-**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.16/Wukong-Codex-Theme-0.18.16-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
+**[下载 Windows 运行包](https://github.com/Udkam/wukong-codex-theme/releases/download/v0.18.17/Wukong-Codex-Theme-0.18.17-Windows.zip)** · [使用说明](docs/QUICK_START.txt) · [更新记录](https://github.com/Udkam/wukong-codex-theme/releases)
 
 ## 效果预览
 
-悟空场景与深浅玻璃材质。本轮调整状态条与标签页绘制，以下展示目标条和排队消息的深浅色效果。[组件预览](docs/previews/README.md)
+悟空场景与深浅玻璃材质。v0.18.17 让正文沿输入框、Goal 和排队消息的真实外形避让，半透明输入区只透壁纸，保留圆角外和两侧正文。[版本状态](docs/CURRENT_GOAL.md) · [组件预览](docs/previews/README.md)
 
 | 深色 | 浅色 |
 | :---: | :---: |
-| ![深色目标与排队消息组件夹具](docs/previews/dark-goal-queue-fixture-20261124.png) | ![浅色目标与排队消息组件夹具](docs/previews/light-goal-queue-fixture-20261124.png) |
+| ![深色正文轮廓避让组件夹具](docs/previews/dark-transcript-occlusion-fixture-20261125.png) | ![浅色正文轮廓避让组件夹具](docs/previews/light-transcript-occlusion-fixture-20261125.png) |
 
-预览使用 Windows Codex 26.1117.4957.0 的原生结构、样式与示例内容生成，属于组件夹具；具体变化见 [发行说明](docs/RELEASE_0.18.16.md)，检查与实机验收情况见 [验证记录](docs/VALIDATION.md)。
+预览由 Windows Codex 26.1120.5083.0 的原生结构、样式及示例内容生成，属于组件夹具，并非实际聊天截图。输入框的现有透明度、字体、尺寸和背景模糊设置保持；具体检查与用户确认范围见 [验证记录](docs/VALIDATION.md)。
 
 ## 开始使用
 

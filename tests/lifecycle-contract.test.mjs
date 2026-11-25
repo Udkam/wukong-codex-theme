@@ -423,9 +423,10 @@ test('renderer refreshes are structural, throttled, and layout-loop free', () =>
   assert.doesNotMatch(runtime, /setInterval/);
   assert.equal(
     runtime.match(/window\.requestAnimationFrame\(/g)?.length,
-    2,
-    'background transitions may use exactly two one-shot paint frames, never a renderer refresh loop'
+    3,
+    'two background frames and the transcript scroll adapter must remain event-driven, without a refresh loop'
   );
+  assert.match(runtime, /requestAnimationFrame: callback => window\.requestAnimationFrame\(callback\)/);
   assert.match(runtime, /state\.transitionFrameA = window\.requestAnimationFrame\(\(\) =>/);
   assert.match(runtime, /state\.transitionFrameB = window\.requestAnimationFrame\(beginTransition\)/);
   assert.match(runtime, /state\.transitionArmTimer = window\.setTimeout\(beginTransition, 64\)/);

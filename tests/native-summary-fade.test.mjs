@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import postcss from 'postcss';
 import { loadNativeBundle, nativeFunction, presentationHarness } from './native-bundle-current-helper.mjs';
 import { chromium } from '@playwright/test';
 
@@ -69,9 +70,18 @@ const loadNative = () => {
   assert.equal(summaryRecords.length, 1, drift);
   const summary = summaryRecords[0], summaryClasses = nodes(summary.ast).map(text).find(value => value.includes('group/summary-panel'));
   assert.ok(summaryClasses, drift);
-  const css = bundle.css('controlSurface-');
-  const controlClass = css.match(/\.(controlSurface-[\w-]+)\{background:linear-gradient\(var\(--color-background-viewer-control\)/)?.[1];
-  assert.ok(controlClass, `${drift}: viewer control material changed`);
+  const controlMaps = bundle.findModules('controlSurface-').flatMap(record => Object.values(bundle.exports(record))
+    .filter(expression => text(prop(expression, 'controlSurface')).startsWith('controlSurface-')));
+  assert.equal(controlMaps.length, 1, `${drift}: viewer control CSS map changed`);
+  const controlClass = text(prop(controlMaps[0], 'controlSurface')), css = bundle.css(controlClass);
+  let nativeMaterial = false;
+  postcss.parse(css).walkRules(rule => {
+    if (!rule.selector.split(',').some(selector => selector.trim() === '.' + controlClass)) return;
+    rule.walkDecls('background', declaration => {
+      if (/^linear-gradient\(var\(--color-background-viewer-control\)/.test(declaration.value)) nativeMaterial = true;
+    });
+  });
+  assert.ok(nativeMaterial, `${drift}: viewer control material changed`);
   cachedNative = { bundle, css, render: harness.load(record.id)[exported], consumers, summaryAst: summary.ast, summaryRecord: summary, summaryClasses, controlClass, drift };
   return cachedNative;
 };
