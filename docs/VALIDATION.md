@@ -10,7 +10,9 @@ Windows ZIP 为 **4,062,244 字节、38 文件**。36 个 app 文件逐项对应
 
 使用同一 ZIP 解压包恢复原生，原生状态断言通过，新增正文遮罩节点及变量均为 0。随后由同包重新应用返回 verified=true、deferred=false，前台读回 documentHidden=false、isActiveThemeState=true、壁纸就绪及 v135 一致；完整样式 SHA-256 `58f67a718dfd186048500a6fdd6750103a641ff465d1f6b5411b933bdfbc5fd6` 与包内 CSS 及主题变量一致，现场有两条可见 rail Item。该读回不替代此前用户对三处贴合的确认。冷启动与卸载本轮未执行。
 
-ZIP SHA-256 为 `565754f21d8a4909e362d9ff81d0f6ae57d4fe3e1142dc968ab6b54a30d179b3`；105 字节校验文件 SHA-256 为 `68705df1b991204216dfffac3388e54dd0984dabd03bac1d9020ba8350605fa8`。资产保留于 release/0.18.17，紧凑验证记录位于忽略的 work/release-01817-20261125。GitHub 发行、资产回下载及清理结果完成后补记。
+ZIP SHA-256 为 `565754f21d8a4909e362d9ff81d0f6ae57d4fe3e1142dc968ab6b54a30d179b3`；105 字节校验文件 SHA-256 为 `68705df1b991204216dfffac3388e54dd0984dabd03bac1d9020ba8350605fa8`。资产保留于 release/0.18.17，紧凑验证记录位于忽略的 work/release-01817-20261125。发行提交为 `3ec8bb5a7f7061bda9f7ccccac1f9bbbf587b5e3`，main 与 v0.18.17 标签均已推送。[GitHub Release](https://github.com/Udkam/wukong-codex-theme/releases/tag/v0.18.17) 回读为 Latest，非草稿、非预发行。ZIP 和校验文件重新下载后逐字节匹配本地资产，大小、SHA-256 与 GitHub asset digest 一致；回下载 ZIP 的 CRC 和 38 个包内文件均再次对应本地包。发行标题与正文也已核对一致。
+
+独立源码、构建目录、解压目录、回下载副本及测试临时目录已清理；共享依赖的唯一 Junction 先单独移除并核验，原依赖目录保留。Studio 5192 无监听，原有工作区材料保留。最终日志、Git blob 与哈希清单、本机和远端读回仅保留于忽略的 work/release-01817-20261125，不进入下载包。[清理记录](CLEANUP.md)
 
 
 ## v135-transcript-occlusion（2026-11-25，开发验证）
